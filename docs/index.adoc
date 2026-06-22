@@ -15,16 +15,19 @@ the behavior currently implemented in `rust-core`.
 
 == Documented Renderer Surface
 
-The behavior documented here is the renderer behavior implemented by these Rust
-types and functions:
+The behavior documented here is exported by the Rust library in
+`rust-core/src/lib.rs`:
 
 * `RuleSet::from_config`
 * `RuleSet::render_rule`
 * `render_config_rule`
 * `RenderError`
+* `ruleset_from_hocon_str`
+* `ruleset_from_hocon_file`
+* `render_hocon_str`
+* `render_hocon_file`
 
-These items currently live in `rust-core/src/main.rs`; `rust-core/src/lib.rs`
-does not yet export them as the crate's public library API.
+The package also builds:
 
-The current binary `main` function is useful as a local demo harness, but it is
-not documented as a supported CLI.
+* a `copperlace` CLI with `render --config <path> --rule <name>`;
+* a C ABI dynamic library with an opaque ruleset handle API.

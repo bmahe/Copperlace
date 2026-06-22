@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::fmt;
 
 use rand::seq::IndexedRandom;
 use regex::Regex;
@@ -11,6 +12,24 @@ pub enum RenderError {
     UnsupportedValue(String),
     InvalidConfigRoot,
 }
+
+impl fmt::Display for RenderError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            RenderError::UnknownRule(rule) => write!(formatter, "unknown rule: {rule}"),
+            RenderError::EmptyChoice => write!(formatter, "cannot render an empty choice"),
+            RenderError::CircularRuleReference(cycle) => {
+                write!(formatter, "circular rule reference: {}", cycle.join(" -> "))
+            }
+            RenderError::UnsupportedValue(value_type) => {
+                write!(formatter, "unsupported value type: {value_type}")
+            }
+            RenderError::InvalidConfigRoot => write!(formatter, "config root must be an object"),
+        }
+    }
+}
+
+impl std::error::Error for RenderError {}
 
 pub struct RenderState<'a> {
     ruleset: &'a RuleSet,
@@ -381,42 +400,6 @@ impl Node for UnsupportedValueNode {
     fn render(&self, _state: &mut RenderState) -> Result<String, RenderError> {
         Err(RenderError::UnsupportedValue(self.value_type.clone()))
     }
-}
-
-fn main() {
-    let result = hocon_rs::Config::load("example.conf", None);
-
-    let config: hocon_rs::Value = result.unwrap();
-
-    let origin: &hocon_rs::Value = config.get_by_path(["mood"]).unwrap();
-
-    match origin {
-        hocon_rs::Value::Array(arr) => {
-            println!("Array:");
-            for item in arr {
-                println!("  {:?}", item);
-            }
-        }
-        _ => println!("Not an array"),
-    }
-    println!("|{:?}|", origin);
-    let t = "Bruno";
-    println!("Hello, world! {:?}", t);
-
-    let test_string = "Hello {hero} Murphy! { name} or {name}";
-
-    let mut context: HashMap<String, String> = HashMap::new();
-    context.insert("hero".to_string(), "Bruno".to_string());
-
-    let ruleset = RuleSet::from_config(config.clone()).unwrap();
-    println!(
-        "Rendered origin rule: {}",
-        ruleset.render_rule("origin").unwrap()
-    );
-    println!(
-        "Rendered story rule: {}",
-        ruleset.render_rule("story").unwrap()
-    );
 }
 
 #[cfg(test)]

@@ -38,7 +38,10 @@ The detailed behavior and configuration contract lives in `docs/`:
 
 == Current Status
 
-The current implementation surface is the Rust renderer logic in
-`rust-core/src/main.rs`. The crate library does not yet export that renderer
-surface, and the binary entry point is demo/debug-oriented rather than a stable
-command-line interface.
+The renderer is exported through the Rust library in `rust-core/src/lib.rs`.
+The package also builds a `copperlace` CLI binary and a C ABI dynamic library.
+
+[source,sh]
+----
+cargo run --bin copperlace -- render --config rust-core/example.conf --rule origin
+----

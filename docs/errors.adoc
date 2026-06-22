@@ -1,8 +1,8 @@
 = Errors and API Behavior
 
 This page documents the current Rust renderer entry points and error behavior.
-These items currently live in `rust-core/src/main.rs`; they are the renderer
-spec surface, not yet an exported public API from `rust-core/src/lib.rs`.
+The Rust API is exported from `rust-core/src/lib.rs`; the CLI and C ABI dynamic
+library are thin wrappers around that library.
 
 == Entry Points
 
@@ -16,6 +16,38 @@ new thread-local random number generator.
 
 `render_config_rule(config: hocon_rs::Value, rule_name: &str) -> Result<String, RenderError>`::
 Convenience function that compiles the config and renders one rule.
+
+`ruleset_from_hocon_str` / `ruleset_from_hocon_file`::
+Parse HOCON input and compile it into a `RuleSet`.
+
+`render_hocon_str` / `render_hocon_file`::
+Parse HOCON input and render one rule in a single call.
+
+== CLI
+
+The package builds a `copperlace` binary:
+
+[source,sh]
+----
+copperlace render --config <path> --rule <name>
+----
+
+The CLI writes rendered output to stdout. Parse and render errors are written to
+stderr and return a nonzero exit code.
+
+== C ABI
+
+The dynamic library exposes an opaque ruleset handle API:
+
+* `copperlace_ruleset_from_file`
+* `copperlace_ruleset_from_string`
+* `copperlace_ruleset_render`
+* `copperlace_ruleset_free`
+* `copperlace_string_free`
+
+Returned strings are allocated by Copperlace and must be released with
+`copperlace_string_free`. Ruleset handles must be released with
+`copperlace_ruleset_free`.
 
 == Render Context
 
@@ -57,7 +89,6 @@ object.
 
 The current implementation does not define these as supported behavior:
 
-* A stable command-line interface.
 * Escaping literal `{` or `}` characters in templates.
 * Weighted choices.
 * Seeded or deterministic random output.
