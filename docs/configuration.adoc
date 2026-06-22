@@ -1,0 +1,123 @@
+= Copperlace Configuration
+
+Copperlace reads HOCON into `hocon_rs::Value` and compiles the root object into
+a `RuleSet`.
+
+== Root Shape
+
+The config root must be a HOCON object. Any non-object root fails compilation
+with `InvalidConfigRoot`.
+
+[source,hocon]
+----
+origin = "{hero:name}{story}"
+name = ["Mia"]
+story = "{hero} walked home."
+----
+
+== Top-Level Keys
+
+Top-level keys become named rules unless the key is `context` and its value is
+an object.
+
+[source,hocon]
+----
+origin = "{story}"
+story = "A {mood} path"
+mood = [bright, quiet]
+----
+
+Each top-level rule can be rendered directly by passing its key to
+`RuleSet::render_rule`.
+
+== Special `context` Object
+
+When top-level `context` is an object, its entries become lazy default values
+used by template references. They are not inserted into the normal rule table,
+but they can still be rendered by name through `render_rule`.
+
+[source,hocon]
+----
+context = {
+  hero = "{name}"
+}
+----
+
+If top-level `context` is not an object, it is treated as a normal rule named
+`context`.
+
+== String Values
+
+Strings are parsed as templates. Each `{...}` section becomes a render-time
+expression; all other text remains literal.
+
+[source,hocon]
+----
+origin = "Hello {name}"
+----
+
+Supported expressions:
+
+* `{rule}` resolves a bound value, context default, or named rule.
+* `{alias:rule}` binds the rendered `rule` value to `alias` for this render and
+  emits an empty string.
+
+Only the first colon in an expression is treated as the binding separator.
+
+== Array Values
+
+Arrays are random choices. The selected element is rendered using the same value
+rules as a top-level config value.
+
+[source,hocon]
+----
+mood = [vexed, wistful, astute]
+----
+
+An empty array is accepted during `RuleSet` construction, but rendering it fails
+with `EmptyChoice`.
+
+== Scalar Values
+
+Scalar values that are not strings, arrays, or objects are converted to strings
+using the underlying HOCON value's `to_string` behavior.
+
+[source,hocon]
+----
+count = 3
+origin = "Count: {count}"
+----
+
+== Object Values
+
+Objects are supported only as the special top-level `context` value. Any other
+object compiles to an unsupported node and fails at render time with
+`UnsupportedValue("object")`.
+
+[source,hocon]
+----
+origin = { value = "nested" }
+----
+
+== Example Configuration
+
+[source,hocon]
+----
+name = ["Arjun", "Yuuma", "Darcy", "Mia", "Chiaki", "Izzi", "Azra", "Lina"]
+
+animal = [unicorn, raven, sparrow, scorpion, coyote, eagle, owl,
+    lizard, zebra, duck, kitten]
+
+mood = [vexed, indignant, impassioned, wistful, astute, courteous]
+
+story = [
+  "{hero} traveled with her pet {heroPet}. {hero} was never {mood}, for the {heroPet} was always too {mood}."
+]
+
+origin = "{hero:name}{heroPet:animal}{story}"
+
+context = {
+  hero = "{name}"
+  heroPet = "{animal}"
+}
+----

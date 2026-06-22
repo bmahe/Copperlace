@@ -1,0 +1,44 @@
+= Copperlace
+
+Copperlace is a Rust-based text rendering engine driven by HOCON configuration.
+It expands named rules, template references, random choices, and per-render
+bindings into generated text.
+
+== Example
+
+[source,hocon]
+----
+name = ["Arjun", "Yuuma", "Darcy", "Mia"]
+animal = [unicorn, raven, sparrow, owl]
+mood = [vexed, wistful, astute]
+
+story = [
+  "{hero} traveled with her pet {heroPet}. {hero} was never {mood}, for the {heroPet} was always too {mood}."
+]
+
+origin = "{hero:name}{heroPet:animal}{story}"
+
+context = {
+  hero = "{name}"
+  heroPet = "{animal}"
+}
+----
+
+Rendering `origin` first binds `hero` from `name` and `heroPet` from `animal`,
+then renders `story` with those bound values reused for the rest of that render.
+
+== Documentation
+
+The detailed behavior and configuration contract lives in `docs/`:
+
+* link:docs/index.adoc[Documentation index]
+* link:docs/capabilities.adoc[Capabilities]
+* link:docs/configuration.adoc[Configuration]
+* link:docs/errors.adoc[Errors and API behavior]
+
+== Current Status
+
+The current implementation surface is the Rust renderer logic in
+`rust-core/src/main.rs`. The crate library does not yet export that renderer
+surface, and the binary entry point is demo/debug-oriented rather than a stable
+command-line interface.

@@ -1,0 +1,30 @@
+= Copperlace Documentation
+
+This directory documents Copperlace's current renderer behavior and HOCON
+configuration contract. Treat these documents as the working specification for
+the behavior currently implemented in `rust-core`.
+
+== Contents
+
+* link:capabilities.adoc[Capabilities] describes what the renderer can produce
+  and how rendering resolves rules, choices, bindings, and context defaults.
+* link:configuration.adoc[Configuration] describes the accepted HOCON shape and
+  how each supported value type is interpreted.
+* link:errors.adoc[Errors and API behavior] describes public Rust entry points
+  and render error conditions.
+
+== Documented Renderer Surface
+
+The behavior documented here is the renderer behavior implemented by these Rust
+types and functions:
+
+* `RuleSet::from_config`
+* `RuleSet::render_rule`
+* `render_config_rule`
+* `RenderError`
+
+These items currently live in `rust-core/src/main.rs`; `rust-core/src/lib.rs`
+does not yet export them as the crate's public library API.
+
+The current binary `main` function is useful as a local demo harness, but it is
+not documented as a supported CLI.

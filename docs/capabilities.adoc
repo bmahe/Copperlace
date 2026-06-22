@@ -1,0 +1,103 @@
+= Copperlace Capabilities
+
+Copperlace renders text from named HOCON rules. A render starts from one rule
+name, expands any template references it encounters, and returns a single
+string or a `RenderError`.
+
+== Named Rules
+
+Every top-level HOCON key is a renderable rule, except for the special
+top-level `context` object.
+
+[source,hocon]
+----
+name = ["Mia"]
+origin = "Hello {name}"
+----
+
+Rendering `origin` resolves `{name}` by rendering the top-level `name` rule.
+Rendering `name` directly is also valid.
+
+== Templates
+
+String values are parsed as templates. Literal text is copied into the output.
+Expressions inside braces are resolved at render time.
+
+[source,hocon]
+----
+adjective = ["bright"]
+story = "A {adjective} path"
+origin = "{story}"
+----
+
+Template expression whitespace is trimmed, so `{ name }` resolves the same rule
+as `{name}`.
+
+== Random Choices
+
+Array values are random choices. Rendering an array-backed rule chooses one
+child value and renders that value.
+
+[source,hocon]
+----
+mood = [vexed, wistful, astute]
+origin = "The path felt {mood}."
+----
+
+Choice elements may be strings, arrays, or scalar values. Nested object values
+are not renderable outside the special top-level `context` object.
+
+== Bindings
+
+An expression of the form `{alias:rule}` renders `rule`, stores the result under
+`alias` for the current render, and emits no text directly.
+
+[source,hocon]
+----
+name = ["Mia"]
+origin = "{hero:name}{hero}/{hero}"
+----
+
+Rendering `origin` produces `Mia/Mia`. The first expression binds `hero`; later
+`{hero}` references reuse the same value.
+
+Bindings are scoped to one call to `render_rule`. A later render starts with an
+empty render context and may choose different random values.
+
+== Context Defaults
+
+A top-level `context` object defines lazy defaults for names used inside
+templates. When a template references `{name}`, resolution uses this order:
+
+. Existing value already bound in the current render context.
+. Lazy default from top-level `context`.
+. Top-level rule with the same name.
+
+[source,hocon]
+----
+name = ["Mia"]
+animal = ["owl"]
+story = "{hero} and {heroPet}"
+origin = "{story}"
+
+context = {
+  hero = "{name}"
+  heroPet = "{animal}"
+}
+----
+
+Rendering `origin` renders `story`; the first `{hero}` reference renders and
+caches `context.hero`, and the first `{heroPet}` reference renders and caches
+`context.heroPet`.
+
+== Cycle Detection
+
+Copperlace tracks the rule call stack during a render. If a rule attempts to
+render a rule already on the stack, rendering fails with
+`CircularRuleReference`.
+
+[source,hocon]
+----
+a = "{b}"
+b = "{a}"
+----
