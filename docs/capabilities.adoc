@@ -49,6 +49,10 @@ are not renderable outside the special top-level `context` object.
 
 == Bindings
 
+Copperlace supports two binding forms. Both forms emit no text directly.
+
+=== Bind If Missing
+
 An expression of the form `{alias:rule}` ensures `alias` has a value for the
 current render and emits no text directly. If `alias` is missing, Copperlace
 renders `rule` and stores the result under `alias`. If `alias` already exists,
@@ -74,6 +78,21 @@ origin = "{hero:first}{hero:second}{hero}"
 
 Rendering `origin` produces `Mia`. The second binding expression is a no-op
 because `hero` already exists.
+
+=== Overwrite Binding
+
+An expression of the form `{alias:=rule}` always renders `rule`, stores the
+result under `alias`, and replaces any existing value for `alias`.
+
+[source,hocon]
+----
+first = ["Mia"]
+second = ["Darcy"]
+origin = "{hero:first}{hero:=second}{hero}"
+----
+
+Rendering `origin` produces `Darcy`. The overwrite binding replaces the
+previous `hero` value.
 
 Bindings are scoped to one call to `render_rule`. A later render starts with an
 empty render context and may choose different random values.

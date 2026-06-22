@@ -61,8 +61,11 @@ Supported expressions:
 * `{rule}` resolves a bound value, context default, or named rule.
 * `{alias:rule}` binds the rendered `rule` value to `alias` if `alias` is not
   already bound for this render, and emits an empty string.
+* `{alias:=rule}` always renders `rule`, stores the result under `alias`, and
+  emits an empty string.
 
-Only the first colon in an expression is treated as the binding separator.
+Overwrite bindings are parsed before bind-if-missing bindings, so `{alias:=rule}`
+is distinct from `{alias:rule}`.
 
 == Array Values
 

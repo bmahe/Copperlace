@@ -209,26 +209,35 @@ impl Node for RuleCallNode {
     }
 }
 
+/// Controls whether a binding expression preserves or overwrites an existing
+/// value in the render context.
+pub enum BindMode {
+    IfMissing,
+    Overwrite,
+}
+
 /// Binds the output of a child node into the render context without emitting it.
 ///
 /// This is the node generated for `{alias:rule}` expressions. If `alias` is not
 /// already bound, it renders `rule` and stores the result under `alias`. It
-/// always returns an empty string so later `{alias}` references reuse the same
-/// generated value.
+/// also supports `{alias:=rule}` expressions, which always render `rule` and
+/// overwrite `alias`. Binding expressions always return an empty string so
+/// later `{alias}` references reuse the generated value.
 pub struct BindNode {
     name: String,
     node: Box<dyn Node>,
+    mode: BindMode,
 }
 
 impl BindNode {
-    pub fn new(name: String, node: Box<dyn Node>) -> Self {
-        BindNode { name, node }
+    pub fn new(name: String, node: Box<dyn Node>, mode: BindMode) -> Self {
+        BindNode { name, node, mode }
     }
 }
 
 impl Node for BindNode {
     fn render(&self, state: &mut RenderState) -> Result<String, RenderError> {
-        if state.context.contains_key(&self.name) {
+        if matches!(self.mode, BindMode::IfMissing) && state.context.contains_key(&self.name) {
             return Ok(String::new());
         }
 
@@ -332,9 +341,22 @@ fn template_to_node(template: &str) -> Box<dyn Node> {
 }
 
 fn expression_to_node(expression: &str) -> Box<dyn Node> {
+    if let Some((name, source)) = expression.split_once(":=") {
+        let node = Box::new(RuleCallNode::new(source.trim().to_string()));
+        return Box::new(BindNode::new(
+            name.trim().to_string(),
+            node,
+            BindMode::Overwrite,
+        ));
+    }
+
     if let Some((name, source)) = expression.split_once(':') {
         let node = Box::new(RuleCallNode::new(source.trim().to_string()));
-        return Box::new(BindNode::new(name.trim().to_string(), node));
+        return Box::new(BindNode::new(
+            name.trim().to_string(),
+            node,
+            BindMode::IfMissing,
+        ));
     }
 
     Box::new(RuleCallNode::new(expression.to_string()))
@@ -466,6 +488,35 @@ mod tests {
         );
 
         assert_eq!(rules.render_rule("origin").unwrap(), "Mia/Mia");
+    }
+
+    #[test]
+    fn overwrite_binding_replaces_existing_value() {
+        let rules = ruleset(
+            r#"
+            first = ["Mia"]
+            second = ["Darcy"]
+            origin = "{hero:first}{hero:=second}{hero}"
+            "#,
+        );
+
+        assert_eq!(rules.render_rule("origin").unwrap(), "Darcy");
+    }
+
+    #[test]
+    fn overwrite_binding_replaces_context_default_value() {
+        let rules = ruleset(
+            r#"
+            name = ["Mia"]
+            other = ["Darcy"]
+            origin = "{hero}{hero:=other}/{hero}"
+            context = {
+                hero = "{name}"
+            }
+            "#,
+        );
+
+        assert_eq!(rules.render_rule("origin").unwrap(), "Mia/Darcy");
     }
 
     #[test]
