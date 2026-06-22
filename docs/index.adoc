@@ -12,6 +12,8 @@ the behavior currently implemented in `rust-core`.
   how each supported value type is interpreted.
 * link:errors.adoc[Errors and API behavior] describes public Rust entry points
   and render error conditions.
+* link:packaging.adoc[Packaging and language wrappers] describes build
+  workflows, distributable artifacts, and Python/Java wrapper surfaces.
 
 == Documented Renderer Surface
 
@@ -27,7 +29,9 @@ The behavior documented here is exported by the Rust library in
 * `render_hocon_str`
 * `render_hocon_file`
 
-The package also builds:
+The package also builds and packages:
 
 * a `copperlace` CLI with `render --config <path> --rule <name>`;
-* a C ABI dynamic library with an opaque ruleset handle API.
+* a C ABI dynamic library with an opaque ruleset handle API;
+* Python wheels backed by the native library;
+* Java API and native classifier JARs.

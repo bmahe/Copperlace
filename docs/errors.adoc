@@ -1,8 +1,10 @@
 = Errors and API Behavior
 
 This page documents the current Rust renderer entry points and error behavior.
-The Rust API is exported from `rust-core/src/lib.rs`; the CLI and C ABI dynamic
-library are thin wrappers around that library.
+The Rust API is exported from `rust-core/src/lib.rs`; the CLI, C ABI, Python
+wrapper, and Java wrapper are thin layers around that library. See
+link:packaging.adoc[Packaging and language wrappers] for wrapper packaging and
+runtime loading details.
 
 == Entry Points
 
