@@ -39,7 +39,7 @@ pub struct RenderState<'a> {
 }
 
 impl<'a> RenderState<'a> {
-    fn new(ruleset: &'a RuleSet) -> Self {
+    pub fn new(ruleset: &'a RuleSet) -> Self {
         RenderState {
             ruleset,
             context: HashMap::new(),

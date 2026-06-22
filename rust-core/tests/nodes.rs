@@ -1,0 +1,161 @@
+use copperlace::render::{
+    BindMode, BindNode, ChoiceNode, Node, RenderError, RenderState, RuleCallNode, RuleSet,
+    UnsupportedValueNode, VariableNode, VecNode,
+};
+
+fn ruleset(config: &str) -> RuleSet {
+    let value = hocon_rs::Config::parse_str::<hocon_rs::Value>(config, None).unwrap();
+    RuleSet::from_config(value).unwrap()
+}
+
+fn empty_ruleset() -> RuleSet {
+    ruleset("anchor = \"value\"")
+}
+
+#[test]
+fn string_node_renders_literal_value() {
+    let rules = empty_ruleset();
+    let mut state = RenderState::new(&rules);
+    let node = "literal".to_string();
+
+    assert_eq!(node.render(&mut state).unwrap(), "literal");
+}
+
+#[test]
+fn variable_node_reads_value_bound_by_bind_node() {
+    let rules = empty_ruleset();
+    let mut state = RenderState::new(&rules);
+    let bind = BindNode::new(
+        "hero".to_string(),
+        Box::new("Mia".to_string()),
+        BindMode::IfMissing,
+    );
+    let variable = VariableNode::new("hero".to_string());
+
+    assert_eq!(bind.render(&mut state).unwrap(), "");
+    assert_eq!(variable.render(&mut state).unwrap(), "Mia");
+}
+
+#[test]
+fn variable_node_returns_unknown_rule_when_unbound() {
+    let rules = empty_ruleset();
+    let mut state = RenderState::new(&rules);
+    let variable = VariableNode::new("hero".to_string());
+
+    assert_eq!(
+        variable.render(&mut state),
+        Err(RenderError::UnknownRule("hero".to_string()))
+    );
+}
+
+#[test]
+fn rule_call_node_renders_named_rule() {
+    let rules = ruleset("name = [\"Mia\"]");
+    let mut state = RenderState::new(&rules);
+    let node = RuleCallNode::new("name".to_string());
+
+    assert_eq!(node.render(&mut state).unwrap(), "Mia");
+}
+
+#[test]
+fn rule_call_node_renders_and_caches_context_default() {
+    let rules = ruleset(
+        r#"
+        name = ["Mia"]
+        context = {
+            hero = "{name}"
+        }
+        "#,
+    );
+    let mut state = RenderState::new(&rules);
+    let node = RuleCallNode::new("hero".to_string());
+
+    assert_eq!(node.render(&mut state).unwrap(), "Mia");
+    assert_eq!(node.render(&mut state).unwrap(), "Mia");
+}
+
+#[test]
+fn bind_node_if_missing_preserves_existing_value() {
+    let rules = empty_ruleset();
+    let mut state = RenderState::new(&rules);
+    let first = BindNode::new(
+        "hero".to_string(),
+        Box::new("Mia".to_string()),
+        BindMode::IfMissing,
+    );
+    let second = BindNode::new(
+        "hero".to_string(),
+        Box::new("Darcy".to_string()),
+        BindMode::IfMissing,
+    );
+    let variable = VariableNode::new("hero".to_string());
+
+    first.render(&mut state).unwrap();
+    second.render(&mut state).unwrap();
+
+    assert_eq!(variable.render(&mut state).unwrap(), "Mia");
+}
+
+#[test]
+fn bind_node_overwrite_replaces_existing_value() {
+    let rules = empty_ruleset();
+    let mut state = RenderState::new(&rules);
+    let first = BindNode::new(
+        "hero".to_string(),
+        Box::new("Mia".to_string()),
+        BindMode::IfMissing,
+    );
+    let second = BindNode::new(
+        "hero".to_string(),
+        Box::new("Darcy".to_string()),
+        BindMode::Overwrite,
+    );
+    let variable = VariableNode::new("hero".to_string());
+
+    first.render(&mut state).unwrap();
+    second.render(&mut state).unwrap();
+
+    assert_eq!(variable.render(&mut state).unwrap(), "Darcy");
+}
+
+#[test]
+fn choice_node_renders_one_child() {
+    let rules = empty_ruleset();
+    let mut state = RenderState::new(&rules);
+    let node = ChoiceNode::new(vec![Box::new("Mia".to_string())]);
+
+    assert_eq!(node.render(&mut state).unwrap(), "Mia");
+}
+
+#[test]
+fn choice_node_returns_empty_choice_for_no_children() {
+    let rules = empty_ruleset();
+    let mut state = RenderState::new(&rules);
+    let node = ChoiceNode::new(Vec::new());
+
+    assert_eq!(node.render(&mut state), Err(RenderError::EmptyChoice));
+}
+
+#[test]
+fn vec_node_concatenates_children() {
+    let rules = ruleset("name = [\"Mia\"]");
+    let mut state = RenderState::new(&rules);
+    let node = VecNode::new(vec![
+        Box::new("Hello ".to_string()),
+        Box::new(RuleCallNode::new("name".to_string())),
+    ]);
+
+    assert_eq!(node.render(&mut state).unwrap(), "Hello Mia");
+}
+
+#[test]
+fn unsupported_value_node_returns_unsupported_value_error() {
+    let rules = empty_ruleset();
+    let mut state = RenderState::new(&rules);
+    let node = UnsupportedValueNode::new("object".to_string());
+
+    assert_eq!(
+        node.render(&mut state),
+        Err(RenderError::UnsupportedValue("object".to_string()))
+    );
+}

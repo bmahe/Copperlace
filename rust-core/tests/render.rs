@@ -166,3 +166,74 @@ fn rendering_object_rule_returns_error() {
         Err(RenderError::UnsupportedValue("object".to_string()))
     );
 }
+
+#[test]
+fn multi_choice_rule_renders_one_allowed_value() {
+    let rules = ruleset(
+        r#"
+        origin = [red, blue]
+        "#,
+    );
+
+    let output = rules.render_rule("origin").unwrap();
+
+    assert!(["red", "blue"].contains(&output.as_str()));
+}
+
+#[test]
+fn scalar_rule_renders_as_string() {
+    let rules = ruleset(
+        r#"
+        origin = 3
+        "#,
+    );
+
+    assert_eq!(rules.render_rule("origin").unwrap(), "3");
+}
+
+#[test]
+fn template_expression_whitespace_is_trimmed() {
+    let rules = ruleset(
+        r#"
+        name = ["Mia"]
+        origin = "Hello { name }"
+        "#,
+    );
+
+    assert_eq!(rules.render_rule("origin").unwrap(), "Hello Mia");
+}
+
+#[test]
+fn overwrite_binding_whitespace_is_trimmed() {
+    let rules = ruleset(
+        r#"
+        first = ["Mia"]
+        second = ["Darcy"]
+        origin = "{ hero:first }{ hero := second }{hero}"
+        "#,
+    );
+
+    assert_eq!(rules.render_rule("origin").unwrap(), "Darcy");
+}
+
+#[test]
+fn invalid_config_root_returns_error() {
+    let config = hocon_rs::Value::String("not an object".to_string());
+
+    match RuleSet::from_config(config) {
+        Err(RenderError::InvalidConfigRoot) => {}
+        Err(error) => panic!("expected invalid config root, got {error:?}"),
+        Ok(_) => panic!("expected invalid config root, got ruleset"),
+    }
+}
+
+#[test]
+fn non_object_context_is_a_normal_rule() {
+    let rules = ruleset(
+        r#"
+        context = "literal"
+        "#,
+    );
+
+    assert_eq!(rules.render_rule("context").unwrap(), "literal");
+}
