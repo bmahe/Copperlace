@@ -23,6 +23,10 @@ Each render has an isolated context. Bindings created by `{alias:rule}` and
 lazy values created from top-level `context` defaults live only for the current
 `render_rule` call.
 
+Bindings are idempotent within a render. If `{alias:rule}` runs after `alias`
+already exists, it leaves the existing value unchanged and does not render
+`rule`.
+
 The renderer does not currently expose seeded randomness, deterministic replay,
 or a way to provide initial context values from the public entry points.
 

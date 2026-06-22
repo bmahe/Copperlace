@@ -59,8 +59,8 @@ origin = "Hello {name}"
 Supported expressions:
 
 * `{rule}` resolves a bound value, context default, or named rule.
-* `{alias:rule}` binds the rendered `rule` value to `alias` for this render and
-  emits an empty string.
+* `{alias:rule}` binds the rendered `rule` value to `alias` if `alias` is not
+  already bound for this render, and emits an empty string.
 
 Only the first colon in an expression is treated as the binding separator.
 

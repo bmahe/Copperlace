@@ -211,9 +211,10 @@ impl Node for RuleCallNode {
 
 /// Binds the output of a child node into the render context without emitting it.
 ///
-/// This is the node generated for `{alias:rule}` expressions. It renders `rule`,
-/// stores the result under `alias`, and returns an empty string so later
-/// `{alias}` references reuse the same generated value.
+/// This is the node generated for `{alias:rule}` expressions. If `alias` is not
+/// already bound, it renders `rule` and stores the result under `alias`. It
+/// always returns an empty string so later `{alias}` references reuse the same
+/// generated value.
 pub struct BindNode {
     name: String,
     node: Box<dyn Node>,
@@ -227,6 +228,10 @@ impl BindNode {
 
 impl Node for BindNode {
     fn render(&self, state: &mut RenderState) -> Result<String, RenderError> {
+        if state.context.contains_key(&self.name) {
+            return Ok(String::new());
+        }
+
         let value = self.node.render(state)?;
         state.context.insert(self.name.clone(), value);
         Ok(String::new())
@@ -428,6 +433,35 @@ mod tests {
             r#"
             name = ["Mia"]
             origin = "{hero:name}{hero}/{hero}"
+            "#,
+        );
+
+        assert_eq!(rules.render_rule("origin").unwrap(), "Mia/Mia");
+    }
+
+    #[test]
+    fn binding_does_not_overwrite_existing_value() {
+        let rules = ruleset(
+            r#"
+            first = ["Mia"]
+            second = ["Darcy"]
+            origin = "{hero:first}{hero:second}{hero}"
+            "#,
+        );
+
+        assert_eq!(rules.render_rule("origin").unwrap(), "Mia");
+    }
+
+    #[test]
+    fn binding_does_not_overwrite_context_default_value() {
+        let rules = ruleset(
+            r#"
+            name = ["Mia"]
+            other = ["Darcy"]
+            origin = "{hero}{hero:other}/{hero}"
+            context = {
+                hero = "{name}"
+            }
             "#,
         );
 
