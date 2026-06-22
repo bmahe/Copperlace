@@ -7,26 +7,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 class CopperlaceTest {
-    @BeforeAll
-    static void buildNativeLibrary() throws Exception {
-        Process process = new ProcessBuilder(
-                        "cargo",
-                        "build",
-                        "--release",
-                        "--manifest-path",
-                        "../rust-core/Cargo.toml")
-                .inheritIO()
-                .start();
-        int status = process.waitFor();
-        if (status != 0) {
-            throw new IllegalStateException("cargo build failed with status " + status);
-        }
-    }
-
     @Test
     void rendersFromString() {
         assertEquals(
@@ -87,5 +70,27 @@ class CopperlaceTest {
         CopperlaceException exception =
                 assertThrows(CopperlaceException.class, () -> rules.render("origin"));
         assertTrue(exception.getMessage().contains("closed"));
+    }
+
+    @Test
+    void usesClassifierScopedNativeResourcePath() {
+        assertEquals(
+                "dev/mahe/copperlace/native/linux-x86_64/libcopperlace.so",
+                NativeLibrary.packagedResourcePath("linux-x86_64", "libcopperlace.so"));
+    }
+
+    @Test
+    void detectsHostNativeLibraryName() {
+        String os = System.getProperty("os.name").toLowerCase();
+        String expected;
+        if (os.contains("win")) {
+            expected = "copperlace.dll";
+        } else if (os.contains("mac") || os.contains("darwin")) {
+            expected = "libcopperlace.dylib";
+        } else {
+            expected = "libcopperlace.so";
+        }
+
+        assertEquals(expected, NativeLibrary.nativeLibraryName());
     }
 }

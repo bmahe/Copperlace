@@ -12,7 +12,116 @@
     <maven.compiler.release>25</maven.compiler.release>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <junit.version>5.11.4</junit.version>
+    <copperlace.native.classifier>unsupported</copperlace.native.classifier>
+    <copperlace.native.library>unsupported</copperlace.native.library>
   </properties>
+
+  <profiles>
+    <profile>
+      <id>linux-x86_64</id>
+      <activation>
+        <os>
+          <name>Linux</name>
+          <arch>amd64</arch>
+        </os>
+      </activation>
+      <properties>
+        <copperlace.native.classifier>linux-x86_64</copperlace.native.classifier>
+        <copperlace.native.library>libcopperlace.so</copperlace.native.library>
+      </properties>
+    </profile>
+    <profile>
+      <id>linux-x86_64-alt</id>
+      <activation>
+        <os>
+          <name>Linux</name>
+          <arch>x86_64</arch>
+        </os>
+      </activation>
+      <properties>
+        <copperlace.native.classifier>linux-x86_64</copperlace.native.classifier>
+        <copperlace.native.library>libcopperlace.so</copperlace.native.library>
+      </properties>
+    </profile>
+    <profile>
+      <id>linux-aarch64</id>
+      <activation>
+        <os>
+          <name>Linux</name>
+          <arch>aarch64</arch>
+        </os>
+      </activation>
+      <properties>
+        <copperlace.native.classifier>linux-aarch64</copperlace.native.classifier>
+        <copperlace.native.library>libcopperlace.so</copperlace.native.library>
+      </properties>
+    </profile>
+    <profile>
+      <id>macos-x86_64</id>
+      <activation>
+        <os>
+          <family>mac</family>
+          <arch>x86_64</arch>
+        </os>
+      </activation>
+      <properties>
+        <copperlace.native.classifier>macos-x86_64</copperlace.native.classifier>
+        <copperlace.native.library>libcopperlace.dylib</copperlace.native.library>
+      </properties>
+    </profile>
+    <profile>
+      <id>macos-aarch64</id>
+      <activation>
+        <os>
+          <family>mac</family>
+          <arch>aarch64</arch>
+        </os>
+      </activation>
+      <properties>
+        <copperlace.native.classifier>macos-aarch64</copperlace.native.classifier>
+        <copperlace.native.library>libcopperlace.dylib</copperlace.native.library>
+      </properties>
+    </profile>
+    <profile>
+      <id>windows-x86_64</id>
+      <activation>
+        <os>
+          <family>windows</family>
+          <arch>amd64</arch>
+        </os>
+      </activation>
+      <properties>
+        <copperlace.native.classifier>windows-x86_64</copperlace.native.classifier>
+        <copperlace.native.library>copperlace.dll</copperlace.native.library>
+      </properties>
+    </profile>
+    <profile>
+      <id>windows-x86_64-alt</id>
+      <activation>
+        <os>
+          <family>windows</family>
+          <arch>x86_64</arch>
+        </os>
+      </activation>
+      <properties>
+        <copperlace.native.classifier>windows-x86_64</copperlace.native.classifier>
+        <copperlace.native.library>copperlace.dll</copperlace.native.library>
+      </properties>
+    </profile>
+    <profile>
+      <id>windows-aarch64</id>
+      <activation>
+        <os>
+          <family>windows</family>
+          <arch>aarch64</arch>
+        </os>
+      </activation>
+      <properties>
+        <copperlace.native.classifier>windows-aarch64</copperlace.native.classifier>
+        <copperlace.native.library>copperlace.dll</copperlace.native.library>
+      </properties>
+    </profile>
+  </profiles>
 
   <dependencies>
     <dependency>
@@ -25,6 +134,66 @@
 
   <build>
     <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-antrun-plugin</artifactId>
+        <version>3.1.0</version>
+        <executions>
+          <execution>
+            <id>build-native-library</id>
+            <phase>generate-resources</phase>
+            <goals>
+              <goal>run</goal>
+            </goals>
+            <configuration>
+              <target>
+                <fail message="Unsupported native platform: ${os.name} ${os.arch}">
+                  <condition>
+                    <equals arg1="${copperlace.native.classifier}" arg2="unsupported"/>
+                  </condition>
+                </fail>
+                <exec executable="cargo" dir="${project.basedir}/.." failonerror="true">
+                  <arg value="build"/>
+                  <arg value="--release"/>
+                  <arg value="--manifest-path"/>
+                  <arg value="${project.basedir}/../rust-core/Cargo.toml"/>
+                </exec>
+                <mkdir dir="${project.build.outputDirectory}/dev/mahe/copperlace/native/${copperlace.native.classifier}"/>
+                <copy
+                    file="${project.basedir}/../rust-core/target/release/${copperlace.native.library}"
+                    todir="${project.build.outputDirectory}/dev/mahe/copperlace/native/${copperlace.native.classifier}"/>
+              </target>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <artifactId>maven-jar-plugin</artifactId>
+        <version>3.4.2</version>
+        <executions>
+          <execution>
+            <id>default-jar</id>
+            <configuration>
+              <excludes>
+                <exclude>dev/mahe/copperlace/native/**</exclude>
+              </excludes>
+            </configuration>
+          </execution>
+          <execution>
+            <id>native-jar</id>
+            <phase>package</phase>
+            <goals>
+              <goal>jar</goal>
+            </goals>
+            <configuration>
+              <classifier>${copperlace.native.classifier}</classifier>
+              <includes>
+                <include>dev/mahe/copperlace/native/**</include>
+              </includes>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>

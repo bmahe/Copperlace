@@ -1,6 +1,7 @@
 package dev.mahe.copperlace;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.lang.foreign.Arena;
 import java.lang.foreign.FunctionDescriptor;
 import java.lang.foreign.Linker;
@@ -10,6 +11,8 @@ import java.lang.foreign.ValueLayout;
 import java.lang.invoke.MethodHandle;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.util.Locale;
 import java.util.Optional;
 
 final class NativeLibrary {
@@ -18,7 +21,6 @@ final class NativeLibrary {
     private static final int COPPERLACE_OK = 0;
     private static final int COPPERLACE_PARSE_ERROR = 2;
     private static final int COPPERLACE_RENDER_ERROR = 3;
-    private static final long ADDRESS_SIZE = ValueLayout.ADDRESS.byteSize();
 
     private final Arena libraryArena = Arena.ofShared();
     private final MethodHandle rulesetFromFile;
@@ -196,6 +198,11 @@ final class NativeLibrary {
         }
 
         String libraryName = nativeLibraryName();
+        Optional<Path> packagedLibrary = findPackagedLibrary(libraryName);
+        if (packagedLibrary.isPresent()) {
+            return packagedLibrary.get();
+        }
+
         for (Path candidate : sourceTreeCandidates(libraryName)) {
             if (Files.exists(candidate)) {
                 return candidate;
@@ -203,7 +210,31 @@ final class NativeLibrary {
         }
 
         throw new CopperlaceException(
-                "Could not find " + libraryName + ". Build rust-core or set COPPERLACE_LIBRARY_PATH.");
+                "Could not find "
+                        + libraryName
+                        + " for "
+                        + nativeClassifier()
+                        + ". Add the matching native classifier artifact, build rust-core, or set COPPERLACE_LIBRARY_PATH.");
+    }
+
+    private static Optional<Path> findPackagedLibrary(String libraryName) {
+        String resourcePath = packagedResourcePath(nativeClassifier(), libraryName);
+        try (InputStream input = NativeLibrary.class.getResourceAsStream("/" + resourcePath)) {
+            if (input == null) {
+                return Optional.empty();
+            }
+
+            Path extracted = Files.createTempFile("copperlace-", "-" + libraryName);
+            Files.copy(input, extracted, StandardCopyOption.REPLACE_EXISTING);
+            extracted.toFile().deleteOnExit();
+            return Optional.of(extracted);
+        } catch (IOException exception) {
+            throw new CopperlaceException("Failed to extract packaged Copperlace native library", exception);
+        }
+    }
+
+    static String packagedResourcePath(String classifier, String libraryName) {
+        return "dev/mahe/copperlace/native/" + classifier + "/" + libraryName;
     }
 
     private static Path[] sourceTreeCandidates(String libraryName) {
@@ -214,14 +245,43 @@ final class NativeLibrary {
         };
     }
 
-    private static String nativeLibraryName() {
-        String os = System.getProperty("os.name").toLowerCase();
+    static String nativeClassifier() {
+        String os = System.getProperty("os.name").toLowerCase(Locale.ROOT);
+        String arch = normalizeArch(System.getProperty("os.arch"));
+        if (os.contains("win")) {
+            return "windows-" + arch;
+        }
+        if (os.contains("mac") || os.contains("darwin")) {
+            return "macos-" + arch;
+        }
+        if (os.contains("linux")) {
+            return "linux-" + arch;
+        }
+        throw new CopperlaceException("Unsupported native OS: " + System.getProperty("os.name"));
+    }
+
+    static String nativeLibraryName() {
+        String os = System.getProperty("os.name").toLowerCase(Locale.ROOT);
         if (os.contains("win")) {
             return "copperlace.dll";
         }
         if (os.contains("mac") || os.contains("darwin")) {
             return "libcopperlace.dylib";
         }
-        return "libcopperlace.so";
+        if (os.contains("linux")) {
+            return "libcopperlace.so";
+        }
+        throw new CopperlaceException("Unsupported native OS: " + System.getProperty("os.name"));
+    }
+
+    private static String normalizeArch(String rawArch) {
+        String arch = rawArch.toLowerCase(Locale.ROOT);
+        if (arch.equals("amd64") || arch.equals("x86_64")) {
+            return "x86_64";
+        }
+        if (arch.equals("aarch64") || arch.equals("arm64")) {
+            return "aarch64";
+        }
+        throw new CopperlaceException("Unsupported native architecture: " + rawArch);
     }
 }
