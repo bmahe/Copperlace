@@ -1,4 +1,4 @@
-package net.copperlace;
+package dev.mahe.copperlace;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;

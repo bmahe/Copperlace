@@ -1,4 +1,4 @@
-package net.copperlace;
+package dev.mahe.copperlace;
 
 import java.io.IOException;
 import java.lang.foreign.Arena;

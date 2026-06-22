@@ -1,4 +1,4 @@
-package net.copperlace;
+package dev.mahe.copperlace;
 
 public class CopperlaceException extends RuntimeException {
     public CopperlaceException(String message) {

@@ -1,4 +1,4 @@
-package net.copperlace;
+package dev.mahe.copperlace;
 
 import java.nio.file.Path;
 
