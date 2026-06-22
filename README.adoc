@@ -36,12 +36,96 @@ The detailed behavior and configuration contract lives in `docs/`:
 * link:docs/configuration.adoc[Configuration]
 * link:docs/errors.adoc[Errors and API behavior]
 
-== Current Status
+== Project Layout
 
-The renderer is exported through the Rust library in `rust-core/src/lib.rs`.
-The package also builds a `copperlace` CLI binary and a C ABI dynamic library.
+* `rust-core/` contains the renderer library, C ABI, and `copperlace` CLI.
+* `python/` contains a Python wheel wrapper backed by the native library.
+* `java/` contains a Java FFM wrapper published as a Java API JAR plus native
+  classifier JARs.
+* `docs/` contains the behavior and configuration specification.
+
+== Quick Start
+
+Use the root `Makefile` for normal development workflows:
 
 [source,sh]
 ----
-cargo run --bin copperlace -- render --config rust-core/example.conf --rule origin
+make help
+make check
+----
+
+`make check` runs Rust formatting checks, Rust tests, Python wrapper tests, and
+Java wrapper tests.
+
+== Rust Core and CLI
+
+Build the Rust library, dynamic library, and CLI:
+
+[source,sh]
+----
+make rust-build
+----
+
+Run the sample CLI render command:
+
+[source,sh]
+----
+make rust-cli
+----
+
+The CLI can also be run directly from `rust-core/`:
+
+[source,sh]
+----
+cargo run --bin copperlace -- render --config example.conf --rule origin
+----
+
+== Python Wrapper
+
+Run Python wrapper tests:
+
+[source,sh]
+----
+make python-test
+----
+
+Build a platform wheel. The wheel build compiles `rust-core` and bundles the
+native library under the Python package:
+
+[source,sh]
+----
+make python-wheel
+----
+
+== Java Wrapper
+
+Run Java FFM wrapper tests:
+
+[source,sh]
+----
+make java-test
+----
+
+Build Java artifacts:
+
+[source,sh]
+----
+make java-package
+----
+
+The Java module uses Maven coordinates `dev.mahe.copperlace:copperlace`. The
+base JAR contains the Java API, while native binaries are attached as platform
+classifier JARs such as `linux-x86_64`, `macos-aarch64`, and `windows-x86_64`.
+
+At runtime, the Java wrapper looks for `COPPERLACE_LIBRARY_PATH` first, then a
+packaged native classifier resource, then local Rust build output for source-tree
+development.
+
+== Cleanup
+
+Remove generated Rust, Python, and Java build output:
+
+[source,sh]
+----
+make clean
 ----
