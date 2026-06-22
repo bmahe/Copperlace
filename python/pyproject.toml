@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "copperlace"
+version = "0.1.0"
+description = "Python wrapper for the Copperlace text renderer"
+readme = "README.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [
+  { name = "Copperlace contributors" }
+]
+
+[tool.setuptools]
+packages = ["copperlace"]
+include-package-data = true
+
+[tool.setuptools.package-data]
+copperlace = ["native/*"]
