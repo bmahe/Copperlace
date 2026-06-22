@@ -33,6 +33,8 @@ The CLI supports:
 copperlace render --config <path> --rule <name>
 ----
 
+CLI rendering uses the builtin processor registry.
+
 == C ABI
 
 The native dynamic library exposes an opaque ruleset handle API:
@@ -64,6 +66,8 @@ Wrapper failures are raised as `CopperlaceError`.
 The wheel build compiles `rust-core` and bundles the platform native library
 under `copperlace/native/`.
 
+Python rendering uses the builtin processor registry.
+
 == Java Wrapper
 
 The Java module in `java/` uses Java FFM over the C ABI. Its Maven coordinates
@@ -87,3 +91,5 @@ At runtime, the Java wrapper loads the native library in this order:
 . `COPPERLACE_LIBRARY_PATH`
 . packaged classifier resource
 . local Rust build output for source-tree development
+
+Java rendering uses the builtin processor registry.

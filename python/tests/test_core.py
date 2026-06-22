@@ -24,6 +24,14 @@ class CopperlaceTests(unittest.TestCase):
         with self.assertRaisesRegex(CopperlaceError, "unknown rule"):
             render_hocon_str('origin = "{missing}"', "origin")
 
+    def test_builtin_processor_pipeline(self) -> None:
+        output = render_hocon_str(
+            'name = ["  mIA  "]\norigin = "{name | trim | capitalize}"',
+            "origin",
+        )
+
+        self.assertEqual(output, "Mia")
+
     def test_repeated_renders_on_one_ruleset(self) -> None:
         ruleset = RuleSet.from_string('name = ["Mia"]\norigin = "{name}"')
         try:

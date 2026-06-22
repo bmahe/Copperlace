@@ -59,13 +59,27 @@ origin = "Hello {name}"
 Supported expressions:
 
 * `{rule}` resolves a bound value, context default, or named rule.
+* `{rule | processor}` renders `rule` and passes the result through one or more
+  processors from left to right.
 * `{alias:rule}` binds the rendered `rule` value to `alias` if `alias` is not
   already bound for this render, and emits an empty string.
 * `{alias:=rule}` always renders `rule`, stores the result under `alias`, and
   emits an empty string.
 
+Binding expressions can also use processors. `{alias:rule | uppercase}` stores
+the processed result under `alias`; `{alias:=rule | uppercase}` overwrites
+`alias` with the processed result.
+
 Overwrite bindings are parsed before bind-if-missing bindings, so `{alias:=rule}`
 is distinct from `{alias:rule}`.
+
+Supported builtin processors are:
+
+* `uppercase`
+* `lowercase`
+* `trim`
+* `capitalize`
+* `titlecase`
 
 == Array Values
 

@@ -33,6 +33,23 @@ origin = "{story}"
 Template expression whitespace is trimmed, so `{ name }` resolves the same rule
 as `{name}`.
 
+== Processors
+
+Template expressions can pipe rendered output through processors. Processors
+run left-to-right and transform strings only.
+
+[source,hocon]
+----
+name = ["  mIA  "]
+origin = "Hello {name | trim | capitalize}"
+----
+
+Rendering `origin` produces `Hello Mia`.
+
+Builtin processors are `uppercase`, `lowercase`, `trim`, `capitalize`, and
+`titlecase`. Rust callers can register custom processors when constructing a
+`RuleSet`; CLI, Python, Java, and C ABI callers use the builtin registry.
+
 == Random Choices
 
 Array values are random choices. Rendering an array-backed rule chooses one
@@ -78,6 +95,16 @@ origin = "{hero:first}{hero:second}{hero}"
 
 Rendering `origin` produces `Mia`. The second binding expression is a no-op
 because `hero` already exists.
+
+Binding expressions store processed values when a pipeline is present:
+
+[source,hocon]
+----
+name = ["mia"]
+origin = "{hero:name | uppercase}{hero}"
+----
+
+Rendering `origin` produces `MIA`.
 
 === Overwrite Binding
 

@@ -1,6 +1,6 @@
 use copperlace::render::{
-    BindMode, BindNode, ChoiceNode, Node, RenderError, RenderState, RuleCallNode, RuleSet,
-    UnsupportedValueNode, VariableNode, VecNode,
+    BindMode, BindNode, ChoiceNode, Node, ProcessorPipelineNode, RenderError, RenderState,
+    RuleCallNode, RuleSet, UnsupportedValueNode, VariableNode, VecNode,
 };
 
 fn ruleset(config: &str) -> RuleSet {
@@ -146,6 +146,22 @@ fn vec_node_concatenates_children() {
     ]);
 
     assert_eq!(node.render(&mut state).unwrap(), "Hello Mia");
+}
+
+#[test]
+fn processor_pipeline_node_applies_processors_in_order() {
+    let rules = empty_ruleset();
+    let mut state = RenderState::new(&rules);
+    let node = ProcessorPipelineNode::new(
+        Box::new("  mIA  ".to_string()),
+        vec![
+            "trim".to_string(),
+            "lowercase".to_string(),
+            "capitalize".to_string(),
+        ],
+    );
+
+    assert_eq!(node.render(&mut state).unwrap(), "Mia");
 }
 
 #[test]

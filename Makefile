@@ -41,7 +41,7 @@ rust-cli:
 	cd $(RUST_DIR) && $(CARGO) run --bin copperlace -- render --config example.conf --rule origin
 
 .PHONY: python-test
-python-test:
+python-test: rust-build
 	PYTHONPATH=$(PYTHON_DIR) $(PYTHON) -m unittest discover -s $(PYTHON_DIR)/tests
 
 .PHONY: python-wheel

@@ -47,6 +47,16 @@ class CopperlaceTest {
     }
 
     @Test
+    void rendersBuiltinProcessorPipeline() {
+        assertEquals(
+                "Mia",
+                Copperlace.renderHoconString("""
+                        name = ["  mIA  "]
+                        origin = "{name | trim | capitalize}"
+                        """, "origin"));
+    }
+
+    @Test
     void rendersRepeatedlyFromOneRuleSet() {
         try (RuleSet rules = RuleSet.fromString("""
                 name = ["Mia"]

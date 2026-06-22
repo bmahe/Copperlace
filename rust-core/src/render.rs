@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::fmt;
+use std::sync::Arc;
 
 use rand::seq::IndexedRandom;
 use regex::Regex;
@@ -7,6 +8,9 @@ use regex::Regex;
 #[derive(Debug, PartialEq, Eq)]
 pub enum RenderError {
     UnknownRule(String),
+    UnknownProcessor(String),
+    ProcessorError { processor: String, message: String },
+    InvalidExpression(String),
     EmptyChoice,
     CircularRuleReference(Vec<String>),
     UnsupportedValue(String),
@@ -17,6 +21,15 @@ impl fmt::Display for RenderError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             RenderError::UnknownRule(rule) => write!(formatter, "unknown rule: {rule}"),
+            RenderError::UnknownProcessor(processor) => {
+                write!(formatter, "unknown processor: {processor}")
+            }
+            RenderError::ProcessorError { processor, message } => {
+                write!(formatter, "processor {processor} failed: {message}")
+            }
+            RenderError::InvalidExpression(expression) => {
+                write!(formatter, "invalid template expression: {expression}")
+            }
             RenderError::EmptyChoice => write!(formatter, "cannot render an empty choice"),
             RenderError::CircularRuleReference(cycle) => {
                 write!(formatter, "circular rule reference: {}", cycle.join(" -> "))
@@ -30,6 +43,78 @@ impl fmt::Display for RenderError {
 }
 
 impl std::error::Error for RenderError {}
+
+pub trait Processor: Send + Sync {
+    fn process(&self, value: &str) -> Result<String, String>;
+}
+
+impl<F> Processor for F
+where
+    F: Fn(&str) -> Result<String, String> + Send + Sync,
+{
+    fn process(&self, value: &str) -> Result<String, String> {
+        self(value)
+    }
+}
+
+pub type ProcessorRegistry = HashMap<String, Arc<dyn Processor>>;
+
+pub fn processor<F>(processor: F) -> Arc<dyn Processor>
+where
+    F: Processor + 'static,
+{
+    Arc::new(processor)
+}
+
+fn builtin_processors() -> ProcessorRegistry {
+    let mut processors = ProcessorRegistry::new();
+    processors.insert(
+        "uppercase".to_string(),
+        processor(|value: &str| Ok(value.to_uppercase())),
+    );
+    processors.insert(
+        "lowercase".to_string(),
+        processor(|value: &str| Ok(value.to_lowercase())),
+    );
+    processors.insert(
+        "trim".to_string(),
+        processor(|value: &str| Ok(value.trim().to_string())),
+    );
+    processors.insert("capitalize".to_string(), processor(capitalize));
+    processors.insert("titlecase".to_string(), processor(titlecase));
+    processors
+}
+
+fn capitalize(value: &str) -> Result<String, String> {
+    let mut chars = value.chars();
+    let Some(first) = chars.next() else {
+        return Ok(String::new());
+    };
+
+    let mut output = String::new();
+    output.extend(first.to_uppercase());
+    output.push_str(&chars.as_str().to_lowercase());
+    Ok(output)
+}
+
+fn titlecase(value: &str) -> Result<String, String> {
+    let mut output = String::new();
+    let mut start_of_word = true;
+
+    for character in value.chars() {
+        if character.is_whitespace() {
+            start_of_word = true;
+            output.push(character);
+        } else if start_of_word {
+            output.extend(character.to_uppercase());
+            start_of_word = false;
+        } else {
+            output.extend(character.to_lowercase());
+        }
+    }
+
+    Ok(output)
+}
 
 pub struct RenderState<'a> {
     ruleset: &'a RuleSet,
@@ -79,13 +164,24 @@ impl Node for String {
 pub struct RuleSet {
     rules: HashMap<String, Box<dyn Node>>,
     context_defaults: HashMap<String, Box<dyn Node>>,
+    processors: ProcessorRegistry,
 }
 
 impl RuleSet {
     pub fn from_config(config: hocon_rs::Value) -> Result<Self, RenderError> {
+        Self::from_config_with_processors(config, ProcessorRegistry::new())
+    }
+
+    pub fn from_config_with_processors(
+        config: hocon_rs::Value,
+        custom_processors: ProcessorRegistry,
+    ) -> Result<Self, RenderError> {
         let hocon_rs::Value::Object(values) = config else {
             return Err(RenderError::InvalidConfigRoot);
         };
+
+        let mut processors = builtin_processors();
+        processors.extend(custom_processors);
 
         let mut rules = HashMap::new();
         let mut context_defaults = HashMap::new();
@@ -94,19 +190,21 @@ impl RuleSet {
             if name == "context" {
                 if let hocon_rs::Value::Object(context_values) = value {
                     for (context_name, context_value) in context_values {
-                        context_defaults.insert(context_name, value_to_node(context_value));
+                        context_defaults
+                            .insert(context_name, value_to_node(context_value, &processors)?);
                     }
                 } else {
-                    rules.insert(name, value_to_node(value));
+                    rules.insert(name, value_to_node(value, &processors)?);
                 }
             } else {
-                rules.insert(name, value_to_node(value));
+                rules.insert(name, value_to_node(value, &processors)?);
             }
         }
 
         Ok(RuleSet {
             rules,
             context_defaults,
+            processors,
         })
     }
 
@@ -159,6 +257,19 @@ impl RuleSet {
         let result = rule.render(state);
         state.call_stack.pop();
         result.map(Some)
+    }
+
+    fn process(&self, processor_name: &str, value: &str) -> Result<String, RenderError> {
+        let Some(processor) = self.processors.get(processor_name) else {
+            return Err(RenderError::UnknownProcessor(processor_name.to_string()));
+        };
+
+        processor
+            .process(value)
+            .map_err(|message| RenderError::ProcessorError {
+                processor: processor_name.to_string(),
+                message,
+            })
     }
 }
 
@@ -266,6 +377,28 @@ impl Node for BindNode {
     }
 }
 
+/// Applies named processors to a rendered child value from left to right.
+pub struct ProcessorPipelineNode {
+    node: Box<dyn Node>,
+    processors: Vec<String>,
+}
+
+impl ProcessorPipelineNode {
+    pub fn new(node: Box<dyn Node>, processors: Vec<String>) -> Self {
+        ProcessorPipelineNode { node, processors }
+    }
+}
+
+impl Node for ProcessorPipelineNode {
+    fn render(&self, state: &mut RenderState) -> Result<String, RenderError> {
+        let mut value = self.node.render(state)?;
+        for processor_name in &self.processors {
+            value = state.ruleset.process(processor_name, &value)?;
+        }
+        Ok(value)
+    }
+}
+
 /// Randomly renders one child node from a list of alternatives.
 ///
 /// This is produced from config arrays. For example, `mood = [happy, sad]`
@@ -318,19 +451,28 @@ impl Node for VecNode {
     }
 }
 
-fn value_to_node(value: hocon_rs::Value) -> Box<dyn Node> {
-    match value {
-        hocon_rs::Value::String(template) => template_to_node(&template),
+fn value_to_node(
+    value: hocon_rs::Value,
+    processors: &ProcessorRegistry,
+) -> Result<Box<dyn Node>, RenderError> {
+    Ok(match value {
+        hocon_rs::Value::String(template) => template_to_node(&template, processors)?,
         hocon_rs::Value::Array(values) => {
-            let nodes = values.into_iter().map(value_to_node).collect();
+            let nodes = values
+                .into_iter()
+                .map(|value| value_to_node(value, processors))
+                .collect::<Result<Vec<_>, _>>()?;
             Box::new(ChoiceNode::new(nodes))
         }
         hocon_rs::Value::Object(_) => Box::new(UnsupportedValueNode::new("object".to_string())),
         _ => Box::new(value.to_string()),
-    }
+    })
 }
 
-fn template_to_node(template: &str) -> Box<dyn Node> {
+fn template_to_node(
+    template: &str,
+    processors: &ProcessorRegistry,
+) -> Result<Box<dyn Node>, RenderError> {
     let re = Regex::new(r"\{\s*(?<expression>[^\}]*)\s*\}").unwrap();
     let mut nodes: Vec<Box<dyn Node>> = Vec::new();
     let mut cursor = 0;
@@ -348,7 +490,7 @@ fn template_to_node(template: &str) -> Box<dyn Node> {
             .name("expression")
             .map(|value| value.as_str().trim())
             .unwrap_or_default();
-        nodes.push(expression_to_node(expression));
+        nodes.push(expression_to_node(expression, processors)?);
         cursor = full_match.end();
     }
 
@@ -356,29 +498,80 @@ fn template_to_node(template: &str) -> Box<dyn Node> {
         nodes.push(Box::new(template[cursor..].to_string()));
     }
 
-    Box::new(VecNode::new(nodes))
+    Ok(Box::new(VecNode::new(nodes)))
 }
 
-fn expression_to_node(expression: &str) -> Box<dyn Node> {
-    if let Some((name, source)) = expression.split_once(":=") {
-        let node = Box::new(RuleCallNode::new(source.trim().to_string()));
-        return Box::new(BindNode::new(
+fn expression_to_node(
+    expression: &str,
+    processors: &ProcessorRegistry,
+) -> Result<Box<dyn Node>, RenderError> {
+    let mut parts = expression.split('|').map(str::trim);
+    let base_expression = parts
+        .next()
+        .filter(|base_expression| !base_expression.is_empty())
+        .ok_or_else(|| RenderError::InvalidExpression(expression.to_string()))?;
+    let processor_names = parts
+        .map(|processor_name| {
+            if processor_name.is_empty() {
+                return Err(RenderError::InvalidExpression(expression.to_string()));
+            }
+            if !processors.contains_key(processor_name) {
+                return Err(RenderError::UnknownProcessor(processor_name.to_string()));
+            }
+            Ok(processor_name.to_string())
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+
+    if let Some((name, source)) = base_expression.split_once(":=") {
+        let name = name.trim();
+        let source = source.trim();
+        if name.is_empty() || source.is_empty() {
+            return Err(RenderError::InvalidExpression(expression.to_string()));
+        }
+        let node = pipeline_node(
+            Box::new(RuleCallNode::new(source.to_string())),
+            processor_names,
+        );
+        return Ok(Box::new(BindNode::new(
             name.trim().to_string(),
             node,
             BindMode::Overwrite,
-        ));
+        )));
     }
 
-    if let Some((name, source)) = expression.split_once(':') {
-        let node = Box::new(RuleCallNode::new(source.trim().to_string()));
-        return Box::new(BindNode::new(
+    if let Some((name, source)) = base_expression.split_once(':') {
+        let name = name.trim();
+        let source = source.trim();
+        if name.is_empty() || source.is_empty() {
+            return Err(RenderError::InvalidExpression(expression.to_string()));
+        }
+        let node = pipeline_node(
+            Box::new(RuleCallNode::new(source.to_string())),
+            processor_names,
+        );
+        return Ok(Box::new(BindNode::new(
             name.trim().to_string(),
             node,
             BindMode::IfMissing,
-        ));
+        )));
     }
 
-    Box::new(RuleCallNode::new(expression.to_string()))
+    let name = base_expression.trim();
+    if name.is_empty() {
+        return Err(RenderError::InvalidExpression(expression.to_string()));
+    }
+    Ok(pipeline_node(
+        Box::new(RuleCallNode::new(name.to_string())),
+        processor_names,
+    ))
+}
+
+fn pipeline_node(node: Box<dyn Node>, processors: Vec<String>) -> Box<dyn Node> {
+    if processors.is_empty() {
+        node
+    } else {
+        Box::new(ProcessorPipelineNode::new(node, processors))
+    }
 }
 
 /// Placeholder node for config value types that are not renderable yet.

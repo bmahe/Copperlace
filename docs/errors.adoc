@@ -25,6 +25,10 @@ Parse HOCON input and compile it into a `RuleSet`.
 `render_hocon_str` / `render_hocon_file`::
 Parse HOCON input and render one rule in a single call.
 
+`RuleSet::from_config_with_processors(config, processors)`::
+Compiles a config with the builtin processor registry plus Rust-provided custom
+processors. Custom processor names override builtin names when they collide.
+
 == CLI
 
 The package builds a `copperlace` binary:
@@ -70,6 +74,16 @@ or a way to provide initial context values from the public entry points.
 `UnknownRule(String)`::
 Returned when a template reference or requested render rule cannot be resolved
 from the current render context, top-level `context` defaults, or named rules.
+
+`UnknownProcessor(String)`::
+Returned when a template pipeline references a processor that is not registered.
+
+`ProcessorError { processor, message }`::
+Returned when a registered processor rejects a rendered value.
+
+`InvalidExpression(String)`::
+Returned when a template expression is malformed, such as `{name | }` or
+`{ | uppercase}`.
 
 `EmptyChoice`::
 Returned when rendering an array value with no elements.
