@@ -117,6 +117,67 @@ final class CopperlaceTest {
     }
 
     @Test
+    void rendersRepeatedlyFromOneCopperlaceInstance() {
+        try (final Copperlace copperlace = Copperlace.fromString("""
+                name = ["Mia"]
+                pet = ["owl"]
+                origin = "{name}"
+                companion = "{name} and {pet}"
+                """)) {
+            assertEquals("Mia", copperlace.render("origin"));
+            assertEquals("Mia and owl", copperlace.render("companion"));
+            assertEquals("Mia", copperlace.render("origin"));
+        }
+    }
+
+    @Test
+    void copperlaceLoadsFromFile() throws IOException {
+        final Path config = Files.createTempFile("copperlace", ".conf");
+        try {
+            Files.writeString(config, """
+                    name = ["Mia"]
+                    origin = "{name}"
+                    """);
+
+            try (final Copperlace copperlace = Copperlace.fromFile(config)) {
+                assertEquals("Mia", copperlace.render("origin"));
+                assertEquals("Mia", copperlace.render("origin"));
+            }
+        } finally {
+            Files.deleteIfExists(config);
+        }
+    }
+
+    @Test
+    void copperlaceRejectsBlankConfig() {
+        final IllegalArgumentException exception =
+                assertThrows(IllegalArgumentException.class, () -> Copperlace.fromString(" "));
+
+        assertTrue(exception.getMessage().contains("config"));
+    }
+
+    @Test
+    void copperlaceRejectsBlankPath() {
+        final IllegalArgumentException exception =
+                assertThrows(IllegalArgumentException.class, () -> Copperlace.fromFile(" "));
+
+        assertTrue(exception.getMessage().contains("path"));
+    }
+
+    @Test
+    void copperlaceRejectsBlankRule() {
+        try (final Copperlace copperlace = Copperlace.fromString("""
+                name = ["Mia"]
+                origin = "{name}"
+                """)) {
+            final IllegalArgumentException exception =
+                    assertThrows(IllegalArgumentException.class, () -> copperlace.render(" "));
+
+            assertTrue(exception.getMessage().contains("rule"));
+        }
+    }
+
+    @Test
     void closeIsIdempotentAndRenderFailsAfterClose() {
         final RuleSet rules = RuleSet.fromString("""
                 name = ["Mia"]
@@ -128,6 +189,21 @@ final class CopperlaceTest {
 
         final CopperlaceException exception =
                 assertThrows(CopperlaceException.class, () -> rules.render("origin"));
+        assertTrue(exception.getMessage().contains("closed"));
+    }
+
+    @Test
+    void copperlaceCloseIsIdempotentAndRenderFailsAfterClose() {
+        final Copperlace copperlace = Copperlace.fromString("""
+                name = ["Mia"]
+                origin = "{name}"
+                """);
+
+        copperlace.close();
+        copperlace.close();
+
+        final CopperlaceException exception =
+                assertThrows(CopperlaceException.class, () -> copperlace.render("origin"));
         assertTrue(exception.getMessage().contains("closed"));
     }
 

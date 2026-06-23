@@ -6,8 +6,9 @@ The wheel build runs Cargo for `../rust-core`, bundles the resulting native
 library, and exposes a small Python API over the Copperlace C ABI.
 
 ```python
-from copperlace import RuleSet
+from copperlace import Copperlace
 
-rules = RuleSet.from_string('name = ["Mia"]\norigin = "{name}"')
-print(rules.render("origin"))
+with Copperlace.from_string('name = ["Mia"]\norigin = "{name}"') as copperlace:
+    print(copperlace.render("origin"))
+    print(copperlace.render("origin"))
 ```

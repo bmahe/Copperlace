@@ -26,6 +26,28 @@ impl From<RenderError> for ConfigError {
     }
 }
 
+pub struct Copperlace {
+    ruleset: RuleSet,
+}
+
+impl Copperlace {
+    pub fn from_hocon_str(config: &str) -> Result<Self, ConfigError> {
+        Ok(Self {
+            ruleset: ruleset_from_hocon_str(config)?,
+        })
+    }
+
+    pub fn from_hocon_file(path: impl AsRef<Path>) -> Result<Self, ConfigError> {
+        Ok(Self {
+            ruleset: ruleset_from_hocon_file(path)?,
+        })
+    }
+
+    pub fn render(&self, rule_name: &str) -> Result<String, RenderError> {
+        self.ruleset.render_rule(rule_name)
+    }
+}
+
 pub fn ruleset_from_hocon_str(config: &str) -> Result<RuleSet, ConfigError> {
     let value = hocon_rs::Config::parse_str::<hocon_rs::Value>(config, None)
         .map_err(|error| ConfigError::Parse(format!("{error:?}")))?;

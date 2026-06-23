@@ -67,6 +67,43 @@ class RuleSet:
             raise CopperlaceError("RuleSet is closed")
 
 
+class Copperlace:
+    def __init__(self, ruleset: RuleSet) -> None:
+        self._ruleset = ruleset
+
+    @classmethod
+    def from_string(cls, config: str) -> Self:
+        return cls(RuleSet.from_string(config))
+
+    @classmethod
+    def from_file(cls, path: str | Path) -> Self:
+        return cls(RuleSet.from_file(path))
+
+    def render(self, rule: str) -> str:
+        return self._ruleset.render(rule)
+
+    def close(self) -> None:
+        self._ruleset.close()
+
+    def __enter__(self) -> Self:
+        self._ruleset._ensure_open()
+        return self
+
+    def __exit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        self.close()
+
+    def __del__(self) -> None:
+        try:
+            self.close()
+        except Exception:
+            pass
+
+
 def render_hocon_str(config: str, rule: str) -> str:
     with RuleSet.from_string(config) as ruleset:
         return ruleset.render(rule)

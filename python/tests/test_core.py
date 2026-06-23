@@ -4,7 +4,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from copperlace import CopperlaceError, RuleSet, render_hocon_file, render_hocon_str
+from copperlace import Copperlace, CopperlaceError, RuleSet, render_hocon_file, render_hocon_str
 
 
 class CopperlaceTests(unittest.TestCase):
@@ -40,12 +40,39 @@ class CopperlaceTests(unittest.TestCase):
         finally:
             ruleset.close()
 
+    def test_repeated_renders_on_one_copperlace_instance(self) -> None:
+        copperlace = Copperlace.from_string(
+            'name = ["Mia"]\npet = ["owl"]\norigin = "{name}"\ncompanion = "{name} and {pet}"'
+        )
+        try:
+            self.assertEqual(copperlace.render("origin"), "Mia")
+            self.assertEqual(copperlace.render("companion"), "Mia and owl")
+            self.assertEqual(copperlace.render("origin"), "Mia")
+        finally:
+            copperlace.close()
+
+    def test_copperlace_loads_from_file(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "story.conf"
+            path.write_text('name = ["Mia"]\norigin = "{name}"', encoding="utf-8")
+
+            with Copperlace.from_file(path) as copperlace:
+                self.assertEqual(copperlace.render("origin"), "Mia")
+                self.assertEqual(copperlace.render("origin"), "Mia")
+
     def test_context_manager_closes_ruleset(self) -> None:
         with RuleSet.from_string('name = ["Mia"]\norigin = "{name}"') as ruleset:
             self.assertEqual(ruleset.render("origin"), "Mia")
 
         with self.assertRaisesRegex(CopperlaceError, "closed"):
             ruleset.render("origin")
+
+    def test_context_manager_closes_copperlace(self) -> None:
+        with Copperlace.from_string('name = ["Mia"]\norigin = "{name}"') as copperlace:
+            self.assertEqual(copperlace.render("origin"), "Mia")
+
+        with self.assertRaisesRegex(CopperlaceError, "closed"):
+            copperlace.render("origin")
 
     def test_explicit_close_is_idempotent(self) -> None:
         ruleset = RuleSet.from_string('name = ["Mia"]\norigin = "{name}"')
@@ -55,6 +82,15 @@ class CopperlaceTests(unittest.TestCase):
 
         with self.assertRaisesRegex(CopperlaceError, "closed"):
             ruleset.render("origin")
+
+    def test_copperlace_close_is_idempotent(self) -> None:
+        copperlace = Copperlace.from_string('name = ["Mia"]\norigin = "{name}"')
+
+        copperlace.close()
+        copperlace.close()
+
+        with self.assertRaisesRegex(CopperlaceError, "closed"):
+            copperlace.render("origin")
 
 
 if __name__ == "__main__":

@@ -54,13 +54,17 @@ Returned strings are allocated by Copperlace and must be released with
 The Python package in `python/` uses `ctypes` over the C ABI. Public entry
 points are:
 
+* `Copperlace.from_string(config)`
+* `Copperlace.from_file(path)`
+* `Copperlace.render(rule)`
 * `RuleSet.from_string(config)`
 * `RuleSet.from_file(path)`
 * `RuleSet.render(rule)`
 * `render_hocon_str(config, rule)`
 * `render_hocon_file(path, rule)`
 
-`RuleSet` is a context manager and releases the native handle when closed.
+`Copperlace` is the recommended load-once API for repeated renders. `Copperlace`
+and `RuleSet` are context managers and release the native handle when closed.
 Wrapper failures are raised as `CopperlaceError`.
 
 The wheel build compiles `rust-core` and bundles the platform native library
@@ -73,14 +77,18 @@ Python rendering uses the builtin processor registry.
 The Java module in `java/` uses Java FFM over the C ABI. Its Maven coordinates
 are `dev.mahe.copperlace:copperlace`. Public entry points are:
 
+* `Copperlace.fromString(config)`
+* `Copperlace.fromFile(path)`
+* `Copperlace.render(rule)`
 * `Copperlace.renderHoconString(config, rule)`
 * `Copperlace.renderHoconFile(path, rule)`
 * `RuleSet.fromString(config)`
 * `RuleSet.fromFile(path)`
 * `RuleSet.render(rule)`
 
-`RuleSet` implements `AutoCloseable`; callers should use try-with-resources or
-call `close`.
+`Copperlace` is the recommended load-once API for repeated renders. `Copperlace`
+and `RuleSet` implement `AutoCloseable`; callers should use try-with-resources
+or call `close`.
 
 The base Java JAR contains the Java API. Native binaries are packaged in
 platform classifier JARs, such as `linux-x86_64`, `linux-aarch64`,

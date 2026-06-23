@@ -8,6 +8,13 @@ runtime loading details.
 
 == Entry Points
 
+`Copperlace::from_hocon_str(config)` / `Copperlace::from_hocon_file(path)`::
+Parse and compile HOCON input once into a reusable renderer for repeated calls
+to `Copperlace::render`.
+
+`Copperlace::render(&self, rule_name: &str) -> Result<String, RenderError>`::
+Starts a fresh render for `rule_name` using the previously loaded config.
+
 `RuleSet::from_config(config: hocon_rs::Value) -> Result<RuleSet, RenderError>`::
 Compiles a HOCON root value into named render rules and context defaults. The
 root must be an object.

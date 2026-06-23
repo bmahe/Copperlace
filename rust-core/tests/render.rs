@@ -1,5 +1,5 @@
 use copperlace::render::{ProcessorRegistry, processor};
-use copperlace::{RenderError, RuleSet};
+use copperlace::{Copperlace, RenderError, RuleSet};
 
 fn ruleset(config: &str) -> RuleSet {
     let value = hocon_rs::Config::parse_str::<hocon_rs::Value>(config, None).unwrap();
@@ -25,6 +25,44 @@ fn renders_from_multiple_named_rules() {
     assert_eq!(rules.render_rule("story").unwrap(), "Mia and owl");
     assert_eq!(rules.render_rule("name").unwrap(), "Mia");
     assert_eq!(rules.render_rule("animal").unwrap(), "owl");
+}
+
+#[test]
+fn copperlace_renders_repeatedly_from_hocon_string() {
+    let copperlace = Copperlace::from_hocon_str(
+        r#"
+        name = ["Mia"]
+        pet = ["owl"]
+        origin = "{name}"
+        companion = "{name} and {pet}"
+        "#,
+    )
+    .unwrap();
+
+    assert_eq!(copperlace.render("origin").unwrap(), "Mia");
+    assert_eq!(copperlace.render("companion").unwrap(), "Mia and owl");
+    assert_eq!(copperlace.render("origin").unwrap(), "Mia");
+}
+
+#[test]
+fn copperlace_renders_repeatedly_from_hocon_file() {
+    let config_path =
+        std::env::temp_dir().join(format!("copperlace-reusable-{}.conf", std::process::id()));
+    std::fs::write(
+        &config_path,
+        r#"
+        name = ["Mia"]
+        origin = "{name}"
+        "#,
+    )
+    .unwrap();
+
+    let copperlace = Copperlace::from_hocon_file(&config_path).unwrap();
+
+    assert_eq!(copperlace.render("origin").unwrap(), "Mia");
+    assert_eq!(copperlace.render("origin").unwrap(), "Mia");
+
+    let _ = std::fs::remove_file(config_path);
 }
 
 #[test]
