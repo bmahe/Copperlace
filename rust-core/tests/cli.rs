@@ -59,6 +59,24 @@ fn defaults_to_origin_rule() {
 }
 
 #[test]
+fn default_command_renders_origin_rule() {
+    let config_path = write_temp_config(
+        r#"
+        origin = "Mia"
+        "#,
+    );
+    let output = Command::new(env!("CARGO_BIN_EXE_copperlace"))
+        .args(["--config", &config_path.to_string_lossy()])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    assert_eq!(String::from_utf8_lossy(&output.stdout).trim(), "Mia");
+
+    let _ = fs::remove_file(config_path);
+}
+
+#[test]
 fn explicit_rule_overrides_origin_default() {
     let config_path = write_temp_config(
         r#"
@@ -74,6 +92,25 @@ fn explicit_rule_overrides_origin_default() {
             "--rule",
             "other",
         ])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    assert_eq!(String::from_utf8_lossy(&output.stdout).trim(), "Darcy");
+
+    let _ = fs::remove_file(config_path);
+}
+
+#[test]
+fn default_command_renders_explicit_rule_with_short_flags() {
+    let config_path = write_temp_config(
+        r#"
+        origin = "Mia"
+        other = "Darcy"
+        "#,
+    );
+    let output = Command::new(env!("CARGO_BIN_EXE_copperlace"))
+        .args(["-c", &config_path.to_string_lossy(), "-r", "other"])
         .output()
         .unwrap();
 
@@ -104,6 +141,25 @@ fn renders_config_file_with_short_flags() {
 
     assert!(output.status.success());
     assert_eq!(String::from_utf8_lossy(&output.stdout).trim(), "Mia");
+
+    let _ = fs::remove_file(config_path);
+}
+
+#[test]
+fn default_command_renders_multiple_outputs_from_one_config() {
+    let config_path = write_temp_config(
+        r#"
+        name = ["Mia"]
+        origin = "{name}"
+        "#,
+    );
+    let output = Command::new(env!("CARGO_BIN_EXE_copperlace"))
+        .args(["--count", "2", "--config", &config_path.to_string_lossy()])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    assert_eq!(String::from_utf8_lossy(&output.stdout).lines().count(), 2);
 
     let _ = fs::remove_file(config_path);
 }
@@ -204,6 +260,17 @@ fn prints_version() {
 
     assert!(output.status.success());
     assert!(String::from_utf8_lossy(&output.stdout).contains(env!("CARGO_PKG_VERSION")));
+}
+
+#[test]
+fn rejects_unknown_non_flag_command() {
+    let output = Command::new(env!("CARGO_BIN_EXE_copperlace"))
+        .arg("validate")
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("unknown command: validate"));
 }
 
 #[test]

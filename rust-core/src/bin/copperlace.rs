@@ -29,14 +29,22 @@ fn run(args: &[String]) -> Result<Option<String>, String> {
         return Ok(Some(format!("copperlace {}\n", env!("CARGO_PKG_VERSION"))));
     }
 
-    if command != "render" {
+    let render_start_index = if command == "render" {
+        2
+    } else if command.starts_with('-') {
+        1
+    } else {
         return Err(format!("unknown command: {command}\n\n{}", help()));
-    }
+    };
 
+    render(args, render_start_index)
+}
+
+fn render(args: &[String], start_index: usize) -> Result<Option<String>, String> {
     let mut config = None;
     let mut rule = None;
     let mut count = 1usize;
-    let mut index = 2;
+    let mut index = start_index;
 
     while index < args.len() {
         match args[index].as_str() {
@@ -112,12 +120,13 @@ fn help() -> String {
 
 fn render_help() -> String {
     "Usage:
-  copperlace render --config <path> [--rule <name>] [--count <n>]
+  copperlace [render] --config <path> [--rule <name>] [--count <n>]
+  copperlace [render] -c <path> [-r <name>] [-n <n>]
   copperlace --help
   copperlace --version
 
 Commands:
-  render    Render a named rule from a HOCON config file
+  render    Render a named rule from a HOCON config file (optional when first argument is a flag)
 
 Render options:
   -c, --config <path>    HOCON config file to load
