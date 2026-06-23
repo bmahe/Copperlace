@@ -89,6 +89,7 @@ Supported builtin processors are:
 * `ordinal`
 * `sentence`
 * `quote`
+* `slug`
 
 The `article` processor prefixes the rendered value with `a` or `an` using
 English heuristics. It preserves the rendered value as-is, so use `trim` first
@@ -177,6 +178,16 @@ escapes internal double quotes and backslashes.
 ----
 line = ["Mia said \"hi\""]
 origin = "{line | quote}"
+----
+
+The `slug` processor lowercases rendered text, trims it, converts runs of
+non-alphanumeric characters to hyphens, removes apostrophes, and strips leading
+or trailing hyphens.
+
+[source,hocon]
+----
+title = ["Mia's Story"]
+origin = "{title | slug}"
 ----
 
 == Array Values

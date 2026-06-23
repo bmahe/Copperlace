@@ -113,6 +113,16 @@ final class CopperlaceTest {
     }
 
     @Test
+    void rendersBuiltinSlugProcessor() {
+        assertEquals(
+                "mias-story",
+                Copperlace.renderHoconString("""
+                        title = ["Mia's Story"]
+                        origin = "{title | slug}"
+                        """, "origin"));
+    }
+
+    @Test
     void rejectsBlankConfig() {
         final IllegalArgumentException exception =
                 assertThrows(

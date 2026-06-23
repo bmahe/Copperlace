@@ -94,6 +94,7 @@ fn builtin_processors() -> ProcessorRegistry {
     processors.insert("ordinal".to_string(), processor(ordinal));
     processors.insert("sentence".to_string(), processor(sentence));
     processors.insert("quote".to_string(), processor(quote));
+    processors.insert("slug".to_string(), processor(slug));
     processors
 }
 
@@ -152,6 +153,27 @@ fn quote(value: &str) -> Result<String, String> {
         }
     }
     output.push('"');
+    Ok(output)
+}
+
+fn slug(value: &str) -> Result<String, String> {
+    let mut output = String::new();
+    let mut pending_separator = false;
+
+    for character in value.trim().chars() {
+        if character.is_alphanumeric() {
+            if pending_separator && !output.is_empty() {
+                output.push('-');
+            }
+            output.extend(character.to_lowercase());
+            pending_separator = false;
+        } else if matches!(character, '\'' | '’') {
+            continue;
+        } else if !output.is_empty() {
+            pending_separator = true;
+        }
+    }
+
     Ok(output)
 }
 

@@ -72,6 +72,14 @@ class CopperlaceTests(unittest.TestCase):
 
         self.assertEqual(output, "1st/11th/23rd")
 
+    def test_builtin_slug_processor(self) -> None:
+        output = render_hocon_str(
+            'title = ["Mia\'s Story"]\norigin = "{title | slug}"',
+            "origin",
+        )
+
+        self.assertEqual(output, "mias-story")
+
     def test_repeated_renders_on_one_ruleset(self) -> None:
         ruleset = RuleSet.from_string('name = ["Mia"]\norigin = "{name}"')
         try:

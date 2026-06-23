@@ -923,6 +923,57 @@ fn quote_processor_wraps_empty_text() {
 }
 
 #[test]
+fn slug_processor_lowercases_and_hyphenates_text() {
+    let rules = ruleset(
+        r#"
+        text = ["Mia's Story"]
+        origin = "{text | slug}"
+        "#,
+    );
+
+    assert_eq!(rules.render_rule("origin").unwrap(), "mias-story");
+}
+
+#[test]
+fn slug_processor_collapses_separator_runs() {
+    let rules = ruleset(
+        r#"
+        text = ["  Mia -- finds_the 8th key!  "]
+        origin = "{text | slug}"
+        "#,
+    );
+
+    assert_eq!(
+        rules.render_rule("origin").unwrap(),
+        "mia-finds-the-8th-key"
+    );
+}
+
+#[test]
+fn slug_processor_removes_apostrophes_without_separators() {
+    let rules = ruleset(
+        r#"
+        text = ["James' Lantern"]
+        origin = "{text | slug}"
+        "#,
+    );
+
+    assert_eq!(rules.render_rule("origin").unwrap(), "james-lantern");
+}
+
+#[test]
+fn slug_processor_returns_empty_for_text_without_alphanumerics() {
+    let rules = ruleset(
+        r#"
+        text = ["  !!!  "]
+        origin = "{text | slug}"
+        "#,
+    );
+
+    assert_eq!(rules.render_rule("origin").unwrap(), "");
+}
+
+#[test]
 fn processor_pipeline_transforms_context_default() {
     let rules = ruleset(
         r#"
