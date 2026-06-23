@@ -1,0 +1,56 @@
+= Copperlace Examples
+
+These standalone HOCON files show different ways to combine rules, random
+choices, bindings, context defaults, and processors. Random choices can produce
+different output on each render.
+
+Run examples from `rust-core/` with:
+
+[source,sh]
+----
+cargo run --bin copperlace -- render --config ../examples/character_scene.conf --rule origin
+----
+
+== Files
+
+`character_scene.conf`::
+Short fiction or RPG flavor text. Demonstrates bindings, context defaults,
+`article`, `possessive`, `present_participle`, and `sentence`.
+
+`item_card.conf`::
+Game item card copy. Demonstrates reusable item bindings, `titlecase`,
+`past_tense`, `pluralize`, and `present_participle`.
+
+`gendered_pronouns.conf`::
+Character text with consistent pronouns. Demonstrates bindings and male,
+female, and neutral lizard pronouns, plus `present_participle`.
+
+`item_json.conf`::
+JSON item data. Demonstrates JSON-safe quoted strings, bindings, scalar values,
+`slug`, `ordinal`, `article`, `past_tense`, `pluralize`, and
+`present_participle`.
+
+`product_blurb.conf`::
+Product or marketing microcopy. Demonstrates multiple render rules plus
+`titlecase`, `sentence`, `article`, `quote`, `pluralize`, and `slug`.
+
+`release_note.conf`::
+Changelog-style output. Demonstrates `past_tense`, `article`, `ordinal`,
+`pluralize`, `possessive`, and binding reuse.
+
+`quest_log.conf`::
+Quest/task text. Demonstrates `singularize`, `article`, `possessive`,
+`present_participle`, `pluralize`, and context defaults.
+
+Try alternate rules where available:
+
+[source,sh]
+----
+cargo run --bin copperlace -- render --config ../examples/product_blurb.conf --rule headline
+cargo run --bin copperlace -- render --config ../examples/product_blurb.conf --rule tagline
+cargo run --bin copperlace -- render --config ../examples/product_blurb.conf --rule slug
+cargo run --bin copperlace -- render --config ../examples/gendered_pronouns.conf --rule origin
+cargo run --bin copperlace -- render --config ../examples/gendered_pronouns.conf --rule profile
+cargo run --bin copperlace -- render --config ../examples/item_json.conf --rule origin
+cargo run --bin copperlace -- render --config ../examples/quest_log.conf --rule objective
+----

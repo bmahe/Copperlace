@@ -26,6 +26,9 @@ context = {
 
 Rendering `origin` first binds `hero` from `name` and `heroPet` from `animal`,
 then renders `story` with those bound values reused for the rest of that render.
+More runnable examples live in link:examples/README.adoc[examples/], covering
+story text, game item cards, gendered pronouns, JSON item data, product copy,
+release notes, and quest logs.
 
 == Documentation
 
