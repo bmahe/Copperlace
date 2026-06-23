@@ -92,6 +92,7 @@ fn builtin_processors() -> ProcessorRegistry {
         processor(present_participle),
     );
     processors.insert("ordinal".to_string(), processor(ordinal));
+    processors.insert("sentence".to_string(), processor(sentence));
     processors
 }
 
@@ -124,6 +125,20 @@ fn titlecase(value: &str) -> Result<String, String> {
     }
 
     Ok(output)
+}
+
+fn sentence(value: &str) -> Result<String, String> {
+    for (index, character) in value.char_indices() {
+        if character.is_alphabetic() {
+            let mut output = String::new();
+            output.push_str(&value[..index]);
+            output.extend(character.to_uppercase());
+            output.push_str(&value[index + character.len_utf8()..]);
+            return Ok(output);
+        }
+    }
+
+    Ok(value.to_string())
 }
 
 fn article(value: &str) -> Result<String, String> {

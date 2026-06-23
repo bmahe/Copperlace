@@ -835,6 +835,55 @@ fn ordinal_processor_rejects_multiple_words() {
 }
 
 #[test]
+fn sentence_processor_capitalizes_first_alphabetic_character() {
+    let rules = ruleset(
+        r#"
+        text = ["hello world"]
+        origin = "{text | sentence}"
+        "#,
+    );
+
+    assert_eq!(rules.render_rule("origin").unwrap(), "Hello world");
+}
+
+#[test]
+fn sentence_processor_skips_leading_punctuation() {
+    let rules = ruleset(
+        r#"
+        text = ["  ...mia waits"]
+        origin = "{text | sentence}"
+        "#,
+    );
+
+    assert_eq!(rules.render_rule("origin").unwrap(), "  ...Mia waits");
+}
+
+#[test]
+fn sentence_processor_leaves_rest_unchanged() {
+    let rules = ruleset(
+        r#"
+        text = ["hello MIA"]
+        origin = "{text | sentence}"
+        "#,
+    );
+
+    assert_eq!(rules.render_rule("origin").unwrap(), "Hello MIA");
+}
+
+#[test]
+fn sentence_processor_returns_text_without_letters_unchanged() {
+    let rules = ruleset(
+        r#"
+        empty = [""]
+        punctuation = ["  ...  "]
+        origin = "{empty | sentence}/{punctuation | sentence}"
+        "#,
+    );
+
+    assert_eq!(rules.render_rule("origin").unwrap(), "/  ...  ");
+}
+
+#[test]
 fn processor_pipeline_transforms_context_default() {
     let rules = ruleset(
         r#"

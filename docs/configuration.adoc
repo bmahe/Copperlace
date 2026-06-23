@@ -87,6 +87,7 @@ Supported builtin processors are:
 * `possessive`
 * `present_participle`
 * `ordinal`
+* `sentence`
 
 The `article` processor prefixes the rendered value with `a` or `an` using
 English heuristics. It preserves the rendered value as-is, so use `trim` first
@@ -157,6 +158,15 @@ non-integer values.
 ----
 rank = [1, 2, 3, 11]
 origin = "Mia finished {rank | ordinal}."
+----
+
+The `sentence` processor capitalizes the first alphabetic character in the
+rendered string and leaves the rest unchanged.
+
+[source,hocon]
+----
+line = ["hello MIA"]
+origin = "{line | sentence}"
 ----
 
 == Array Values
