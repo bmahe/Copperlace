@@ -684,6 +684,78 @@ fn possessive_processor_rejects_multiple_words() {
 }
 
 #[test]
+fn present_participle_processor_handles_regular_verbs() {
+    let rules = ruleset(
+        r#"
+        walk = ["walk"]
+        make = ["make"]
+        run = ["run"]
+        lie = ["lie"]
+        see = ["see"]
+        origin = "{walk | present_participle}/{make | present_participle}/{run | present_participle}/{lie | present_participle}/{see | present_participle}"
+        "#,
+    );
+
+    assert_eq!(
+        rules.render_rule("origin").unwrap(),
+        "walking/making/running/lying/seeing"
+    );
+}
+
+#[test]
+fn present_participle_processor_preserves_capitalization_and_whitespace() {
+    let rules = ruleset(
+        r#"
+        title = ["Run"]
+        upper = ["RUN"]
+        padded = ["  walk  "]
+        origin = "{title | present_participle}/{upper | present_participle}/{padded | present_participle}"
+        "#,
+    );
+
+    assert_eq!(
+        rules.render_rule("origin").unwrap(),
+        "Running/RUNNING/  walking  "
+    );
+}
+
+#[test]
+fn present_participle_processor_rejects_blank_input() {
+    let rules = ruleset(
+        r#"
+        blank = ["  "]
+        origin = "{blank | present_participle}"
+        "#,
+    );
+
+    assert_eq!(
+        rules.render_rule("origin"),
+        Err(RenderError::ProcessorError {
+            processor: "present_participle".to_string(),
+            message: "input must contain one verb".to_string(),
+        })
+    );
+}
+
+#[test]
+fn present_participle_processor_rejects_multiple_words() {
+    let rules = ruleset(
+        r#"
+        phrase = ["walk home"]
+        origin = "{phrase | present_participle}"
+        "#,
+    );
+
+    assert_eq!(
+        rules.render_rule("origin"),
+        Err(RenderError::ProcessorError {
+            processor: "present_participle".to_string(),
+            message: "input must contain exactly one verb token".to_string(),
+        })
+    );
+}
+
+#[test]
 fn processor_pipeline_transforms_context_default() {
     let rules = ruleset(
         r#"

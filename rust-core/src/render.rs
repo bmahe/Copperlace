@@ -87,6 +87,10 @@ fn builtin_processors() -> ProcessorRegistry {
     processors.insert("pluralize".to_string(), processor(pluralize));
     processors.insert("singularize".to_string(), processor(singularize));
     processors.insert("possessive".to_string(), processor(possessive));
+    processors.insert(
+        "present_participle".to_string(),
+        processor(present_participle),
+    );
     processors
 }
 
@@ -342,6 +346,37 @@ fn possessive(value: &str) -> Result<String, String> {
     let suffix = if token.ends_with('s') { "'" } else { "'s" };
 
     Ok(format!("{leading}{token}{suffix}{trailing}"))
+}
+
+fn present_participle(value: &str) -> Result<String, String> {
+    let (leading, token, trailing) = single_token_parts(value, "verb")?;
+    let participle = apply_case_style(token, &present_participle_lowercase(&token.to_lowercase()));
+
+    Ok(format!("{leading}{participle}{trailing}"))
+}
+
+fn present_participle_lowercase(value: &str) -> String {
+    if let Some(stem) = value.strip_suffix("ie") {
+        return format!("{stem}ying");
+    }
+
+    if value.ends_with('e')
+        && !value.ends_with("ee")
+        && !value.ends_with("ye")
+        && !value.ends_with("oe")
+    {
+        return format!(
+            "{}ing",
+            value.strip_suffix('e').expect("suffix was checked")
+        );
+    }
+
+    if should_double_final_consonant(value) {
+        let final_character = value.chars().last().expect("value is not empty");
+        return format!("{value}{final_character}ing");
+    }
+
+    format!("{value}ing")
 }
 
 fn past_tense_lowercase(value: &str) -> String {

@@ -85,6 +85,7 @@ Supported builtin processors are:
 * `pluralize`
 * `singularize`
 * `possessive`
+* `present_participle`
 
 The `article` processor prefixes the rendered value with `a` or `an` using
 English heuristics. It preserves the rendered value as-is, so use `trim` first
@@ -135,6 +136,16 @@ multi-word phrases.
 ----
 name = ["Mia", "James"]
 origin = "{name | possessive} lantern glows."
+----
+
+The `present_participle` processor converts one verb token to its `-ing` form.
+It preserves surrounding whitespace but returns an error for blank values or
+multi-word phrases.
+
+[source,hocon]
+----
+action = ["walk", "run", "lie"]
+origin = "Mia is {action | present_participle}."
 ----
 
 == Array Values
