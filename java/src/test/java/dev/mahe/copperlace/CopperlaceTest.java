@@ -101,6 +101,18 @@ final class CopperlaceTest {
     }
 
     @Test
+    void rendersBuiltinOrdinalProcessor() {
+        assertEquals(
+                "1st/11th/23rd",
+                Copperlace.renderHoconString("""
+                        one = [1]
+                        eleven = [11]
+                        twenty_three = [23]
+                        origin = "{one | ordinal}/{eleven | ordinal}/{twenty_three | ordinal}"
+                        """, "origin"));
+    }
+
+    @Test
     void rejectsBlankConfig() {
         final IllegalArgumentException exception =
                 assertThrows(

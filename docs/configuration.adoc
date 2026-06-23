@@ -86,6 +86,7 @@ Supported builtin processors are:
 * `singularize`
 * `possessive`
 * `present_participle`
+* `ordinal`
 
 The `article` processor prefixes the rendered value with `a` or `an` using
 English heuristics. It preserves the rendered value as-is, so use `trim` first
@@ -146,6 +147,16 @@ multi-word phrases.
 ----
 action = ["walk", "run", "lie"]
 origin = "Mia is {action | present_participle}."
+----
+
+The `ordinal` processor adds an English ordinal suffix to one integer token. It
+preserves surrounding whitespace but returns an error for blank, multi-word, or
+non-integer values.
+
+[source,hocon]
+----
+rank = [1, 2, 3, 11]
+origin = "Mia finished {rank | ordinal}."
 ----
 
 == Array Values

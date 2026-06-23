@@ -64,6 +64,14 @@ class CopperlaceTests(unittest.TestCase):
 
         self.assertEqual(output, "Mia's/James'")
 
+    def test_builtin_ordinal_processor(self) -> None:
+        output = render_hocon_str(
+            'one = [1]\neleven = [11]\ntwenty_three = [23]\norigin = "{one | ordinal}/{eleven | ordinal}/{twenty_three | ordinal}"',
+            "origin",
+        )
+
+        self.assertEqual(output, "1st/11th/23rd")
+
     def test_repeated_renders_on_one_ruleset(self) -> None:
         ruleset = RuleSet.from_string('name = ["Mia"]\norigin = "{name}"')
         try:

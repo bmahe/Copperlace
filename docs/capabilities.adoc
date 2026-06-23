@@ -48,13 +48,14 @@ Rendering `origin` produces `Hello Mia`.
 
 Builtin processors are `uppercase`, `lowercase`, `trim`, `capitalize`,
 `titlecase`, `article`, `past_tense`, `pluralize`, `singularize`, and
-`possessive`, and `present_participle`. The `article` processor prefixes
-rendered text with `a` or `an`, as in `{item | article}`. The `past_tense` and
-`present_participle` processors convert one verb token to past tense or `-ing`
-form. The `pluralize` and `singularize` processors convert one noun token
-between singular and plural forms, and `possessive` adds an English possessive
-suffix. Rust callers can register custom processors when constructing a
-`RuleSet`; CLI, Python, Java, and C ABI callers use the builtin registry.
+`possessive`, `present_participle`, and `ordinal`. The `article` processor
+prefixes rendered text with `a` or `an`, as in `{item | article}`. The
+`past_tense` and `present_participle` processors convert one verb token to past
+tense or `-ing` form. The `pluralize` and `singularize` processors convert one
+noun token between singular and plural forms, `possessive` adds an English
+possessive suffix, and `ordinal` adds an ordinal suffix to one integer token.
+Rust callers can register custom processors when constructing a `RuleSet`; CLI,
+Python, Java, and C ABI callers use the builtin registry.
 
 == Random Choices
 

@@ -756,6 +756,85 @@ fn present_participle_processor_rejects_multiple_words() {
 }
 
 #[test]
+fn ordinal_processor_adds_number_suffixes() {
+    let rules = ruleset(
+        r#"
+        one = ["1"]
+        two = ["2"]
+        three = ["3"]
+        four = ["4"]
+        origin = "{one | ordinal}/{two | ordinal}/{three | ordinal}/{four | ordinal}"
+        "#,
+    );
+
+    assert_eq!(rules.render_rule("origin").unwrap(), "1st/2nd/3rd/4th");
+}
+
+#[test]
+fn ordinal_processor_handles_teen_exceptions_and_larger_numbers() {
+    let rules = ruleset(
+        r#"
+        eleven = ["11"]
+        twelve = ["12"]
+        thirteen = ["13"]
+        twenty_three = ["23"]
+        origin = "{eleven | ordinal}/{twelve | ordinal}/{thirteen | ordinal}/{twenty_three | ordinal}"
+        "#,
+    );
+
+    assert_eq!(rules.render_rule("origin").unwrap(), "11th/12th/13th/23rd");
+}
+
+#[test]
+fn ordinal_processor_preserves_surrounding_whitespace_and_sign() {
+    let rules = ruleset(
+        r#"
+        padded = ["  21  "]
+        negative = ["-1"]
+        origin = "{padded | ordinal}/{negative | ordinal}"
+        "#,
+    );
+
+    assert_eq!(rules.render_rule("origin").unwrap(), "  21st  /-1st");
+}
+
+#[test]
+fn ordinal_processor_rejects_non_integer_input() {
+    let rules = ruleset(
+        r#"
+        word = ["first"]
+        origin = "{word | ordinal}"
+        "#,
+    );
+
+    assert_eq!(
+        rules.render_rule("origin"),
+        Err(RenderError::ProcessorError {
+            processor: "ordinal".to_string(),
+            message: "input must contain one integer".to_string(),
+        })
+    );
+}
+
+#[test]
+fn ordinal_processor_rejects_multiple_words() {
+    let rules = ruleset(
+        r#"
+        phrase = ["1 2"]
+        origin = "{phrase | ordinal}"
+        "#,
+    );
+
+    assert_eq!(
+        rules.render_rule("origin"),
+        Err(RenderError::ProcessorError {
+            processor: "ordinal".to_string(),
+            message: "input must contain exactly one integer token".to_string(),
+        })
+    );
+}
+
+#[test]
 fn processor_pipeline_transforms_context_default() {
     let rules = ruleset(
         r#"

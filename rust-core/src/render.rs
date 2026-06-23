@@ -91,6 +91,7 @@ fn builtin_processors() -> ProcessorRegistry {
         "present_participle".to_string(),
         processor(present_participle),
     );
+    processors.insert("ordinal".to_string(), processor(ordinal));
     processors
 }
 
@@ -377,6 +378,37 @@ fn present_participle_lowercase(value: &str) -> String {
     }
 
     format!("{value}ing")
+}
+
+fn ordinal(value: &str) -> Result<String, String> {
+    let (leading, token, trailing) = single_token_parts(value, "integer")?;
+    let digits = token.strip_prefix('-').unwrap_or(token);
+    if digits.is_empty() || !digits.chars().all(|character| character.is_ascii_digit()) {
+        return Err("input must contain one integer".to_string());
+    }
+
+    Ok(format!(
+        "{leading}{token}{}{trailing}",
+        ordinal_suffix(digits)
+    ))
+}
+
+fn ordinal_suffix(digits: &str) -> &'static str {
+    let last_two = if digits.len() >= 2 {
+        &digits[digits.len() - 2..]
+    } else {
+        digits
+    };
+    if matches!(last_two, "11" | "12" | "13") {
+        return "th";
+    }
+
+    match digits.chars().last() {
+        Some('1') => "st",
+        Some('2') => "nd",
+        Some('3') => "rd",
+        _ => "th",
+    }
 }
 
 fn past_tense_lowercase(value: &str) -> String {
