@@ -1,1 +1,5 @@
 target/
+.vscode/
+python/build/
+python/copperlace.egg-info/
+python/dist/
