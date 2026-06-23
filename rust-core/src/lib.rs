@@ -1,5 +1,6 @@
 pub mod config;
 pub mod ffi;
+mod processors;
 pub mod render;
 
 pub use config::{
