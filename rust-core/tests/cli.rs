@@ -241,6 +241,142 @@ fn rejects_missing_rule_value() {
 }
 
 #[test]
+fn checks_config_file() {
+    let config_path = write_temp_config(
+        r#"
+        origin = "Mia"
+        "#,
+    );
+    let output = Command::new(env!("CARGO_BIN_EXE_copperlace"))
+        .args(["check", "--config", &config_path.to_string_lossy()])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    assert_eq!(String::from_utf8_lossy(&output.stdout), "OK\n");
+
+    let _ = fs::remove_file(config_path);
+}
+
+#[test]
+fn checks_config_file_with_short_flag() {
+    let config_path = write_temp_config(
+        r#"
+        origin = "Mia"
+        "#,
+    );
+    let output = Command::new(env!("CARGO_BIN_EXE_copperlace"))
+        .args(["check", "-c", &config_path.to_string_lossy()])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    assert_eq!(String::from_utf8_lossy(&output.stdout), "OK\n");
+
+    let _ = fs::remove_file(config_path);
+}
+
+#[test]
+fn checks_config_string() {
+    let output = Command::new(env!("CARGO_BIN_EXE_copperlace"))
+        .args(["check", "--string", r#"origin = "Mia""#])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    assert_eq!(String::from_utf8_lossy(&output.stdout), "OK\n");
+}
+
+#[test]
+fn check_rejects_invalid_hocon_string() {
+    let output = Command::new(env!("CARGO_BIN_EXE_copperlace"))
+        .args(["check", "--string", "[\"Mia\"]"])
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("failed to parse config"));
+}
+
+#[test]
+fn check_rejects_invalid_copperlace_config() {
+    let output = Command::new(env!("CARGO_BIN_EXE_copperlace"))
+        .args([
+            "check",
+            "--string",
+            r#"origin = "{name | missing_processor}""#,
+        ])
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("unknown processor"));
+}
+
+#[test]
+fn check_rejects_missing_input() {
+    let output = Command::new(env!("CARGO_BIN_EXE_copperlace"))
+        .arg("check")
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success());
+    assert!(
+        String::from_utf8_lossy(&output.stderr)
+            .contains("missing required argument: --config or --string")
+    );
+}
+
+#[test]
+fn check_rejects_multiple_inputs() {
+    let config_path = write_temp_config(
+        r#"
+        origin = "Mia"
+        "#,
+    );
+    let output = Command::new(env!("CARGO_BIN_EXE_copperlace"))
+        .args([
+            "check",
+            "--config",
+            &config_path.to_string_lossy(),
+            "--string",
+            r#"origin = "Darcy""#,
+        ])
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success());
+    assert!(
+        String::from_utf8_lossy(&output.stderr)
+            .contains("only one of --config or --string may be provided")
+    );
+
+    let _ = fs::remove_file(config_path);
+}
+
+#[test]
+fn check_rejects_missing_string_value() {
+    let output = Command::new(env!("CARGO_BIN_EXE_copperlace"))
+        .args(["check", "--string"])
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("missing value for --string"));
+}
+
+#[test]
+fn prints_check_help() {
+    let output = Command::new(env!("CARGO_BIN_EXE_copperlace"))
+        .args(["check", "--help"])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    assert!(String::from_utf8_lossy(&output.stdout).contains("Check options:"));
+}
+
+#[test]
 fn prints_help() {
     let output = Command::new(env!("CARGO_BIN_EXE_copperlace"))
         .arg("--help")
