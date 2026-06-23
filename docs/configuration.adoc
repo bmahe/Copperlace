@@ -82,6 +82,7 @@ Supported builtin processors are:
 * `titlecase`
 * `article`
 * `past_tense`
+* `pluralize`
 
 The `article` processor prefixes the rendered value with `a` or `an` using
 English heuristics. It preserves the rendered value as-is, so use `trim` first
@@ -101,6 +102,16 @@ but returns an error for blank values or multi-word phrases.
 ----
 action = ["walk", "run", "try"]
 origin = "Mia {action | past_tense}."
+----
+
+The `pluralize` processor converts one noun token to plural form using regular
+spelling rules and common irregular nouns. It preserves surrounding whitespace
+but returns an error for blank values or multi-word phrases.
+
+[source,hocon]
+----
+creature = ["cat", "person", "city"]
+origin = "The town has many {creature | pluralize}."
 ----
 
 == Array Values

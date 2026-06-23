@@ -438,6 +438,93 @@ fn past_tense_processor_rejects_multiple_words() {
 }
 
 #[test]
+fn pluralize_processor_handles_regular_nouns() {
+    let rules = ruleset(
+        r#"
+        cat = ["cat"]
+        box = ["box"]
+        city = ["city"]
+        leaf = ["leaf"]
+        knife = ["knife"]
+        origin = "{cat | pluralize}/{box | pluralize}/{city | pluralize}/{leaf | pluralize}/{knife | pluralize}"
+        "#,
+    );
+
+    assert_eq!(
+        rules.render_rule("origin").unwrap(),
+        "cats/boxes/cities/leaves/knives"
+    );
+}
+
+#[test]
+fn pluralize_processor_handles_common_irregular_nouns() {
+    let rules = ruleset(
+        r#"
+        person = ["person"]
+        child = ["child"]
+        mouse = ["mouse"]
+        ox = ["ox"]
+        origin = "{person | pluralize}/{child | pluralize}/{mouse | pluralize}/{ox | pluralize}"
+        "#,
+    );
+
+    assert_eq!(
+        rules.render_rule("origin").unwrap(),
+        "people/children/mice/oxen"
+    );
+}
+
+#[test]
+fn pluralize_processor_preserves_capitalization_and_whitespace() {
+    let rules = ruleset(
+        r#"
+        title = ["Person"]
+        upper = ["DOG"]
+        padded = ["  cat  "]
+        origin = "{title | pluralize}/{upper | pluralize}/{padded | pluralize}"
+        "#,
+    );
+
+    assert_eq!(rules.render_rule("origin").unwrap(), "People/DOGS/  cats  ");
+}
+
+#[test]
+fn pluralize_processor_rejects_blank_input() {
+    let rules = ruleset(
+        r#"
+        blank = ["  "]
+        origin = "{blank | pluralize}"
+        "#,
+    );
+
+    assert_eq!(
+        rules.render_rule("origin"),
+        Err(RenderError::ProcessorError {
+            processor: "pluralize".to_string(),
+            message: "input must contain one noun".to_string(),
+        })
+    );
+}
+
+#[test]
+fn pluralize_processor_rejects_multiple_words() {
+    let rules = ruleset(
+        r#"
+        phrase = ["red cat"]
+        origin = "{phrase | pluralize}"
+        "#,
+    );
+
+    assert_eq!(
+        rules.render_rule("origin"),
+        Err(RenderError::ProcessorError {
+            processor: "pluralize".to_string(),
+            message: "input must contain exactly one noun token".to_string(),
+        })
+    );
+}
+
+#[test]
 fn processor_pipeline_transforms_context_default() {
     let rules = ruleset(
         r#"

@@ -48,6 +48,14 @@ class CopperlaceTests(unittest.TestCase):
 
         self.assertEqual(output, "walked/ran")
 
+    def test_builtin_pluralize_processor(self) -> None:
+        output = render_hocon_str(
+            'cat = ["cat"]\nperson = ["person"]\norigin = "{cat | pluralize}/{person | pluralize}"',
+            "origin",
+        )
+
+        self.assertEqual(output, "cats/people")
+
     def test_repeated_renders_on_one_ruleset(self) -> None:
         ruleset = RuleSet.from_string('name = ["Mia"]\norigin = "{name}"')
         try:

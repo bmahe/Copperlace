@@ -84,6 +84,7 @@ fn builtin_processors() -> ProcessorRegistry {
     processors.insert("titlecase".to_string(), processor(titlecase));
     processors.insert("article".to_string(), processor(article));
     processors.insert("past_tense".to_string(), processor(past_tense));
+    processors.insert("pluralize".to_string(), processor(pluralize));
     processors
 }
 
@@ -221,6 +222,63 @@ fn past_tense(value: &str) -> Result<String, String> {
     Ok(format!("{leading}{tense}{trailing}"))
 }
 
+fn pluralize(value: &str) -> Result<String, String> {
+    let (leading, token, trailing) = single_token_parts(value, "noun")?;
+    let plural = apply_case_style(token, &pluralize_lowercase(&token.to_lowercase()));
+
+    Ok(format!("{leading}{plural}{trailing}"))
+}
+
+fn pluralize_lowercase(value: &str) -> String {
+    if let Some(irregular) = irregular_plural(value) {
+        return irregular.to_string();
+    }
+
+    if let Some(stem) = value.strip_suffix("fe") {
+        return format!("{stem}ves");
+    }
+
+    if let Some(stem) = value.strip_suffix('f') {
+        return format!("{stem}ves");
+    }
+
+    if let Some(stem) = value.strip_suffix('y') {
+        if stem
+            .chars()
+            .last()
+            .is_some_and(|character| is_consonant(character))
+        {
+            return format!("{stem}ies");
+        }
+    }
+
+    if value.ends_with('s')
+        || value.ends_with('x')
+        || value.ends_with('z')
+        || value.ends_with("ch")
+        || value.ends_with("sh")
+    {
+        return format!("{value}es");
+    }
+
+    format!("{value}s")
+}
+
+fn irregular_plural(value: &str) -> Option<&'static str> {
+    match value {
+        "person" => Some("people"),
+        "child" => Some("children"),
+        "mouse" => Some("mice"),
+        "goose" => Some("geese"),
+        "man" => Some("men"),
+        "woman" => Some("women"),
+        "tooth" => Some("teeth"),
+        "foot" => Some("feet"),
+        "ox" => Some("oxen"),
+        _ => None,
+    }
+}
+
 fn past_tense_lowercase(value: &str) -> String {
     if let Some(irregular) = irregular_past_tense(value) {
         return irregular.to_string();
@@ -274,6 +332,28 @@ fn irregular_past_tense(value: &str) -> Option<&'static str> {
         "read" => Some("read"),
         _ => None,
     }
+}
+
+fn single_token_parts<'a>(
+    value: &'a str,
+    part_of_speech: &str,
+) -> Result<(&'a str, &'a str, &'a str), String> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return Err(format!("input must contain one {part_of_speech}"));
+    }
+    if trimmed.split_whitespace().count() != 1 {
+        return Err(format!(
+            "input must contain exactly one {part_of_speech} token"
+        ));
+    }
+
+    let leading_len = value.len() - value.trim_start().len();
+    let trailing_len = value.len() - value.trim_end().len();
+    let leading = &value[..leading_len];
+    let trailing = &value[value.len() - trailing_len..];
+
+    Ok((leading, trimmed, trailing))
 }
 
 fn should_double_final_consonant(value: &str) -> bool {

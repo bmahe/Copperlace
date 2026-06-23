@@ -79,6 +79,17 @@ final class CopperlaceTest {
     }
 
     @Test
+    void rendersBuiltinPluralizeProcessor() {
+        assertEquals(
+                "cats/people",
+                Copperlace.renderHoconString("""
+                        cat = ["cat"]
+                        person = ["person"]
+                        origin = "{cat | pluralize}/{person | pluralize}"
+                        """, "origin"));
+    }
+
+    @Test
     void rejectsBlankConfig() {
         final IllegalArgumentException exception =
                 assertThrows(
