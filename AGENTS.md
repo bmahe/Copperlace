@@ -27,4 +27,24 @@ Python wheels and Java native classifier JARs are platform-specific because they
 
 ## Commit & Pull Request Guidelines
 
-Use short imperative commit subjects matching project history, such as `Add Python wheel wrapper`, `Move tests out of source`, or `Rename Java package coordinates`. Pull requests should summarize behavior changes, list verification commands run, and call out native-library, packaging, or cross-language API impacts.
+Use short imperative commit subjects matching project history, such as `Add article processor`, `Move tests out of source`, or `Rename Java package coordinates`. Small focused changes can use a subject-only commit. Add a commit body when the subject alone does not explain intent, behavior, API impact, packaging changes, native-library effects, or cross-language wrapper implications. Commit bodies should state the purpose of the change, its user or maintenance impact, and why that impact matters; include relevant verification commands when useful. Do not use the body merely to list edited files.
+
+Example subject-only commit:
+
+```text
+Add article processor
+```
+
+Example commit with body:
+
+```text
+Add reusable Copperlace API
+
+Expose a load-once renderer in Rust, Python, and Java so callers can render
+multiple rules without recompiling config each time. This reduces repeated
+render overhead for applications that reuse the same configuration.
+
+Verified with make check.
+```
+
+Pull requests should summarize behavior changes, list verification commands run, and call out native-library, packaging, or cross-language API impacts.
