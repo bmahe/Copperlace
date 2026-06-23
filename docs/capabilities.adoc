@@ -47,13 +47,13 @@ origin = "Hello {name | trim | capitalize}"
 Rendering `origin` produces `Hello Mia`.
 
 Builtin processors are `uppercase`, `lowercase`, `trim`, `capitalize`,
-`titlecase`, `article`, `past_tense`, and `pluralize`. The `article` processor
-prefixes rendered text with `a` or `an`, as in `{item | article}`. The
-`past_tense` processor converts one verb token to past tense, as in
-`{action | past_tense}`. The `pluralize` processor converts one noun token to
-plural form, as in `{creature | pluralize}`. Rust callers can register custom
-processors when constructing a `RuleSet`; CLI, Python, Java, and C ABI callers
-use the builtin registry.
+`titlecase`, `article`, `past_tense`, `pluralize`, and `singularize`. The
+`article` processor prefixes rendered text with `a` or `an`, as in
+`{item | article}`. The `past_tense` processor converts one verb token to past
+tense, as in `{action | past_tense}`. The `pluralize` and `singularize`
+processors convert one noun token between singular and plural forms. Rust
+callers can register custom processors when constructing a `RuleSet`; CLI,
+Python, Java, and C ABI callers use the builtin registry.
 
 == Random Choices
 

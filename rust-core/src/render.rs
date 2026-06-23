@@ -85,6 +85,7 @@ fn builtin_processors() -> ProcessorRegistry {
     processors.insert("article".to_string(), processor(article));
     processors.insert("past_tense".to_string(), processor(past_tense));
     processors.insert("pluralize".to_string(), processor(pluralize));
+    processors.insert("singularize".to_string(), processor(singularize));
     processors
 }
 
@@ -275,6 +276,62 @@ fn irregular_plural(value: &str) -> Option<&'static str> {
         "tooth" => Some("teeth"),
         "foot" => Some("feet"),
         "ox" => Some("oxen"),
+        _ => None,
+    }
+}
+
+fn singularize(value: &str) -> Result<String, String> {
+    let (leading, token, trailing) = single_token_parts(value, "noun")?;
+    let singular = apply_case_style(token, &singularize_lowercase(&token.to_lowercase()));
+
+    Ok(format!("{leading}{singular}{trailing}"))
+}
+
+fn singularize_lowercase(value: &str) -> String {
+    if let Some(irregular) = irregular_singular(value) {
+        return irregular.to_string();
+    }
+
+    if let Some(stem) = value.strip_suffix("ies") {
+        return format!("{stem}y");
+    }
+
+    if let Some(stem) = value.strip_suffix("ves") {
+        return format!("{stem}f");
+    }
+
+    if value.ends_with("ches")
+        || value.ends_with("shes")
+        || value.ends_with("xes")
+        || value.ends_with("ses")
+        || value.ends_with("zes")
+    {
+        return value
+            .strip_suffix("es")
+            .expect("suffix was checked")
+            .to_string();
+    }
+
+    if value.len() > 1 {
+        if let Some(stem) = value.strip_suffix('s') {
+            return stem.to_string();
+        }
+    }
+
+    value.to_string()
+}
+
+fn irregular_singular(value: &str) -> Option<&'static str> {
+    match value {
+        "people" => Some("person"),
+        "children" => Some("child"),
+        "mice" => Some("mouse"),
+        "geese" => Some("goose"),
+        "men" => Some("man"),
+        "women" => Some("woman"),
+        "teeth" => Some("tooth"),
+        "feet" => Some("foot"),
+        "oxen" => Some("ox"),
         _ => None,
     }
 }

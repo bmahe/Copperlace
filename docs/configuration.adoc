@@ -83,6 +83,7 @@ Supported builtin processors are:
 * `article`
 * `past_tense`
 * `pluralize`
+* `singularize`
 
 The `article` processor prefixes the rendered value with `a` or `an` using
 English heuristics. It preserves the rendered value as-is, so use `trim` first
@@ -112,6 +113,17 @@ but returns an error for blank values or multi-word phrases.
 ----
 creature = ["cat", "person", "city"]
 origin = "The town has many {creature | pluralize}."
+----
+
+The `singularize` processor converts one plural noun token to singular form
+using common reverse spelling rules and irregular nouns. It preserves
+surrounding whitespace but returns an error for blank values or multi-word
+phrases.
+
+[source,hocon]
+----
+creatures = ["cats", "people", "cities"]
+origin = "One {creatures | singularize} waits."
 ----
 
 == Array Values
