@@ -31,10 +31,12 @@ The CLI supports:
 
 [source,sh]
 ----
-copperlace render --config <path> --rule <name>
+copperlace render --config <path>
+copperlace render -c <path> -r <name> --count <n>
 ----
 
-CLI rendering uses the builtin processor registry.
+CLI rendering uses the builtin processor registry. If `--rule` is omitted, the
+CLI renders `origin`. `--count` renders multiple outputs from one loaded config.
 
 == C ABI
 

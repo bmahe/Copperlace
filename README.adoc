@@ -60,7 +60,14 @@ Run the CLI against a bundled example:
 [source,sh]
 ----
 cd rust-core
-cargo run --bin copperlace -- render --config ../examples/character_scene.conf --rule origin
+cargo run --bin copperlace -- render --config ../examples/character_scene.conf
+----
+
+Render several outputs from one loaded config:
+
+[source,sh]
+----
+cargo run --bin copperlace -- render -c ../examples/character_scene.conf --count 3
 ----
 
 More runnable examples live in link:examples/README.adoc[examples/], covering
@@ -173,6 +180,7 @@ Common targeted commands:
 ----
 make rust-build
 make rust-test
+make rust-cli
 make python-test
 make python-wheel
 make js-package

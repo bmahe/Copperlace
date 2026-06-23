@@ -42,11 +42,13 @@ The package builds a `copperlace` binary:
 
 [source,sh]
 ----
-copperlace render --config <path> --rule <name>
+copperlace render --config <path>
+copperlace render -c <path> -r <name> --count <n>
 ----
 
-The CLI writes rendered output to stdout. Parse and render errors are written to
-stderr and return a nonzero exit code.
+The CLI renders `origin` when `--rule` is omitted. It writes rendered output,
+help, and version text to stdout. Parse, render, and argument errors are written
+to stderr and return a nonzero exit code.
 
 == C ABI
 
