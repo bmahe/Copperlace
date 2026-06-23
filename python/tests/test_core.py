@@ -56,6 +56,14 @@ class CopperlaceTests(unittest.TestCase):
 
         self.assertEqual(output, "cats/people")
 
+    def test_builtin_possessive_processor(self) -> None:
+        output = render_hocon_str(
+            'mia = ["Mia"]\njames = ["James"]\norigin = "{mia | possessive}/{james | possessive}"',
+            "origin",
+        )
+
+        self.assertEqual(output, "Mia's/James'")
+
     def test_repeated_renders_on_one_ruleset(self) -> None:
         ruleset = RuleSet.from_string('name = ["Mia"]\norigin = "{name}"')
         try:

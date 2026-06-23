@@ -86,6 +86,7 @@ fn builtin_processors() -> ProcessorRegistry {
     processors.insert("past_tense".to_string(), processor(past_tense));
     processors.insert("pluralize".to_string(), processor(pluralize));
     processors.insert("singularize".to_string(), processor(singularize));
+    processors.insert("possessive".to_string(), processor(possessive));
     processors
 }
 
@@ -334,6 +335,13 @@ fn irregular_singular(value: &str) -> Option<&'static str> {
         "oxen" => Some("ox"),
         _ => None,
     }
+}
+
+fn possessive(value: &str) -> Result<String, String> {
+    let (leading, token, trailing) = single_token_parts(value, "name")?;
+    let suffix = if token.ends_with('s') { "'" } else { "'s" };
+
+    Ok(format!("{leading}{token}{suffix}{trailing}"))
 }
 
 fn past_tense_lowercase(value: &str) -> String {

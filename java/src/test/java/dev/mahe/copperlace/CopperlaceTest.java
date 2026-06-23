@@ -90,6 +90,17 @@ final class CopperlaceTest {
     }
 
     @Test
+    void rendersBuiltinPossessiveProcessor() {
+        assertEquals(
+                "Mia's/James'",
+                Copperlace.renderHoconString("""
+                        mia = ["Mia"]
+                        james = ["James"]
+                        origin = "{mia | possessive}/{james | possessive}"
+                        """, "origin"));
+    }
+
+    @Test
     void rejectsBlankConfig() {
         final IllegalArgumentException exception =
                 assertThrows(

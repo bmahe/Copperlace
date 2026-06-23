@@ -612,6 +612,78 @@ fn singularize_processor_rejects_multiple_words() {
 }
 
 #[test]
+fn possessive_processor_adds_apostrophe_s() {
+    let rules = ruleset(
+        r#"
+        name = ["Mia"]
+        origin = "{name | possessive}"
+        "#,
+    );
+
+    assert_eq!(rules.render_rule("origin").unwrap(), "Mia's");
+}
+
+#[test]
+fn possessive_processor_adds_apostrophe_for_s_ending() {
+    let rules = ruleset(
+        r#"
+        name = ["James"]
+        origin = "{name | possessive}"
+        "#,
+    );
+
+    assert_eq!(rules.render_rule("origin").unwrap(), "James'");
+}
+
+#[test]
+fn possessive_processor_preserves_surrounding_whitespace() {
+    let rules = ruleset(
+        r#"
+        name = ["  Mia  "]
+        origin = "{name | possessive}"
+        "#,
+    );
+
+    assert_eq!(rules.render_rule("origin").unwrap(), "  Mia's  ");
+}
+
+#[test]
+fn possessive_processor_rejects_blank_input() {
+    let rules = ruleset(
+        r#"
+        blank = ["  "]
+        origin = "{blank | possessive}"
+        "#,
+    );
+
+    assert_eq!(
+        rules.render_rule("origin"),
+        Err(RenderError::ProcessorError {
+            processor: "possessive".to_string(),
+            message: "input must contain one name".to_string(),
+        })
+    );
+}
+
+#[test]
+fn possessive_processor_rejects_multiple_words() {
+    let rules = ruleset(
+        r#"
+        phrase = ["Mia Rose"]
+        origin = "{phrase | possessive}"
+        "#,
+    );
+
+    assert_eq!(
+        rules.render_rule("origin"),
+        Err(RenderError::ProcessorError {
+            processor: "possessive".to_string(),
+            message: "input must contain exactly one name token".to_string(),
+        })
+    );
+}
+
+#[test]
 fn processor_pipeline_transforms_context_default() {
     let rules = ruleset(
         r#"

@@ -84,6 +84,7 @@ Supported builtin processors are:
 * `past_tense`
 * `pluralize`
 * `singularize`
+* `possessive`
 
 The `article` processor prefixes the rendered value with `a` or `an` using
 English heuristics. It preserves the rendered value as-is, so use `trim` first
@@ -124,6 +125,16 @@ phrases.
 ----
 creatures = ["cats", "people", "cities"]
 origin = "One {creatures | singularize} waits."
+----
+
+The `possessive` processor adds an English possessive suffix to one token. It
+preserves surrounding whitespace but returns an error for blank values or
+multi-word phrases.
+
+[source,hocon]
+----
+name = ["Mia", "James"]
+origin = "{name | possessive} lantern glows."
 ----
 
 == Array Values
