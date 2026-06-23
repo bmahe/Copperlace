@@ -15,7 +15,7 @@ Copperlace is split into a Rust core plus language wrappers. `rust-core/` contai
 
 ## Coding Style & Naming Conventions
 
-Rust code must pass `cargo fmt --check`; keep tests outside `rust-core/src/`. Python uses small typed modules and standard-library `unittest`. Java uses Maven layout, Java FFM APIs, and package `dev.mahe.copperlace`. Keep Maven dependency and plugin versions in properties. Prefer descriptive names that match the renderer domain: rules, nodes, bindings, and render contexts.
+Rust code must pass `cargo fmt --check`; keep tests outside `rust-core/src/`. Python uses small typed modules and standard-library `unittest`. Java uses Maven layout, Java FFM APIs, and package `dev.mahe.copperlace`. Keep Maven dependency and plugin versions in properties. Code defensively, including explicit precondition checks and using Java's `final` modifier wherever practical for locals, parameters, fields, and classes. Prefer descriptive names that match the renderer domain: rules, nodes, bindings, and render contexts.
 
 ## Testing Guidelines
 

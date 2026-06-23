@@ -4,27 +4,30 @@ import java.lang.foreign.MemorySegment;
 import java.nio.file.Path;
 import java.util.Objects;
 
+import org.apache.commons.lang3.Validate;
+
 public final class RuleSet implements AutoCloseable {
     private MemorySegment handle;
     private boolean closed;
 
-    private RuleSet(MemorySegment handle) {
+    private RuleSet(final MemorySegment handle) {
+        Validate.isTrue(!NativeLibrary.isNull(handle), "handle must not be null");
         this.handle = handle;
     }
 
-    public static RuleSet fromString(String config) {
-        Objects.requireNonNull(config, "config");
+    public static RuleSet fromString(final String config) {
+        Validate.notBlank(config, "config must not be blank");
         return new RuleSet(NativeLibrary.INSTANCE.rulesetFromString(config));
     }
 
-    public static RuleSet fromFile(Path path) {
+    public static RuleSet fromFile(final Path path) {
         Objects.requireNonNull(path, "path");
         return new RuleSet(NativeLibrary.INSTANCE.rulesetFromFile(path));
     }
 
-    public String render(String rule) {
+    public String render(final String rule) {
         ensureOpen();
-        Objects.requireNonNull(rule, "rule");
+        Validate.notBlank(rule, "rule must not be blank");
         return NativeLibrary.INSTANCE.render(handle, rule);
     }
 

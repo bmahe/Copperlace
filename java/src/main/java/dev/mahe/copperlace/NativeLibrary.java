@@ -13,7 +13,10 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.Locale;
+import java.util.Objects;
 import java.util.Optional;
+
+import org.apache.commons.lang3.Validate;
 
 final class NativeLibrary {
     static final NativeLibrary INSTANCE = new NativeLibrary();
@@ -30,8 +33,8 @@ final class NativeLibrary {
     private final MethodHandle stringFree;
 
     private NativeLibrary() {
-        Linker linker = Linker.nativeLinker();
-        SymbolLookup lookup = SymbolLookup.libraryLookup(findLibrary(), libraryArena);
+        final Linker linker = Linker.nativeLinker();
+        final SymbolLookup lookup = SymbolLookup.libraryLookup(findLibrary(), libraryArena);
         rulesetFromFile = downcall(
                 linker,
                 lookup,
@@ -72,84 +75,95 @@ final class NativeLibrary {
                 FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
     }
 
-    MemorySegment rulesetFromString(String config) {
-        try (Arena arena = Arena.ofConfined()) {
-            MemorySegment outHandle = arena.allocate(ValueLayout.ADDRESS);
-            MemorySegment outError = arena.allocate(ValueLayout.ADDRESS);
-            MemorySegment configString = arena.allocateFrom(config);
+    MemorySegment rulesetFromString(final String config) {
+        Validate.notBlank(config, "config must not be blank");
 
-            int status = (int) rulesetFromString.invokeExact(configString, outHandle, outError);
+        try (Arena arena = Arena.ofConfined()) {
+            final MemorySegment outHandle = arena.allocate(ValueLayout.ADDRESS);
+            final MemorySegment outError = arena.allocate(ValueLayout.ADDRESS);
+            final MemorySegment configString = arena.allocateFrom(config);
+
+            final int status = (int) rulesetFromString.invokeExact(configString, outHandle, outError);
             checkStatus(status, outError);
             return outHandle.get(ValueLayout.ADDRESS, 0);
-        } catch (CopperlaceException exception) {
+        } catch (final CopperlaceException exception) {
             throw exception;
-        } catch (Throwable throwable) {
+        } catch (final Throwable throwable) {
             throw new CopperlaceException("Failed to create Copperlace ruleset", throwable);
         }
     }
 
-    MemorySegment rulesetFromFile(Path path) {
-        try (Arena arena = Arena.ofConfined()) {
-            MemorySegment outHandle = arena.allocate(ValueLayout.ADDRESS);
-            MemorySegment outError = arena.allocate(ValueLayout.ADDRESS);
-            MemorySegment pathString = arena.allocateFrom(path.toString());
+    MemorySegment rulesetFromFile(final Path path) {
+        Objects.requireNonNull(path, "path");
 
-            int status = (int) rulesetFromFile.invokeExact(pathString, outHandle, outError);
+        try (Arena arena = Arena.ofConfined()) {
+            final MemorySegment outHandle = arena.allocate(ValueLayout.ADDRESS);
+            final MemorySegment outError = arena.allocate(ValueLayout.ADDRESS);
+            final MemorySegment pathString = arena.allocateFrom(path.toString());
+
+            final int status = (int) rulesetFromFile.invokeExact(pathString, outHandle, outError);
             checkStatus(status, outError);
             return outHandle.get(ValueLayout.ADDRESS, 0);
-        } catch (CopperlaceException exception) {
+        } catch (final CopperlaceException exception) {
             throw exception;
-        } catch (Throwable throwable) {
+        } catch (final Throwable throwable) {
             throw new CopperlaceException("Failed to create Copperlace ruleset", throwable);
         }
     }
 
-    String render(MemorySegment handle, String rule) {
-        try (Arena arena = Arena.ofConfined()) {
-            MemorySegment outString = arena.allocate(ValueLayout.ADDRESS);
-            MemorySegment outError = arena.allocate(ValueLayout.ADDRESS);
-            MemorySegment ruleString = arena.allocateFrom(rule);
+    String render(final MemorySegment handle, final String rule) {
+        Validate.isTrue(!isNull(handle), "handle must not be null");
+        Validate.notBlank(rule, "rule must not be blank");
 
-            int status = (int) rulesetRender.invokeExact(handle, ruleString, outString, outError);
+        try (Arena arena = Arena.ofConfined()) {
+            final MemorySegment outString = arena.allocate(ValueLayout.ADDRESS);
+            final MemorySegment outError = arena.allocate(ValueLayout.ADDRESS);
+            final MemorySegment ruleString = arena.allocateFrom(rule);
+
+            final int status = (int) rulesetRender.invokeExact(handle, ruleString, outString, outError);
             checkStatus(status, outError);
 
-            MemorySegment nativeString = outString.get(ValueLayout.ADDRESS, 0);
+            final MemorySegment nativeString = outString.get(ValueLayout.ADDRESS, 0);
             try {
                 return readNativeString(nativeString);
             } finally {
                 stringFree(nativeString);
             }
-        } catch (CopperlaceException exception) {
+        } catch (final CopperlaceException exception) {
             throw exception;
-        } catch (Throwable throwable) {
+        } catch (final Throwable throwable) {
             throw new CopperlaceException("Failed to render Copperlace rule", throwable);
         }
     }
 
-    void rulesetFree(MemorySegment handle) {
+    void rulesetFree(final MemorySegment handle) {
+        Validate.isTrue(!isNull(handle), "handle must not be null");
+
         try {
             rulesetFree.invokeExact(handle);
-        } catch (Throwable throwable) {
+        } catch (final Throwable throwable) {
             throw new CopperlaceException("Failed to free Copperlace ruleset", throwable);
         }
     }
 
-    private void stringFree(MemorySegment nativeString) {
+    private void stringFree(final MemorySegment nativeString) {
         if (!isNull(nativeString)) {
             try {
                 stringFree.invokeExact(nativeString);
-            } catch (Throwable throwable) {
+            } catch (final Throwable throwable) {
                 throw new CopperlaceException("Failed to free Copperlace string", throwable);
             }
         }
     }
 
-    private void checkStatus(int status, MemorySegment outError) {
+    private void checkStatus(final int status, final MemorySegment outError) {
+        Objects.requireNonNull(outError, "outError");
+
         if (status == COPPERLACE_OK) {
             return;
         }
 
-        MemorySegment nativeError = outError.get(ValueLayout.ADDRESS, 0);
+        final MemorySegment nativeError = outError.get(ValueLayout.ADDRESS, 0);
         String message = switch (status) {
             case COPPERLACE_PARSE_ERROR -> "Copperlace parse error";
             case COPPERLACE_RENDER_ERROR -> "Copperlace render error";
@@ -165,7 +179,7 @@ final class NativeLibrary {
         throw new CopperlaceException(message);
     }
 
-    private String readNativeString(MemorySegment nativeString) {
+    private String readNativeString(final MemorySegment nativeString) {
         if (isNull(nativeString)) {
             return "";
         }
@@ -173,37 +187,42 @@ final class NativeLibrary {
     }
 
     private static MethodHandle downcall(
-            Linker linker,
-            SymbolLookup lookup,
-            String symbol,
-            FunctionDescriptor descriptor) {
-        Optional<MemorySegment> address = lookup.find(symbol);
+            final Linker linker,
+            final SymbolLookup lookup,
+            final String symbol,
+            final FunctionDescriptor descriptor) {
+        Objects.requireNonNull(linker, "linker");
+        Objects.requireNonNull(lookup, "lookup");
+        Validate.notBlank(symbol, "symbol must not be blank");
+        Objects.requireNonNull(descriptor, "descriptor");
+
+        final Optional<MemorySegment> address = lookup.find(symbol);
         if (address.isEmpty()) {
             throw new CopperlaceException("Could not find native symbol: " + symbol);
         }
         return linker.downcallHandle(address.get(), descriptor);
     }
 
-    private static boolean isNull(MemorySegment segment) {
+    static boolean isNull(final MemorySegment segment) {
         return segment == null || segment.equals(MemorySegment.NULL) || segment.address() == 0;
     }
 
     private static Path findLibrary() {
-        String override = System.getenv("COPPERLACE_LIBRARY_PATH");
+        final String override = System.getenv("COPPERLACE_LIBRARY_PATH");
         if (override != null && !override.isBlank()) {
-            Path path = Path.of(override);
+            final Path path = Path.of(override);
             if (Files.exists(path)) {
                 return path;
             }
         }
 
-        String libraryName = nativeLibraryName();
-        Optional<Path> packagedLibrary = findPackagedLibrary(libraryName);
+        final String libraryName = nativeLibraryName();
+        final Optional<Path> packagedLibrary = findPackagedLibrary(libraryName);
         if (packagedLibrary.isPresent()) {
             return packagedLibrary.get();
         }
 
-        for (Path candidate : sourceTreeCandidates(libraryName)) {
+        for (final Path candidate : sourceTreeCandidates(libraryName)) {
             if (Files.exists(candidate)) {
                 return candidate;
             }
@@ -217,28 +236,35 @@ final class NativeLibrary {
                         + ". Add the matching native classifier artifact, build rust-core, or set COPPERLACE_LIBRARY_PATH.");
     }
 
-    private static Optional<Path> findPackagedLibrary(String libraryName) {
-        String resourcePath = packagedResourcePath(nativeClassifier(), libraryName);
+    private static Optional<Path> findPackagedLibrary(final String libraryName) {
+        Validate.notBlank(libraryName, "libraryName must not be blank");
+
+        final String resourcePath = packagedResourcePath(nativeClassifier(), libraryName);
         try (InputStream input = NativeLibrary.class.getResourceAsStream("/" + resourcePath)) {
             if (input == null) {
                 return Optional.empty();
             }
 
-            Path extracted = Files.createTempFile("copperlace-", "-" + libraryName);
+            final Path extracted = Files.createTempFile("copperlace-", "-" + libraryName);
             Files.copy(input, extracted, StandardCopyOption.REPLACE_EXISTING);
             extracted.toFile().deleteOnExit();
             return Optional.of(extracted);
-        } catch (IOException exception) {
+        } catch (final IOException exception) {
             throw new CopperlaceException("Failed to extract packaged Copperlace native library", exception);
         }
     }
 
-    static String packagedResourcePath(String classifier, String libraryName) {
+    static String packagedResourcePath(final String classifier, final String libraryName) {
+        Validate.notBlank(classifier, "classifier must not be blank");
+        Validate.notBlank(libraryName, "libraryName must not be blank");
+
         return "dev/mahe/copperlace/native/" + classifier + "/" + libraryName;
     }
 
-    private static Path[] sourceTreeCandidates(String libraryName) {
-        Path cwd = Path.of("").toAbsolutePath().normalize();
+    private static Path[] sourceTreeCandidates(final String libraryName) {
+        Validate.notBlank(libraryName, "libraryName must not be blank");
+
+        final Path cwd = Path.of("").toAbsolutePath().normalize();
         return new Path[] {
             cwd.resolve("../rust-core/target/release").resolve(libraryName).normalize(),
             cwd.resolve("rust-core/target/release").resolve(libraryName).normalize()
@@ -246,8 +272,8 @@ final class NativeLibrary {
     }
 
     static String nativeClassifier() {
-        String os = System.getProperty("os.name").toLowerCase(Locale.ROOT);
-        String arch = normalizeArch(System.getProperty("os.arch"));
+        final String os = System.getProperty("os.name").toLowerCase(Locale.ROOT);
+        final String arch = normalizeArch(System.getProperty("os.arch"));
         if (os.contains("win")) {
             return "windows-" + arch;
         }
@@ -261,7 +287,7 @@ final class NativeLibrary {
     }
 
     static String nativeLibraryName() {
-        String os = System.getProperty("os.name").toLowerCase(Locale.ROOT);
+        final String os = System.getProperty("os.name").toLowerCase(Locale.ROOT);
         if (os.contains("win")) {
             return "copperlace.dll";
         }
@@ -274,8 +300,10 @@ final class NativeLibrary {
         throw new CopperlaceException("Unsupported native OS: " + System.getProperty("os.name"));
     }
 
-    private static String normalizeArch(String rawArch) {
-        String arch = rawArch.toLowerCase(Locale.ROOT);
+    private static String normalizeArch(final String rawArch) {
+        Validate.notBlank(rawArch, "rawArch must not be blank");
+
+        final String arch = rawArch.toLowerCase(Locale.ROOT);
         if (arch.equals("amd64") || arch.equals("x86_64")) {
             return "x86_64";
         }

@@ -1,6 +1,6 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0"
-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
   <modelVersion>4.0.0</modelVersion>
 
   <groupId>dev.mahe.copperlace</groupId>
@@ -11,12 +11,17 @@
   <properties>
     <maven.compiler.release>25</maven.compiler.release>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-    <junit.version>5.11.4</junit.version>
+
+    <copperlace.native.classifier>unsupported</copperlace.native.classifier>
+    <copperlace.native.library>unsupported</copperlace.native.library>
+
     <maven.antrun.plugin.version>3.1.0</maven.antrun.plugin.version>
     <maven.jar.plugin.version>3.4.2</maven.jar.plugin.version>
     <maven.surefire.plugin.version>3.5.2</maven.surefire.plugin.version>
-    <copperlace.native.classifier>unsupported</copperlace.native.classifier>
-    <copperlace.native.library>unsupported</copperlace.native.library>
+
+    <apache.commons.lang3.version>3.20.0</apache.commons.lang3.version>
+
+    <junit.version>5.11.4</junit.version>
   </properties>
 
   <profiles>
@@ -127,6 +132,14 @@
   </profiles>
 
   <dependencies>
+
+    <dependency>
+      <groupId>org.apache.commons</groupId>
+      <artifactId>commons-lang3</artifactId>
+      <version>${apache.commons.lang3.version}</version>
+      <scope>compile</scope>
+    </dependency>
+
     <dependency>
       <groupId>org.junit.jupiter</groupId>
       <artifactId>junit-jupiter</artifactId>
@@ -152,19 +165,20 @@
               <target>
                 <fail message="Unsupported native platform: ${os.name} ${os.arch}">
                   <condition>
-                    <equals arg1="${copperlace.native.classifier}" arg2="unsupported"/>
+                    <equals arg1="${copperlace.native.classifier}" arg2="unsupported" />
                   </condition>
                 </fail>
                 <exec executable="cargo" dir="${project.basedir}/.." failonerror="true">
-                  <arg value="build"/>
-                  <arg value="--release"/>
-                  <arg value="--manifest-path"/>
-                  <arg value="${project.basedir}/../rust-core/Cargo.toml"/>
+                  <arg value="build" />
+                  <arg value="--release" />
+                  <arg value="--manifest-path" />
+                  <arg value="${project.basedir}/../rust-core/Cargo.toml" />
                 </exec>
-                <mkdir dir="${project.build.outputDirectory}/dev/mahe/copperlace/native/${copperlace.native.classifier}"/>
+                <mkdir
+                  dir="${project.build.outputDirectory}/dev/mahe/copperlace/native/${copperlace.native.classifier}" />
                 <copy
-                    file="${project.basedir}/../rust-core/target/release/${copperlace.native.library}"
-                    todir="${project.build.outputDirectory}/dev/mahe/copperlace/native/${copperlace.native.classifier}"/>
+                  file="${project.basedir}/../rust-core/target/release/${copperlace.native.library}"
+                  todir="${project.build.outputDirectory}/dev/mahe/copperlace/native/${copperlace.native.classifier}" />
               </target>
             </configuration>
           </execution>

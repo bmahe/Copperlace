@@ -1,11 +1,13 @@
 package dev.mahe.copperlace;
 
-public class CopperlaceException extends RuntimeException {
-    public CopperlaceException(String message) {
+public final class CopperlaceException extends RuntimeException {
+    private static final long serialVersionUID = 1L;
+
+    public CopperlaceException(final String message) {
         super(message);
     }
 
-    public CopperlaceException(String message, Throwable cause) {
+    public CopperlaceException(final String message, final Throwable cause) {
         super(message, cause);
     }
 }

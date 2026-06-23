@@ -9,7 +9,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 
-class CopperlaceTest {
+final class CopperlaceTest {
     @Test
     void rendersFromString() {
         assertEquals(
@@ -22,7 +22,7 @@ class CopperlaceTest {
 
     @Test
     void rendersFromFile() throws IOException {
-        Path config = Files.createTempFile("copperlace", ".conf");
+        final Path config = Files.createTempFile("copperlace", ".conf");
         try {
             Files.writeString(config, """
                     name = ["Mia"]
@@ -37,7 +37,7 @@ class CopperlaceTest {
 
     @Test
     void missingRuleRaisesException() {
-        CopperlaceException exception = assertThrows(
+        final CopperlaceException exception = assertThrows(
                 CopperlaceException.class,
                 () -> Copperlace.renderHoconString("""
                         origin = "{missing}"
@@ -57,8 +57,57 @@ class CopperlaceTest {
     }
 
     @Test
+    void rejectsBlankConfig() {
+        final IllegalArgumentException exception =
+                assertThrows(
+                        IllegalArgumentException.class,
+                        () -> Copperlace.renderHoconString(" ", "origin"));
+
+        assertTrue(exception.getMessage().contains("config"));
+    }
+
+    @Test
+    void rejectsBlankRule() {
+        final IllegalArgumentException exception =
+                assertThrows(
+                        IllegalArgumentException.class,
+                        () -> Copperlace.renderHoconString("name = [\"Mia\"]", " "));
+
+        assertTrue(exception.getMessage().contains("rule"));
+    }
+
+    @Test
+    void rejectsBlankPath() {
+        final IllegalArgumentException exception =
+                assertThrows(IllegalArgumentException.class, () -> Copperlace.renderHoconFile(" ", "origin"));
+
+        assertTrue(exception.getMessage().contains("path"));
+    }
+
+    @Test
+    void rulesetRejectsBlankConfig() {
+        final IllegalArgumentException exception =
+                assertThrows(IllegalArgumentException.class, () -> RuleSet.fromString(" "));
+
+        assertTrue(exception.getMessage().contains("config"));
+    }
+
+    @Test
+    void rulesetRejectsBlankRule() {
+        try (final RuleSet rules = RuleSet.fromString("""
+                name = ["Mia"]
+                origin = "{name}"
+                """)) {
+            final IllegalArgumentException exception =
+                    assertThrows(IllegalArgumentException.class, () -> rules.render(" "));
+
+            assertTrue(exception.getMessage().contains("rule"));
+        }
+    }
+
+    @Test
     void rendersRepeatedlyFromOneRuleSet() {
-        try (RuleSet rules = RuleSet.fromString("""
+        try (final RuleSet rules = RuleSet.fromString("""
                 name = ["Mia"]
                 origin = "{name}"
                 """)) {
@@ -69,7 +118,7 @@ class CopperlaceTest {
 
     @Test
     void closeIsIdempotentAndRenderFailsAfterClose() {
-        RuleSet rules = RuleSet.fromString("""
+        final RuleSet rules = RuleSet.fromString("""
                 name = ["Mia"]
                 origin = "{name}"
                 """);
@@ -77,7 +126,7 @@ class CopperlaceTest {
         rules.close();
         rules.close();
 
-        CopperlaceException exception =
+        final CopperlaceException exception =
                 assertThrows(CopperlaceException.class, () -> rules.render("origin"));
         assertTrue(exception.getMessage().contains("closed"));
     }
@@ -91,8 +140,8 @@ class CopperlaceTest {
 
     @Test
     void detectsHostNativeLibraryName() {
-        String os = System.getProperty("os.name").toLowerCase();
-        String expected;
+        final String os = System.getProperty("os.name").toLowerCase();
+        final String expected;
         if (os.contains("win")) {
             expected = "copperlace.dll";
         } else if (os.contains("mac") || os.contains("darwin")) {
