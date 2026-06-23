@@ -3,10 +3,12 @@
 CARGO ?= cargo
 MVN ?= mvn
 PYTHON ?= python
+WASM_PACK ?= wasm-pack
 
 RUST_DIR := rust-core
 PYTHON_DIR := python
 JAVA_DIR := java
+JS_DIR := js
 
 .PHONY: help
 help:
@@ -17,10 +19,12 @@ help:
 	@printf '%s\n' '  make rust-cli       Run the sample CLI render command'
 	@printf '%s\n' '  make python-test    Run Python wrapper tests'
 	@printf '%s\n' '  make python-wheel   Build the Python wheel'
+	@printf '%s\n' '  make js-package     Build JS/TS WebAssembly package for bundlers'
+	@printf '%s\n' '  make js-web         Build JS/TS WebAssembly package for direct browser import'
 	@printf '%s\n' '  make java-test      Run Java FFM tests'
 	@printf '%s\n' '  make java-package   Build Java API and native classifier JARs'
 	@printf '%s\n' '  make test           Run Rust, Python, and Java tests'
-	@printf '%s\n' '  make package        Build Python and Java distributable artifacts'
+	@printf '%s\n' '  make package        Build Python, JS/TS, and Java distributable artifacts'
 	@printf '%s\n' '  make check          Run formatting checks and tests'
 	@printf '%s\n' '  make clean          Remove build outputs'
 
@@ -48,6 +52,14 @@ python-test: rust-build
 python-wheel:
 	cd $(PYTHON_DIR) && $(PYTHON) -m build --wheel
 
+.PHONY: js-package
+js-package:
+	$(WASM_PACK) build $(RUST_DIR) --target bundler --out-dir ../$(JS_DIR)/pkg
+
+.PHONY: js-web
+js-web:
+	$(WASM_PACK) build $(RUST_DIR) --target web --out-dir ../$(JS_DIR)/pkg
+
 .PHONY: java-test
 java-test:
 	cd $(JAVA_DIR) && $(MVN) -q test
@@ -60,7 +72,7 @@ java-package:
 test: rust-test python-test java-test
 
 .PHONY: package
-package: python-wheel java-package
+package: python-wheel js-package java-package
 
 .PHONY: check
 check: rust-fmt test
@@ -69,5 +81,6 @@ check: rust-fmt test
 clean:
 	cd $(RUST_DIR) && $(CARGO) clean
 	rm -rf $(PYTHON_DIR)/build $(PYTHON_DIR)/dist $(PYTHON_DIR)/*.egg-info
+	rm -rf $(JS_DIR)/pkg
 	find $(PYTHON_DIR) -type d -name __pycache__ -prune -exec rm -rf {} +
 	cd $(JAVA_DIR) && $(MVN) -q clean

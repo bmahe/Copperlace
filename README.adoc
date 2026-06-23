@@ -10,7 +10,8 @@ The core renderer is written in Rust and is exposed through:
 * a `copperlace` CLI;
 * a C ABI dynamic library;
 * Python bindings backed by `ctypes`;
-* Java bindings backed by the Java FFM API.
+* Java bindings backed by the Java FFM API;
+* JS/TS WebAssembly bindings for browser use.
 
 == What It Does
 
@@ -116,6 +117,24 @@ Java also exposes `RuleSet`, `Copperlace.renderHoconFile`, and
 `Copperlace.renderHoconString`. `Copperlace` and `RuleSet` implement
 `AutoCloseable`.
 
+=== JS/TS
+
+[source,ts]
+----
+import { Copperlace } from "./pkg/copperlace";
+
+const response = await fetch("/config.conf");
+const config = await response.text();
+const copperlace = new Copperlace(config);
+const output = copperlace.render("origin");
+----
+
+The JS/TS package is generated with `wasm-pack`. Bundler output can be imported
+directly; direct browser ES module output must call the generated `init`
+function before using `Copperlace`. Browser code should load config text, then
+pass the string to `new Copperlace(config)`. File-path APIs are not exported to
+WebAssembly.
+
 == Documentation
 
 The detailed behavior and configuration contract lives in `docs/`:
@@ -131,6 +150,7 @@ The detailed behavior and configuration contract lives in `docs/`:
 * `rust-core/` contains the renderer library, C ABI, and CLI.
 * `python/` contains the Python wheel wrapper and `ctypes` bindings.
 * `java/` contains the Java FFM wrapper and Maven packaging.
+* `js/` contains JS/TS WebAssembly package documentation.
 * `docs/` contains the behavior and configuration specification.
 * `examples/` contains runnable HOCON examples.
 
@@ -143,8 +163,8 @@ Use the root `Makefile` for normal workflows:
 make help          # list available targets
 make check         # Rust fmt check plus Rust, Python, and Java tests
 make test          # Rust, Python, and Java tests
-make package       # Python wheel and Java API/native classifier JARs
-make clean         # remove generated Rust, Python, and Java build outputs
+make package       # Python wheel, JS/TS wasm package, and Java JARs
+make clean         # remove generated Rust, Python, JS/TS, and Java build outputs
 ----
 
 Common targeted commands:
@@ -155,6 +175,8 @@ make rust-build
 make rust-test
 make python-test
 make python-wheel
+make js-package
+make js-web
 make java-test
 make java-package
 ----
@@ -162,7 +184,8 @@ make java-package
 == Packaging Notes
 
 Python wheels and Java native classifier JARs are platform-specific because
-they include the Rust dynamic library.
+they include the Rust dynamic library. JS/TS packages are generated from the
+same Rust renderer as WebAssembly and require `wasm-pack`.
 
 The Java module uses Maven coordinates `dev.mahe.copperlace:copperlace`. At
 runtime, the Java wrapper loads the native library from `COPPERLACE_LIBRARY_PATH`

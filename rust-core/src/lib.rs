@@ -10,9 +10,12 @@
 //! [`render_hocon_file`] or [`render_hocon_str`].
 
 pub mod config;
+#[cfg(not(target_arch = "wasm32"))]
 pub mod ffi;
 mod processors;
 pub mod render;
+#[cfg(target_arch = "wasm32")]
+mod wasm;
 
 pub use config::{
     ConfigError, Copperlace, render_hocon_file, render_hocon_str, ruleset_from_hocon_file,

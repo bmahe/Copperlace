@@ -3,3 +3,4 @@ target/
 python/build/
 python/copperlace.egg-info/
 python/dist/
+js/pkg/
