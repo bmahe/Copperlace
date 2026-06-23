@@ -17,6 +17,10 @@ cargo run --bin copperlace -- render --config ../examples/character_scene.conf -
 Short fiction or RPG flavor text. Demonstrates bindings, context defaults,
 `article`, `possessive`, `present_participle`, and `sentence`.
 
+`culture_names.conf`::
+Procedural culture and naming patterns. Demonstrates phonetic profiles,
+first names, family names, place names, accented vowels, and bindings.
+
 `item_card.conf`::
 Game item card copy. Demonstrates reusable item bindings, `titlecase`,
 `past_tense`, `pluralize`, and `present_participle`.
@@ -53,4 +57,7 @@ cargo run --bin copperlace -- render --config ../examples/gendered_pronouns.conf
 cargo run --bin copperlace -- render --config ../examples/gendered_pronouns.conf --rule profile
 cargo run --bin copperlace -- render --config ../examples/item_json.conf --rule origin
 cargo run --bin copperlace -- render --config ../examples/quest_log.conf --rule objective
+cargo run --bin copperlace -- render --config ../examples/culture_names.conf --rule first_name
+cargo run --bin copperlace -- render --config ../examples/culture_names.conf --rule family_name
+cargo run --bin copperlace -- render --config ../examples/culture_names.conf --rule place_name
 ----
