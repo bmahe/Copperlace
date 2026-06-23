@@ -32,6 +32,14 @@ class CopperlaceTests(unittest.TestCase):
 
         self.assertEqual(output, "Mia")
 
+    def test_builtin_article_processor(self) -> None:
+        output = render_hocon_str(
+            'apple = ["apple"]\nuser = ["user"]\norigin = "{apple | article}/{user | article}"',
+            "origin",
+        )
+
+        self.assertEqual(output, "an apple/a user")
+
     def test_repeated_renders_on_one_ruleset(self) -> None:
         ruleset = RuleSet.from_string('name = ["Mia"]\norigin = "{name}"')
         try:

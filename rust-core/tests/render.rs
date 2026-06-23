@@ -280,6 +280,66 @@ fn processor_pipeline_runs_left_to_right() {
 }
 
 #[test]
+fn article_processor_adds_a_or_an_for_common_words() {
+    let rules = ruleset(
+        r#"
+        apple = ["apple"]
+        book = ["book"]
+        hour = ["hour"]
+        user = ["user"]
+        origin = "{apple | article}/{book | article}/{hour | article}/{user | article}"
+        "#,
+    );
+
+    assert_eq!(
+        rules.render_rule("origin").unwrap(),
+        "an apple/a book/an hour/a user"
+    );
+}
+
+#[test]
+fn article_processor_handles_initialisms_and_numbers() {
+    let rules = ruleset(
+        r#"
+        mri = ["MRI"]
+        url = ["URL"]
+        eight_ball = ["8-ball"]
+        eleven_year_old = ["11-year-old"]
+        origin = "{mri | article}/{url | article}/{eight_ball | article}/{eleven_year_old | article}"
+        "#,
+    );
+
+    assert_eq!(
+        rules.render_rule("origin").unwrap(),
+        "an MRI/a URL/an 8-ball/an 11-year-old"
+    );
+}
+
+#[test]
+fn article_processor_preserves_input_spacing() {
+    let rules = ruleset(
+        r#"
+        padded = ["  apple  "]
+        origin = "{padded | article}"
+        "#,
+    );
+
+    assert_eq!(rules.render_rule("origin").unwrap(), "an   apple  ");
+}
+
+#[test]
+fn article_processor_composes_with_trim() {
+    let rules = ruleset(
+        r#"
+        padded = ["  apple  "]
+        origin = "{padded | trim | article}"
+        "#,
+    );
+
+    assert_eq!(rules.render_rule("origin").unwrap(), "an apple");
+}
+
+#[test]
 fn processor_pipeline_transforms_context_default() {
     let rules = ruleset(
         r#"

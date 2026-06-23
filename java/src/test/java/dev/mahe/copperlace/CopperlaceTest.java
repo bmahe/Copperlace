@@ -57,6 +57,17 @@ final class CopperlaceTest {
     }
 
     @Test
+    void rendersBuiltinArticleProcessor() {
+        assertEquals(
+                "an apple/a user",
+                Copperlace.renderHoconString("""
+                        apple = ["apple"]
+                        user = ["user"]
+                        origin = "{apple | article}/{user | article}"
+                        """, "origin"));
+    }
+
+    @Test
     void rejectsBlankConfig() {
         final IllegalArgumentException exception =
                 assertThrows(

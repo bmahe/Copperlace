@@ -82,6 +82,7 @@ fn builtin_processors() -> ProcessorRegistry {
     );
     processors.insert("capitalize".to_string(), processor(capitalize));
     processors.insert("titlecase".to_string(), processor(titlecase));
+    processors.insert("article".to_string(), processor(article));
     processors
 }
 
@@ -114,6 +115,91 @@ fn titlecase(value: &str) -> Result<String, String> {
     }
 
     Ok(output)
+}
+
+fn article(value: &str) -> Result<String, String> {
+    let article = if uses_an(value) { "an" } else { "a" };
+    Ok(format!("{article} {value}"))
+}
+
+fn uses_an(value: &str) -> bool {
+    let token = value.split_whitespace().next().unwrap_or("");
+    if token.is_empty() {
+        return false;
+    }
+
+    let token = token.trim_matches(|character: char| {
+        !character.is_alphanumeric() && character != '\'' && character != '-'
+    });
+    if token.is_empty() {
+        return false;
+    }
+
+    if starts_with_vowel_sound_number(token) {
+        return true;
+    }
+
+    let lowercase = token.to_lowercase();
+    if starts_with_silent_h(&lowercase) {
+        return true;
+    }
+    if starts_with_hard_vowel_sound(&lowercase) {
+        return false;
+    }
+    if is_initialism(token) {
+        return starts_with_vowel_sound_initial(token);
+    }
+
+    matches!(lowercase.chars().next(), Some('a' | 'e' | 'i' | 'o' | 'u'))
+}
+
+fn starts_with_silent_h(value: &str) -> bool {
+    ["heir", "honest", "honor", "honour", "hour"]
+        .iter()
+        .any(|prefix| value.starts_with(prefix))
+}
+
+fn starts_with_hard_vowel_sound(value: &str) -> bool {
+    [
+        "euro",
+        "one",
+        "ubiquit",
+        "uk",
+        "unanim",
+        "unic",
+        "uniform",
+        "union",
+        "unique",
+        "unit",
+        "university",
+        "use",
+        "user",
+        "usual",
+        "utensil",
+        "utility",
+        "utopia",
+    ]
+    .iter()
+    .any(|prefix| value.starts_with(prefix))
+}
+
+fn starts_with_vowel_sound_number(value: &str) -> bool {
+    value.starts_with('8') || value.starts_with("11") || value.starts_with("18")
+}
+
+fn is_initialism(value: &str) -> bool {
+    let letters: Vec<char> = value
+        .chars()
+        .filter(|character| character.is_alphabetic())
+        .collect();
+    !letters.is_empty() && letters.iter().all(|character| character.is_uppercase())
+}
+
+fn starts_with_vowel_sound_initial(value: &str) -> bool {
+    matches!(
+        value.chars().find(|character| character.is_alphabetic()),
+        Some('A' | 'E' | 'F' | 'H' | 'I' | 'L' | 'M' | 'N' | 'O' | 'R' | 'S' | 'X')
+    )
 }
 
 pub struct RenderState<'a> {

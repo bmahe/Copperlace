@@ -80,6 +80,17 @@ Supported builtin processors are:
 * `trim`
 * `capitalize`
 * `titlecase`
+* `article`
+
+The `article` processor prefixes the rendered value with `a` or `an` using
+English heuristics. It preserves the rendered value as-is, so use `trim` first
+when surrounding whitespace should be ignored.
+
+[source,hocon]
+----
+item = ["apple", "user", "hour"]
+origin = "You found {item | article}."
+----
 
 == Array Values
 
