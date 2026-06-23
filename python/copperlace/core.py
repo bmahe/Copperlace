@@ -9,16 +9,37 @@ from ._native import NativeError, native
 
 
 class CopperlaceError(RuntimeError):
+    """Raised when Copperlace cannot parse config, render a rule, or call native code."""
+
     pass
 
 
 class RuleSet:
+    """Compiled Copperlace rules loaded from HOCON config.
+
+    Use :meth:`from_string` or :meth:`from_file` to compile config once, then
+    call :meth:`render` repeatedly. ``RuleSet`` owns a native handle, so callers
+    should use it as a context manager or call :meth:`close` when finished.
+    """
+
     def __init__(self, handle: ctypes.c_void_p) -> None:
         self._handle = handle
         self._closed = False
 
     @classmethod
     def from_string(cls, config: str) -> Self:
+        """Compile a ruleset from a HOCON config string.
+
+        Args:
+            config: HOCON config text containing Copperlace rules.
+
+        Returns:
+            A ``RuleSet`` backed by a native Copperlace handle.
+
+        Raises:
+            CopperlaceError: If the config cannot be parsed or compiled.
+        """
+
         try:
             return cls(native().ruleset_from_string(config))
         except NativeError as error:
@@ -26,12 +47,39 @@ class RuleSet:
 
     @classmethod
     def from_file(cls, path: str | Path) -> Self:
+        """Compile a ruleset from a HOCON config file.
+
+        Args:
+            path: Path to the HOCON config file.
+
+        Returns:
+            A ``RuleSet`` backed by a native Copperlace handle.
+
+        Raises:
+            CopperlaceError: If the file cannot be loaded, parsed, or compiled.
+        """
+
         try:
             return cls(native().ruleset_from_file(path))
         except NativeError as error:
             raise CopperlaceError(str(error)) from error
 
     def render(self, rule: str) -> str:
+        """Render a named rule from this ruleset.
+
+        Each call uses a fresh render context, so per-render bindings are
+        consistent within one output but do not carry over to later renders.
+
+        Args:
+            rule: Name of the rule to render.
+
+        Returns:
+            Rendered text for the requested rule.
+
+        Raises:
+            CopperlaceError: If this ruleset is closed or rendering fails.
+        """
+
         self._ensure_open()
         try:
             return native().ruleset_render(self._handle, rule)
@@ -39,6 +87,12 @@ class RuleSet:
             raise CopperlaceError(str(error)) from error
 
     def close(self) -> None:
+        """Release this ruleset's native handle.
+
+        Calling ``close`` more than once is allowed. Rendering after close raises
+        ``CopperlaceError``.
+        """
+
         if not self._closed:
             native().ruleset_free(self._handle)
             self._closed = True
@@ -68,21 +122,66 @@ class RuleSet:
 
 
 class Copperlace:
+    """Load-once Copperlace renderer for repeated renders.
+
+    ``Copperlace`` is the recommended high-level API when rendering multiple
+    rules or rendering the same rule multiple times from one config. It wraps a
+    ``RuleSet`` and can be used as a context manager.
+    """
+
     def __init__(self, ruleset: RuleSet) -> None:
         self._ruleset = ruleset
 
     @classmethod
     def from_string(cls, config: str) -> Self:
+        """Create a renderer from a HOCON config string.
+
+        Args:
+            config: HOCON config text containing Copperlace rules.
+
+        Returns:
+            A ``Copperlace`` renderer that can render rules repeatedly.
+
+        Raises:
+            CopperlaceError: If the config cannot be parsed or compiled.
+        """
+
         return cls(RuleSet.from_string(config))
 
     @classmethod
     def from_file(cls, path: str | Path) -> Self:
+        """Create a renderer from a HOCON config file.
+
+        Args:
+            path: Path to the HOCON config file.
+
+        Returns:
+            A ``Copperlace`` renderer that can render rules repeatedly.
+
+        Raises:
+            CopperlaceError: If the file cannot be loaded, parsed, or compiled.
+        """
+
         return cls(RuleSet.from_file(path))
 
     def render(self, rule: str) -> str:
+        """Render a named rule from the loaded config.
+
+        Args:
+            rule: Name of the rule to render.
+
+        Returns:
+            Rendered text for the requested rule.
+
+        Raises:
+            CopperlaceError: If the renderer is closed or rendering fails.
+        """
+
         return self._ruleset.render(rule)
 
     def close(self) -> None:
+        """Release the underlying native ruleset handle."""
+
         self._ruleset.close()
 
     def __enter__(self) -> Self:
@@ -105,10 +204,42 @@ class Copperlace:
 
 
 def render_hocon_str(config: str, rule: str) -> str:
+    """Render one rule from a HOCON config string.
+
+    This convenience helper compiles the config, renders one rule, and releases
+    the native handle. Use ``Copperlace.from_string`` for repeated renders.
+
+    Args:
+        config: HOCON config text containing Copperlace rules.
+        rule: Name of the rule to render.
+
+    Returns:
+        Rendered text for the requested rule.
+
+    Raises:
+        CopperlaceError: If parsing, compilation, or rendering fails.
+    """
+
     with RuleSet.from_string(config) as ruleset:
         return ruleset.render(rule)
 
 
 def render_hocon_file(path: str | Path, rule: str) -> str:
+    """Render one rule from a HOCON config file.
+
+    This convenience helper loads the file, renders one rule, and releases the
+    native handle. Use ``Copperlace.from_file`` for repeated renders.
+
+    Args:
+        path: Path to the HOCON config file.
+        rule: Name of the rule to render.
+
+    Returns:
+        Rendered text for the requested rule.
+
+    Raises:
+        CopperlaceError: If loading, parsing, compilation, or rendering fails.
+    """
+
     with RuleSet.from_file(path) as ruleset:
         return ruleset.render(rule)

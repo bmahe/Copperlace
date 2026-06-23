@@ -5,15 +5,30 @@ use std::ptr;
 use crate::config::{ruleset_from_hocon_file, ruleset_from_hocon_str};
 use crate::render::RuleSet;
 
+/// Status code for a successful C ABI call.
 pub const COPPERLACE_OK: c_int = 0;
+/// Status code for invalid C ABI arguments such as null required pointers.
 pub const COPPERLACE_INVALID_ARGUMENT: c_int = 1;
+/// Status code for config loading, parsing, or compilation failures.
 pub const COPPERLACE_PARSE_ERROR: c_int = 2;
+/// Status code for rule rendering failures.
 pub const COPPERLACE_RENDER_ERROR: c_int = 3;
 
+/// Opaque C ABI handle for a compiled Copperlace ruleset.
+///
+/// Handles are allocated by `copperlace_ruleset_from_file` or
+/// `copperlace_ruleset_from_string` and must be released with
+/// `copperlace_ruleset_free`.
 pub struct CopperlaceRuleSet {
     ruleset: RuleSet,
 }
 
+/// Loads a HOCON config file and returns an opaque ruleset handle.
+///
+/// On success, writes a non-null handle to `out_handle` and returns
+/// [`COPPERLACE_OK`]. On failure, writes null to `out_handle`, writes an owned
+/// error string to `out_error` when provided, and returns a nonzero status code.
+/// Returned error strings must be released with `copperlace_string_free`.
 #[unsafe(no_mangle)]
 pub extern "C" fn copperlace_ruleset_from_file(
     path: *const c_char,
@@ -37,6 +52,12 @@ pub extern "C" fn copperlace_ruleset_from_file(
     }
 }
 
+/// Compiles a HOCON config string and returns an opaque ruleset handle.
+///
+/// On success, writes a non-null handle to `out_handle` and returns
+/// [`COPPERLACE_OK`]. On failure, writes null to `out_handle`, writes an owned
+/// error string to `out_error` when provided, and returns a nonzero status code.
+/// Returned error strings must be released with `copperlace_string_free`.
 #[unsafe(no_mangle)]
 pub extern "C" fn copperlace_ruleset_from_string(
     config: *const c_char,
@@ -60,6 +81,13 @@ pub extern "C" fn copperlace_ruleset_from_string(
     }
 }
 
+/// Renders a named rule from a ruleset handle.
+///
+/// On success, writes an owned UTF-8 string to `out_string` and returns
+/// [`COPPERLACE_OK`]. On failure, writes null to `out_string`, writes an owned
+/// error string to `out_error` when provided, and returns a nonzero status code.
+/// Returned output and error strings must be released with
+/// `copperlace_string_free`.
 #[unsafe(no_mangle)]
 pub extern "C" fn copperlace_ruleset_render(
     handle: *const CopperlaceRuleSet,
@@ -96,6 +124,9 @@ pub extern "C" fn copperlace_ruleset_render(
     }
 }
 
+/// Releases a ruleset handle returned by the C ABI.
+///
+/// Passing null is allowed and has no effect.
 #[unsafe(no_mangle)]
 pub extern "C" fn copperlace_ruleset_free(handle: *mut CopperlaceRuleSet) {
     if !handle.is_null() {
@@ -105,6 +136,9 @@ pub extern "C" fn copperlace_ruleset_free(handle: *mut CopperlaceRuleSet) {
     }
 }
 
+/// Releases a string returned by the C ABI.
+///
+/// Passing null is allowed and has no effect.
 #[unsafe(no_mangle)]
 pub extern "C" fn copperlace_string_free(value: *mut c_char) {
     if !value.is_null() {

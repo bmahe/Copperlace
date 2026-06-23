@@ -7,15 +7,24 @@ use regex::Regex;
 
 use crate::processors::builtin_processors;
 
+/// Error returned while compiling or rendering Copperlace rules.
 #[derive(Debug, PartialEq, Eq)]
 pub enum RenderError {
+    /// A template referenced a name that is neither bound nor defined as a rule.
     UnknownRule(String),
+    /// A template pipeline referenced a processor that is not registered.
     UnknownProcessor(String),
+    /// A registered processor rejected the rendered value.
     ProcessorError { processor: String, message: String },
+    /// A `{...}` template expression could not be parsed.
     InvalidExpression(String),
+    /// An array-backed choice rule had no alternatives.
     EmptyChoice,
+    /// Rendering detected a recursive rule cycle.
     CircularRuleReference(Vec<String>),
+    /// A config value type was parsed but is not renderable.
     UnsupportedValue(String),
+    /// The root HOCON value was not an object.
     InvalidConfigRoot,
 }
 
@@ -46,7 +55,13 @@ impl fmt::Display for RenderError {
 
 impl std::error::Error for RenderError {}
 
+/// String transformer used in template processor pipelines.
+///
+/// Processors receive the rendered output of a rule or binding expression and
+/// return the transformed value. Returning `Err` stops rendering and surfaces a
+/// [`RenderError::ProcessorError`].
 pub trait Processor: Send + Sync {
+    /// Transforms one rendered value.
     fn process(&self, value: &str) -> Result<String, String>;
 }
 
@@ -59,8 +74,14 @@ where
     }
 }
 
+/// Registry mapping processor names to processor implementations.
+///
+/// Custom processors registered with [`RuleSet::from_config_with_processors`]
+/// extend the builtin registry. If a custom processor uses the same name as a
+/// builtin, the custom implementation takes precedence.
 pub type ProcessorRegistry = HashMap<String, Arc<dyn Processor>>;
 
+/// Wraps a processor implementation for insertion into a [`ProcessorRegistry`].
 pub fn processor<F>(processor: F) -> Arc<dyn Processor>
 where
     F: Processor + 'static,
@@ -68,6 +89,11 @@ where
     Arc::new(processor)
 }
 
+/// Mutable state for one render operation.
+///
+/// `RuleSet::render_rule` creates a fresh state for each call. The state tracks
+/// per-render bindings, the rule call stack used for cycle detection, and the
+/// random number generator used by choice nodes.
 pub struct RenderState<'a> {
     ruleset: &'a RuleSet,
     context: HashMap<String, String>,
@@ -76,6 +102,7 @@ pub struct RenderState<'a> {
 }
 
 impl<'a> RenderState<'a> {
+    /// Creates an empty render state for a ruleset.
     pub fn new(ruleset: &'a RuleSet) -> Self {
         RenderState {
             ruleset,
@@ -92,6 +119,7 @@ impl<'a> RenderState<'a> {
 /// driven by `RenderState`, which carries the rule table, bound variables, RNG,
 /// and rule call stack for cycle detection.
 pub trait Node {
+    /// Renders this node using the supplied render state.
     fn render(&self, state: &mut RenderState) -> Result<String, RenderError>;
 }
 
@@ -120,10 +148,20 @@ pub struct RuleSet {
 }
 
 impl RuleSet {
+    /// Compiles a HOCON root value using the builtin processor registry.
+    ///
+    /// The root value must be a HOCON object. Top-level entries become named
+    /// rules, except a top-level object named `context`, whose entries become
+    /// lazy defaults available to template references.
     pub fn from_config(config: hocon_rs::Value) -> Result<Self, RenderError> {
         Self::from_config_with_processors(config, ProcessorRegistry::new())
     }
 
+    /// Compiles a HOCON root value with additional custom processors.
+    ///
+    /// Custom processors are merged into the builtin registry before templates
+    /// are compiled, so unknown processor names fail during compilation. A
+    /// custom processor with the same name as a builtin overrides the builtin.
     pub fn from_config_with_processors(
         config: hocon_rs::Value,
         custom_processors: ProcessorRegistry,
@@ -160,6 +198,10 @@ impl RuleSet {
         })
     }
 
+    /// Renders a named rule from this ruleset.
+    ///
+    /// Each call starts with a fresh render context. Bindings and lazy context
+    /// defaults are cached within one render, but not shared with later calls.
     pub fn render_rule(&self, rule_name: &str) -> Result<String, RenderError> {
         let mut state = RenderState::new(self);
         self.render_rule_with_state(rule_name, &mut state)
@@ -225,6 +267,10 @@ impl RuleSet {
     }
 }
 
+/// Compiles a HOCON root value and renders one rule.
+///
+/// This is a one-shot helper around [`RuleSet::from_config`] and
+/// [`RuleSet::render_rule`]. Use [`RuleSet`] directly for repeated renders.
 pub fn render_config_rule(config: hocon_rs::Value, rule_name: &str) -> Result<String, RenderError> {
     let ruleset = RuleSet::from_config(config)?;
     ruleset.render_rule(rule_name)
@@ -241,6 +287,7 @@ pub struct VariableNode {
 }
 
 impl VariableNode {
+    /// Creates a variable node that reads a bound value by name.
     pub fn new(name: String) -> Self {
         VariableNode { name }
     }
@@ -268,6 +315,7 @@ pub struct RuleCallNode {
 }
 
 impl RuleCallNode {
+    /// Creates a rule call node for a template reference.
     pub fn new(name: String) -> Self {
         RuleCallNode { name }
     }
@@ -294,7 +342,9 @@ impl Node for RuleCallNode {
 /// Controls whether a binding expression preserves or overwrites an existing
 /// value in the render context.
 pub enum BindMode {
+    /// Preserve an existing binding and bind only when the name is missing.
     IfMissing,
+    /// Always render the source and replace any existing binding.
     Overwrite,
 }
 
@@ -312,6 +362,7 @@ pub struct BindNode {
 }
 
 impl BindNode {
+    /// Creates a binding node for a target name, source node, and binding mode.
     pub fn new(name: String, node: Box<dyn Node>, mode: BindMode) -> Self {
         BindNode { name, node, mode }
     }
@@ -336,6 +387,7 @@ pub struct ProcessorPipelineNode {
 }
 
 impl ProcessorPipelineNode {
+    /// Creates a pipeline node that applies processors to the rendered child.
     pub fn new(node: Box<dyn Node>, processors: Vec<String>) -> Self {
         ProcessorPipelineNode { node, processors }
     }
@@ -361,6 +413,7 @@ pub struct ChoiceNode {
 }
 
 impl ChoiceNode {
+    /// Creates a choice node from renderable alternatives.
     pub fn new(nodes: Vec<Box<dyn Node>>) -> Self {
         ChoiceNode { nodes }
     }
@@ -386,6 +439,7 @@ pub struct VecNode {
 }
 
 impl VecNode {
+    /// Creates a sequence node that renders children in order.
     pub fn new(nodes: Vec<Box<dyn Node>>) -> Self {
         VecNode { nodes }
     }
@@ -536,6 +590,7 @@ pub struct UnsupportedValueNode {
 }
 
 impl UnsupportedValueNode {
+    /// Creates a node that reports an unsupported config value type at render time.
     pub fn new(value_type: String) -> Self {
         UnsupportedValueNode { value_type }
     }
