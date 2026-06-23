@@ -88,6 +88,7 @@ Supported builtin processors are:
 * `present_participle`
 * `ordinal`
 * `sentence`
+* `quote`
 
 The `article` processor prefixes the rendered value with `a` or `an` using
 English heuristics. It preserves the rendered value as-is, so use `trim` first
@@ -167,6 +168,15 @@ rendered string and leaves the rest unchanged.
 ----
 line = ["hello MIA"]
 origin = "{line | sentence}"
+----
+
+The `quote` processor wraps the rendered string in ASCII double quotes and
+escapes internal double quotes and backslashes.
+
+[source,hocon]
+----
+line = ["Mia said \"hi\""]
+origin = "{line | quote}"
 ----
 
 == Array Values

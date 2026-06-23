@@ -93,6 +93,7 @@ fn builtin_processors() -> ProcessorRegistry {
     );
     processors.insert("ordinal".to_string(), processor(ordinal));
     processors.insert("sentence".to_string(), processor(sentence));
+    processors.insert("quote".to_string(), processor(quote));
     processors
 }
 
@@ -139,6 +140,19 @@ fn sentence(value: &str) -> Result<String, String> {
     }
 
     Ok(value.to_string())
+}
+
+fn quote(value: &str) -> Result<String, String> {
+    let mut output = String::from("\"");
+    for character in value.chars() {
+        match character {
+            '\\' => output.push_str("\\\\"),
+            '"' => output.push_str("\\\""),
+            _ => output.push(character),
+        }
+    }
+    output.push('"');
+    Ok(output)
 }
 
 fn article(value: &str) -> Result<String, String> {

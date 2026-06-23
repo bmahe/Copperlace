@@ -884,6 +884,45 @@ fn sentence_processor_returns_text_without_letters_unchanged() {
 }
 
 #[test]
+fn quote_processor_wraps_text_in_double_quotes() {
+    let rules = ruleset(
+        r#"
+        text = ["Mia waits"]
+        origin = "{text | quote}"
+        "#,
+    );
+
+    assert_eq!(rules.render_rule("origin").unwrap(), "\"Mia waits\"");
+}
+
+#[test]
+fn quote_processor_escapes_quotes_and_backslashes() {
+    let rules = ruleset(
+        r#"
+        text = ["Mia said \"hi\" at C:\\tmp"]
+        origin = "{text | quote}"
+        "#,
+    );
+
+    assert_eq!(
+        rules.render_rule("origin").unwrap(),
+        "\"Mia said \\\"hi\\\" at C:\\\\tmp\""
+    );
+}
+
+#[test]
+fn quote_processor_wraps_empty_text() {
+    let rules = ruleset(
+        r#"
+        text = [""]
+        origin = "{text | quote}"
+        "#,
+    );
+
+    assert_eq!(rules.render_rule("origin").unwrap(), "\"\"");
+}
+
+#[test]
 fn processor_pipeline_transforms_context_default() {
     let rules = ruleset(
         r#"
