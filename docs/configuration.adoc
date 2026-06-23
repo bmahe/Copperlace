@@ -81,6 +81,7 @@ Supported builtin processors are:
 * `capitalize`
 * `titlecase`
 * `article`
+* `past_tense`
 
 The `article` processor prefixes the rendered value with `a` or `an` using
 English heuristics. It preserves the rendered value as-is, so use `trim` first
@@ -90,6 +91,16 @@ when surrounding whitespace should be ignored.
 ----
 item = ["apple", "user", "hour"]
 origin = "You found {item | article}."
+----
+
+The `past_tense` processor converts one verb token to past tense using regular
+spelling rules and common irregular verbs. It preserves surrounding whitespace
+but returns an error for blank values or multi-word phrases.
+
+[source,hocon]
+----
+action = ["walk", "run", "try"]
+origin = "Mia {action | past_tense}."
 ----
 
 == Array Values

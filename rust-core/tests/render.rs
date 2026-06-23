@@ -340,6 +340,104 @@ fn article_processor_composes_with_trim() {
 }
 
 #[test]
+fn past_tense_processor_handles_regular_verbs() {
+    let rules = ruleset(
+        r#"
+        walk = ["walk"]
+        bake = ["bake"]
+        try = ["try"]
+        stop = ["stop"]
+        origin = "{walk | past_tense}/{bake | past_tense}/{try | past_tense}/{stop | past_tense}"
+        "#,
+    );
+
+    assert_eq!(
+        rules.render_rule("origin").unwrap(),
+        "walked/baked/tried/stopped"
+    );
+}
+
+#[test]
+fn past_tense_processor_handles_common_irregular_verbs() {
+    let rules = ruleset(
+        r#"
+        go = ["go"]
+        run = ["run"]
+        be = ["be"]
+        are = ["are"]
+        read = ["read"]
+        origin = "{go | past_tense}/{run | past_tense}/{be | past_tense}/{are | past_tense}/{read | past_tense}"
+        "#,
+    );
+
+    assert_eq!(
+        rules.render_rule("origin").unwrap(),
+        "went/ran/was/were/read"
+    );
+}
+
+#[test]
+fn past_tense_processor_preserves_capitalization_style() {
+    let rules = ruleset(
+        r#"
+        title = ["Run"]
+        upper = ["RUN"]
+        origin = "{title | past_tense}/{upper | past_tense}"
+        "#,
+    );
+
+    assert_eq!(rules.render_rule("origin").unwrap(), "Ran/RAN");
+}
+
+#[test]
+fn past_tense_processor_preserves_surrounding_whitespace() {
+    let rules = ruleset(
+        r#"
+        padded = ["  walk  "]
+        origin = "{padded | past_tense}"
+        "#,
+    );
+
+    assert_eq!(rules.render_rule("origin").unwrap(), "  walked  ");
+}
+
+#[test]
+fn past_tense_processor_rejects_blank_input() {
+    let rules = ruleset(
+        r#"
+        blank = ["  "]
+        origin = "{blank | past_tense}"
+        "#,
+    );
+
+    assert_eq!(
+        rules.render_rule("origin"),
+        Err(RenderError::ProcessorError {
+            processor: "past_tense".to_string(),
+            message: "input must contain one verb".to_string(),
+        })
+    );
+}
+
+#[test]
+fn past_tense_processor_rejects_multiple_words() {
+    let rules = ruleset(
+        r#"
+        phrase = ["walk home"]
+        origin = "{phrase | past_tense}"
+        "#,
+    );
+
+    assert_eq!(
+        rules.render_rule("origin"),
+        Err(RenderError::ProcessorError {
+            processor: "past_tense".to_string(),
+            message: "input must contain exactly one verb token".to_string(),
+        })
+    );
+}
+
+#[test]
 fn processor_pipeline_transforms_context_default() {
     let rules = ruleset(
         r#"

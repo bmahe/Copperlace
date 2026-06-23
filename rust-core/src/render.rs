@@ -83,6 +83,7 @@ fn builtin_processors() -> ProcessorRegistry {
     processors.insert("capitalize".to_string(), processor(capitalize));
     processors.insert("titlecase".to_string(), processor(titlecase));
     processors.insert("article".to_string(), processor(article));
+    processors.insert("past_tense".to_string(), processor(past_tense));
     processors
 }
 
@@ -200,6 +201,123 @@ fn starts_with_vowel_sound_initial(value: &str) -> bool {
         value.chars().find(|character| character.is_alphabetic()),
         Some('A' | 'E' | 'F' | 'H' | 'I' | 'L' | 'M' | 'N' | 'O' | 'R' | 'S' | 'X')
     )
+}
+
+fn past_tense(value: &str) -> Result<String, String> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return Err("input must contain one verb".to_string());
+    }
+    if trimmed.split_whitespace().count() != 1 {
+        return Err("input must contain exactly one verb token".to_string());
+    }
+
+    let leading_len = value.len() - value.trim_start().len();
+    let trailing_len = value.len() - value.trim_end().len();
+    let leading = &value[..leading_len];
+    let trailing = &value[value.len() - trailing_len..];
+    let tense = apply_case_style(trimmed, &past_tense_lowercase(&trimmed.to_lowercase()));
+
+    Ok(format!("{leading}{tense}{trailing}"))
+}
+
+fn past_tense_lowercase(value: &str) -> String {
+    if let Some(irregular) = irregular_past_tense(value) {
+        return irregular.to_string();
+    }
+
+    if value.ends_with('e') {
+        return format!("{value}d");
+    }
+
+    if let Some(stem) = value.strip_suffix('y') {
+        if stem
+            .chars()
+            .last()
+            .is_some_and(|character| is_consonant(character))
+        {
+            return format!("{stem}ied");
+        }
+    }
+
+    if should_double_final_consonant(value) {
+        let final_character = value.chars().last().expect("value is not empty");
+        return format!("{value}{final_character}ed");
+    }
+
+    format!("{value}ed")
+}
+
+fn irregular_past_tense(value: &str) -> Option<&'static str> {
+    match value {
+        "am" | "be" | "is" => Some("was"),
+        "are" => Some("were"),
+        "go" => Some("went"),
+        "do" => Some("did"),
+        "have" => Some("had"),
+        "make" => Some("made"),
+        "take" => Some("took"),
+        "come" => Some("came"),
+        "run" => Some("ran"),
+        "eat" => Some("ate"),
+        "see" => Some("saw"),
+        "say" => Some("said"),
+        "get" => Some("got"),
+        "give" => Some("gave"),
+        "find" => Some("found"),
+        "think" => Some("thought"),
+        "buy" => Some("bought"),
+        "catch" => Some("caught"),
+        "teach" => Some("taught"),
+        "bring" => Some("brought"),
+        "write" => Some("wrote"),
+        "read" => Some("read"),
+        _ => None,
+    }
+}
+
+fn should_double_final_consonant(value: &str) -> bool {
+    let characters: Vec<char> = value.chars().collect();
+    if characters.len() < 3 {
+        return false;
+    }
+
+    let last = characters[characters.len() - 1];
+    let middle = characters[characters.len() - 2];
+    let first = characters[characters.len() - 3];
+
+    is_consonant(first)
+        && is_vowel(middle)
+        && is_consonant(last)
+        && !matches!(last, 'w' | 'x' | 'y')
+}
+
+fn is_vowel(character: char) -> bool {
+    matches!(character, 'a' | 'e' | 'i' | 'o' | 'u')
+}
+
+fn is_consonant(character: char) -> bool {
+    character.is_ascii_alphabetic() && !is_vowel(character.to_ascii_lowercase())
+}
+
+fn apply_case_style(original: &str, value: &str) -> String {
+    if original
+        .chars()
+        .all(|character| !character.is_alphabetic() || character.is_uppercase())
+    {
+        return value.to_uppercase();
+    }
+
+    let mut characters = original
+        .chars()
+        .filter(|character| character.is_alphabetic());
+    if let Some(first) = characters.next() {
+        if first.is_uppercase() && characters.all(|character| character.is_lowercase()) {
+            return capitalize(value).expect("capitalize is infallible");
+        }
+    }
+
+    value.to_string()
 }
 
 pub struct RenderState<'a> {

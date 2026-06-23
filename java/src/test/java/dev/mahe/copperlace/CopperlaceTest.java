@@ -68,6 +68,17 @@ final class CopperlaceTest {
     }
 
     @Test
+    void rendersBuiltinPastTenseProcessor() {
+        assertEquals(
+                "walked/ran",
+                Copperlace.renderHoconString("""
+                        walk = ["walk"]
+                        run = ["run"]
+                        origin = "{walk | past_tense}/{run | past_tense}"
+                        """, "origin"));
+    }
+
+    @Test
     void rejectsBlankConfig() {
         final IllegalArgumentException exception =
                 assertThrows(

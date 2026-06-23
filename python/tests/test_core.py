@@ -40,6 +40,14 @@ class CopperlaceTests(unittest.TestCase):
 
         self.assertEqual(output, "an apple/a user")
 
+    def test_builtin_past_tense_processor(self) -> None:
+        output = render_hocon_str(
+            'walk = ["walk"]\nrun = ["run"]\norigin = "{walk | past_tense}/{run | past_tense}"',
+            "origin",
+        )
+
+        self.assertEqual(output, "walked/ran")
+
     def test_repeated_renders_on_one_ruleset(self) -> None:
         ruleset = RuleSet.from_string('name = ["Mia"]\norigin = "{name}"')
         try:
