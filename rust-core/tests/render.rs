@@ -187,6 +187,96 @@ fn circular_rule_reference_returns_error() {
 }
 
 #[test]
+fn dotted_path_key_rule_renders_leaf_value() {
+    let rules = ruleset(
+        r#"
+        nordic.vowel = ["ö"]
+        origin = "{nordic.vowel}"
+        "#,
+    );
+
+    assert_eq!(rules.render_rule("origin").unwrap(), "ö");
+    assert_eq!(rules.render_rule("nordic.vowel").unwrap(), "ö");
+}
+
+#[test]
+fn nested_object_rule_renders_leaf_value() {
+    let rules = ruleset(
+        r#"
+        nordic {
+            vowel = ["ö"]
+        }
+        origin = "{nordic.vowel}"
+        "#,
+    );
+
+    assert_eq!(rules.render_rule("origin").unwrap(), "ö");
+    assert_eq!(rules.render_rule("nordic.vowel").unwrap(), "ö");
+}
+
+#[test]
+fn rendering_object_parent_returns_error() {
+    let rules = ruleset(
+        r#"
+        nordic.vowel = ["ö"]
+        "#,
+    );
+
+    assert_eq!(
+        rules.render_rule("nordic"),
+        Err(RenderError::UnsupportedValue("object".to_string()))
+    );
+}
+
+#[test]
+fn dotted_context_default_renders_and_caches_value() {
+    let rules = ruleset(
+        r#"
+        first = ["Mia"]
+        second = ["Darcy"]
+        origin = "{hero.name}{hero.name:=second}/{hero.name}"
+        context.hero.name = "{first}"
+        "#,
+    );
+
+    assert_eq!(rules.render_rule("origin").unwrap(), "Mia/Darcy");
+}
+
+#[test]
+fn rendering_context_object_parent_returns_error() {
+    let rules = ruleset(
+        r#"
+        context.hero.name = "Mia"
+        origin = "{hero}"
+        "#,
+    );
+
+    assert_eq!(
+        rules.render_rule("origin"),
+        Err(RenderError::UnsupportedValue("object".to_string()))
+    );
+}
+
+#[test]
+fn dotted_rules_report_circular_reference_path() {
+    let rules = ruleset(
+        r#"
+        nordic.first = "{nordic.family}"
+        nordic.family = "{nordic.first}"
+        "#,
+    );
+
+    assert_eq!(
+        rules.render_rule("nordic.first"),
+        Err(RenderError::CircularRuleReference(vec![
+            "nordic.first".to_string(),
+            "nordic.family".to_string(),
+            "nordic.first".to_string(),
+        ]))
+    );
+}
+
+#[test]
 fn empty_choice_returns_error() {
     let rules = ruleset(
         r#"

@@ -107,8 +107,8 @@ vector contains the detected path, including the repeated final rule name.
 
 `UnsupportedValue(String)`::
 Returned when rendering a value type that compiled to an unsupported node. The
-current unsupported value type is `"object"` for nested objects outside the
-special top-level `context` object.
+current unsupported value type is `"object"` for object parents such as `name`
+when only dotted leaves such as `name.first` are renderable.
 
 `InvalidConfigRoot`::
 Returned by `RuleSet::from_config` when the provided HOCON value root is not an
@@ -120,4 +120,4 @@ The current implementation does not define these as supported behavior:
 
 * Escaping literal `{` or `}` characters in templates.
 * Seeded or deterministic random output.
-* Nested object rendering outside top-level `context`.
+* Rendering object parents directly.

@@ -7,7 +7,9 @@ string or a `RenderError`.
 == Named Rules
 
 Every top-level HOCON key is a renderable rule, except for the special
-top-level `context` object.
+top-level `context` object. Nested object leaves are available as dotted rule
+names, so `name.first = ["Mia"]` can be rendered as `{name.first}`. Object
+parents such as `name` are not directly renderable.
 
 [source,hocon]
 ----

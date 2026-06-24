@@ -190,14 +190,18 @@ impl RuleSet {
             if name == "context" {
                 if let hocon_rs::Value::Object(context_values) = value {
                     for (context_name, context_value) in context_values {
-                        context_defaults
-                            .insert(context_name, value_to_node(context_value, &processors)?);
+                        insert_named_nodes(
+                            &mut context_defaults,
+                            context_name,
+                            context_value,
+                            &processors,
+                        )?;
                     }
                 } else {
-                    rules.insert(name, value_to_node(value, &processors)?);
+                    insert_named_nodes(&mut rules, name, value, &processors)?;
                 }
             } else {
-                rules.insert(name, value_to_node(value, &processors)?);
+                insert_named_nodes(&mut rules, name, value, &processors)?;
             }
         }
 
@@ -517,6 +521,35 @@ fn value_to_node(
         hocon_rs::Value::Object(_) => Box::new(UnsupportedValueNode::new("object".to_string())),
         _ => Box::new(value.to_string()),
     })
+}
+
+fn insert_named_nodes(
+    nodes: &mut HashMap<String, Box<dyn Node>>,
+    name: String,
+    value: hocon_rs::Value,
+    processors: &ProcessorRegistry,
+) -> Result<(), RenderError> {
+    match value {
+        hocon_rs::Value::Object(values) => {
+            nodes.insert(
+                name.clone(),
+                Box::new(UnsupportedValueNode::new("object".to_string())),
+            );
+            for (child_name, child_value) in values {
+                insert_named_nodes(
+                    nodes,
+                    format!("{name}.{child_name}"),
+                    child_value,
+                    processors,
+                )?;
+            }
+        }
+        value => {
+            nodes.insert(name, value_to_node(value, processors)?);
+        }
+    }
+
+    Ok(())
 }
 
 fn array_contains_weighted_entry(values: &[hocon_rs::Value]) -> bool {

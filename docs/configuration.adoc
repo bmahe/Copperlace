@@ -18,17 +18,19 @@ story = "{hero} walked home."
 == Top-Level Keys
 
 Top-level keys become named rules unless the key is `context` and its value is
-an object.
+an object. HOCON path keys and nested objects can define dotted rule names.
 
 [source,hocon]
 ----
 origin = "{story}"
 story = "A {mood} path"
 mood = [bright, quiet]
+name.first = ["Mia"]
 ----
 
 Each top-level rule can be rendered directly by passing its key to
-`RuleSet::render_rule`.
+`RuleSet::render_rule`. Dotted leaves can also be rendered directly, such as
+`RuleSet::render_rule("name.first")`.
 
 == Special `context` Object
 
@@ -235,9 +237,26 @@ origin = "Count: {count}"
 
 == Object Values
 
-Objects are supported only as the special top-level `context` value and as
-weighted choice entries inside arrays. Any other object compiles to an
-unsupported node and fails at render time with `UnsupportedValue("object")`.
+Objects can organize rules into dotted names. HOCON path keys and nested object
+syntax are equivalent, so `name.first = ["Mia"]` and
+`name { first = ["Mia"] }` both define a rule named `name.first`.
+
+[source,hocon]
+----
+name {
+  first = ["Mia"]
+  family = ["Darcy"]
+}
+
+origin = "{name.first} {name.family}"
+----
+
+Object parents are not directly renderable. Rendering `name` in the example
+above fails with `UnsupportedValue("object")`.
+
+Objects are also supported as the special top-level `context` value and as
+weighted choice entries inside arrays. Nested context values use the same dotted
+name behavior.
 
 [source,hocon]
 ----
