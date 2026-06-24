@@ -1,6 +1,6 @@
 = Copperlace Examples
 
-These standalone HOCON files show different ways to combine rules, random
+These standalone rule files show different ways to combine rules, random
 choices, bindings, context defaults, and processors. Random choices can produce
 different output on each render.
 

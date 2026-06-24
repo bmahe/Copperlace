@@ -1,14 +1,15 @@
 = Copperlace Configuration
 
-Copperlace reads HOCON into `hocon_rs::Value` and compiles the root object into
-a `RuleSet`.
+Copperlace reads configuration into a `RuleSet`. The current parser accepts
+HOCON syntax, but the renderer behavior described here is independent of that
+implementation detail.
 
 == Root Shape
 
-The config root must be a HOCON object. Any non-object root fails compilation
+The config root must be an object. Any non-object root fails compilation
 with `InvalidConfigRoot`.
 
-[source,hocon]
+[source]
 ----
 origin = "{hero:name}{story}"
 name = ["Mia"]
@@ -18,9 +19,9 @@ story = "{hero} walked home."
 == Top-Level Keys
 
 Top-level keys become named rules unless the key is `context` and its value is
-an object. HOCON path keys and nested objects can define dotted rule names.
+an object. Path keys and nested objects can define dotted rule names.
 
-[source,hocon]
+[source]
 ----
 origin = "{story}"
 story = "A {mood} path"
@@ -38,7 +39,7 @@ When top-level `context` is an object, its entries become lazy default values
 used by template references. They are not inserted into the normal rule table,
 but they can still be rendered by name through `render_rule`.
 
-[source,hocon]
+[source]
 ----
 context = {
   hero = "{name}"
@@ -59,16 +60,16 @@ render finishes.
 Strings are parsed as templates. Each `{...}` section becomes a render-time
 expression; all other text remains literal.
 
-[source,hocon]
+[source]
 ----
 origin = "Hello {name}"
 ----
 
 Literal braces can be escaped in template text with `\{` and `\}`. In normal
-quoted HOCON strings, escape the backslash itself as `\\{` or `\\}`. In
-triple-quoted strings, write `\{` or `\}` directly.
+quoted strings, escape the backslash itself as `\\{` or `\\}`. In triple-quoted
+strings, write `\{` or `\}` directly.
 
-[source,hocon]
+[source]
 ----
 inline = "\\{name\\}"
 json = """\{
@@ -115,7 +116,7 @@ The `article` processor prefixes the rendered value with `a` or `an` using
 English heuristics. It preserves the rendered value as-is, so use `trim` first
 when surrounding whitespace should be ignored.
 
-[source,hocon]
+[source]
 ----
 item = ["apple", "user", "hour"]
 origin = "You found {item | article}."
@@ -125,7 +126,7 @@ The `past_tense` processor converts one verb token to past tense using regular
 spelling rules and common irregular verbs. It preserves surrounding whitespace
 but returns an error for blank values or multi-word phrases.
 
-[source,hocon]
+[source]
 ----
 action = ["walk", "run", "try"]
 origin = "Mia {action | past_tense}."
@@ -135,7 +136,7 @@ The `pluralize` processor converts one noun token to plural form using regular
 spelling rules and common irregular nouns. It preserves surrounding whitespace
 but returns an error for blank values or multi-word phrases.
 
-[source,hocon]
+[source]
 ----
 creature = ["cat", "person", "city"]
 origin = "The town has many {creature | pluralize}."
@@ -146,7 +147,7 @@ using common reverse spelling rules and irregular nouns. It preserves
 surrounding whitespace but returns an error for blank values or multi-word
 phrases.
 
-[source,hocon]
+[source]
 ----
 creatures = ["cats", "people", "cities"]
 origin = "One {creatures | singularize} waits."
@@ -156,7 +157,7 @@ The `possessive` processor adds an English possessive suffix to one token. It
 preserves surrounding whitespace but returns an error for blank values or
 multi-word phrases.
 
-[source,hocon]
+[source]
 ----
 name = ["Mia", "James"]
 origin = "{name | possessive} lantern glows."
@@ -166,7 +167,7 @@ The `present_participle` processor converts one verb token to its `-ing` form.
 It preserves surrounding whitespace but returns an error for blank values or
 multi-word phrases.
 
-[source,hocon]
+[source]
 ----
 action = ["walk", "run", "lie"]
 origin = "Mia is {action | present_participle}."
@@ -176,7 +177,7 @@ The `ordinal` processor adds an English ordinal suffix to one integer token. It
 preserves surrounding whitespace but returns an error for blank, multi-word, or
 non-integer values.
 
-[source,hocon]
+[source]
 ----
 rank = [1, 2, 3, 11]
 origin = "Mia finished {rank | ordinal}."
@@ -185,7 +186,7 @@ origin = "Mia finished {rank | ordinal}."
 The `sentence` processor capitalizes the first alphabetic character in the
 rendered string and leaves the rest unchanged.
 
-[source,hocon]
+[source]
 ----
 line = ["hello MIA"]
 origin = "{line | sentence}"
@@ -194,7 +195,7 @@ origin = "{line | sentence}"
 The `quote` processor wraps the rendered string in ASCII double quotes and
 escapes internal double quotes and backslashes.
 
-[source,hocon]
+[source]
 ----
 line = ["Mia said \"hi\""]
 origin = "{line | quote}"
@@ -204,7 +205,7 @@ The `slug` processor lowercases rendered text, trims it, converts runs of
 non-alphanumeric characters to hyphens, removes apostrophes, and strips leading
 or trailing hyphens.
 
-[source,hocon]
+[source]
 ----
 title = ["Mia's Story"]
 origin = "{title | slug}"
@@ -215,7 +216,7 @@ origin = "{title | slug}"
 Arrays are random choices. The selected element is rendered using the same value
 rules as a top-level config value.
 
-[source,hocon]
+[source]
 ----
 mood = [vexed, wistful, astute]
 ----
@@ -226,7 +227,7 @@ as any other array element, and `weight` must be a finite non-negative number.
 If any array entry is weighted, plain entries in the same array receive weight
 `1.0`.
 
-[source,hocon]
+[source]
 ----
 mood = [
   { value = vexed, weight = 6 },
@@ -245,9 +246,9 @@ with `EmptyChoice`.
 == Scalar Values
 
 Scalar values that are not strings, arrays, or objects are converted to strings
-using the underlying HOCON value's `to_string` behavior.
+using the parsed value's `to_string` behavior.
 
-[source,hocon]
+[source]
 ----
 count = 3
 origin = "Count: {count}"
@@ -255,11 +256,11 @@ origin = "Count: {count}"
 
 == Object Values
 
-Objects can organize rules into dotted names. HOCON path keys and nested object
+Objects can organize rules into dotted names. Path keys and nested object
 syntax are equivalent, so `name.first = ["Mia"]` and
 `name { first = ["Mia"] }` both define a rule named `name.first`.
 
-[source,hocon]
+[source]
 ----
 name {
   first = ["Mia"]
@@ -276,14 +277,14 @@ Objects are also supported as the special top-level `context` value and as
 weighted choice entries inside arrays. Nested context values use the same dotted
 name behavior.
 
-[source,hocon]
+[source]
 ----
 origin = { value = "nested" }
 ----
 
 == Example Configuration
 
-[source,hocon]
+[source]
 ----
 name = ["Arjun", "Yuuma", "Darcy", "Mia", "Chiaki", "Izzi", "Azra", "Lina"]
 

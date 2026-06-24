@@ -1,0 +1,38 @@
+= Language Wrappers
+
+Copperlace exposes one Rust renderer through several language-specific
+surfaces. The wrapper pages here give a short orientation; generated native API
+documentation lives under `api/`.
+
+== Rust And CLI
+
+The Rust crate provides the renderer, C ABI, and CLI. Use `Copperlace` or
+`RuleSet` when rendering repeatedly from one config, and the one-shot helper
+functions for short scripts or tests.
+
+* link:api/rust/index.html[Rust API docs]
+* link:docs/packaging.html#_rust_artifacts[Rust artifacts and CLI packaging]
+
+== Python
+
+The Python package wraps the C ABI with `ctypes` and exposes context-manager
+APIs for safe native-handle cleanup.
+
+* link:api/python/index.html[Python API docs]
+* link:docs/packaging.html#_python_wrapper[Python wrapper notes]
+
+== Java
+
+The Java package uses the Java FFM API, publishes the Java API JAR, and packages
+platform native classifier JARs.
+
+* link:api/java/index.html[Java API docs]
+* link:docs/packaging.html#_java_wrapper[Java wrapper notes]
+
+== JS/TS WebAssembly
+
+The JS/TS package is generated with `wasm-pack` for browser and bundler use.
+Browser callers load rule text and pass it to `new Copperlace(config)`.
+
+* link:api/js/index.html[JS/TS API docs]
+* link:docs/packaging.html#_jsts_webassembly_package[JS/TS packaging notes]

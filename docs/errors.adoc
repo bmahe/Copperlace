@@ -9,7 +9,7 @@ runtime loading details.
 == Entry Points
 
 `Copperlace::from_hocon_str(config)` / `Copperlace::from_hocon_file(path)`::
-Parse and compile HOCON input once into a reusable renderer for repeated calls
+Parse and compile configuration input once into a reusable renderer for repeated calls
 to `Copperlace::render`.
 
 `Copperlace::render(&self, rule_name: &str) -> Result<String, RenderError>`::
@@ -19,7 +19,7 @@ Starts a fresh render for `rule_name` using the previously loaded config.
 Starts a fresh render with initial context values.
 
 `RuleSet::from_config(config: hocon_rs::Value) -> Result<RuleSet, RenderError>`::
-Compiles a HOCON root value into named render rules and context defaults. The
+Compiles a parsed root value into named render rules and context defaults. The
 root must be an object.
 
 `RuleSet::render_rule(&self, rule_name: &str) -> Result<String, RenderError>`::
@@ -33,10 +33,10 @@ Starts a fresh render with initial context values.
 Convenience function that compiles the config and renders one rule.
 
 `ruleset_from_hocon_str` / `ruleset_from_hocon_file`::
-Parse HOCON input and compile it into a `RuleSet`.
+Parse configuration input and compile it into a `RuleSet`.
 
 `render_hocon_str` / `render_hocon_file`::
-Parse HOCON input and render one rule in a single call.
+Parse configuration input and render one rule in a single call.
 
 `RuleSet::from_config_with_processors(config, processors)`::
 Compiles a config with the builtin processor registry plus Rust-provided custom
@@ -60,7 +60,7 @@ copperlace check --config -
 ----
 
 The CLI renders `origin` when `--rule` is omitted. Passing `-` as the render or
-check config path reads HOCON from standard input. It writes rendered output,
+check config path reads configuration from standard input. It writes rendered output,
 help, version text, and successful check output to stdout. Parse, render, check,
 and argument errors are written to stderr and return a nonzero exit code.
 
@@ -139,7 +139,7 @@ current unsupported value type is `"object"` for object parents such as `name`
 when only dotted leaves such as `name.first` are renderable.
 
 `InvalidConfigRoot`::
-Returned by `RuleSet::from_config` when the provided HOCON value root is not an
+Returned by `RuleSet::from_config` when the provided value root is not an
 object.
 
 == Current Non-Goals

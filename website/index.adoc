@@ -1,0 +1,40 @@
+= Copperlace
+:description: A rule-driven text rendering engine for reusable procedural text.
+
+Copperlace compiles readable generation rules into a reusable renderer for
+game content, product copy, structured snippets, browser-side experiments, and
+other text that needs controlled variation. It keeps random choices consistent
+within one render through per-render bindings and context defaults.
+
+[source]
+----
+name = ["Arjun", "Mia", "Lina"]
+animal = [unicorn, raven, owl]
+
+story = "{hero} traveled with {heroPet | article}."
+origin = "{hero:name}{heroPet:animal}{story}"
+----
+
+== Why Copperlace
+
+* Readable rules instead of embedding generation logic in application code.
+* Random choices, rule references, reusable bindings, context defaults, and
+  processor pipelines.
+* One Rust core exposed through CLI, C ABI, Python, Java, and JS/TS WebAssembly
+  wrappers.
+* Runnable examples for stories, game items, JSON-like output, release notes,
+  product copy, and quest logs.
+
+== Start Here
+
+* link:docs/capabilities.html[Capabilities]
+* link:docs/configuration.html[Configuration]
+* link:examples/index.html[Examples]
+* link:docs/packaging.html[Packaging and wrappers]
+
+== Native API Docs
+
+* link:api/rust/index.html[Rust API docs]
+* link:api/python/index.html[Python API docs]
+* link:api/java/index.html[Java API docs]
+* link:api/js/index.html[JS/TS API docs]

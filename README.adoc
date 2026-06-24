@@ -1,6 +1,6 @@
 = Copperlace
 
-Copperlace is a HOCON-driven text rendering engine. It expands named rules,
+Copperlace is a rule-driven text rendering engine. It expands named rules,
 template references, random choices, processors, context defaults, and
 per-render bindings into generated text.
 
@@ -19,7 +19,7 @@ Copperlace renders one named rule at a time. Each render gets its own binding
 context, so a random choice can be selected once and reused consistently across
 the generated output.
 
-[source,hocon]
+[source]
 ----
 name = ["Arjun", "Mia", "Lina"]
 animal = [unicorn, raven, owl]
@@ -35,7 +35,7 @@ that render.
 
 Template expressions also support processor pipelines:
 
-[source,hocon]
+[source]
 ----
 item = ["ancient key", "owl feather", "brass compass"]
 slug = "{item | slug}"
@@ -63,7 +63,7 @@ cd rust-core
 cargo run --bin copperlace -- render --config ../examples/character_scene.conf
 ----
 
-Use `-` as the config path to read HOCON from standard input:
+Use `-` as the config path to read configuration from standard input:
 
 [source,sh]
 ----
@@ -91,7 +91,7 @@ release notes, and quest logs.
 
 == Load Once, Render Many Times
 
-For repeated renders, load the HOCON config once and call `render` multiple
+For repeated renders, load the configuration once and call `render` multiple
 times. This avoids recompiling the rule set for each render.
 
 === Rust
@@ -109,9 +109,7 @@ let seeded = copperlace.render_with_context(
 )?;
 ----
 
-One-shot helpers are also available when repeated rendering is not needed:
-`render_hocon_file`, `render_hocon_str`, `ruleset_from_hocon_file`, and
-`ruleset_from_hocon_str`.
+One-shot helpers are also available when repeated rendering is not needed.
 
 === Python
 
@@ -131,8 +129,8 @@ with Copperlace.from_string(
     shouted = copperlace.render("origin")
 ----
 
-Python also exposes `RuleSet`, `render_hocon_file`, and `render_hocon_str`.
-Wrapper errors are raised as `CopperlaceError`.
+Python also exposes `RuleSet` and one-shot render helpers. Wrapper errors are
+raised as `CopperlaceError`.
 
 === Java
 
@@ -154,9 +152,8 @@ try (final Copperlace copperlace = Copperlace.fromStringWithProcessors(
 }
 ----
 
-Java also exposes `RuleSet`, `Copperlace.renderHoconFile`, and
-`Copperlace.renderHoconString`. `Copperlace` and `RuleSet` implement
-`AutoCloseable`.
+Java also exposes `RuleSet` and one-shot render helpers. `Copperlace` and
+`RuleSet` implement `AutoCloseable`.
 
 === JS/TS
 
@@ -197,7 +194,7 @@ The detailed behavior and configuration contract lives in `docs/`:
 * `java/` contains the Java FFM wrapper and Maven packaging.
 * `js/` contains JS/TS WebAssembly package documentation.
 * `docs/` contains the behavior and configuration specification.
-* `examples/` contains runnable HOCON examples.
+* `examples/` contains runnable rule examples.
 
 == Development Commands
 

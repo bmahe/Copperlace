@@ -23,6 +23,10 @@ help:
 	@printf '%s\n' '  make js-web         Build JS/TS WebAssembly package for direct browser import'
 	@printf '%s\n' '  make java-test      Run Java FFM tests'
 	@printf '%s\n' '  make java-package   Build Java API and native classifier JARs'
+	@printf '%s\n' '  make site           Build website and native API documentation'
+	@printf '%s\n' '  make site-main      Build website pages from AsciiDoc sources'
+	@printf '%s\n' '  make site-api       Build native API documentation sub-sites'
+	@printf '%s\n' '  make site-serve     Serve generated website locally'
 	@printf '%s\n' '  make test           Run Rust, Python, and Java tests'
 	@printf '%s\n' '  make package        Build Python, JS/TS, and Java distributable artifacts'
 	@printf '%s\n' '  make check          Run formatting checks and tests'
@@ -67,6 +71,22 @@ java-test:
 .PHONY: java-package
 java-package:
 	cd $(JAVA_DIR) && $(MVN) -q package
+
+.PHONY: site
+site:
+	$(PYTHON) website/build_site.py --clean
+
+.PHONY: site-main
+site-main:
+	$(PYTHON) website/build_site.py --clean --main
+
+.PHONY: site-api
+site-api:
+	$(PYTHON) website/build_site.py --api
+
+.PHONY: site-serve
+site-serve: site-main
+	cd target/site && $(PYTHON) -m http.server 8000
 
 .PHONY: test
 test: rust-test python-test java-test

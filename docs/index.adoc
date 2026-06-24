@@ -1,6 +1,6 @@
 = Copperlace Documentation
 
-This directory documents Copperlace's current renderer behavior and HOCON
+This directory documents Copperlace's current renderer behavior and
 configuration contract. Treat these documents as the working specification for
 the behavior currently implemented in `rust-core`.
 
@@ -8,7 +8,7 @@ the behavior currently implemented in `rust-core`.
 
 * link:capabilities.adoc[Capabilities] describes what the renderer can produce
   and how rendering resolves rules, choices, bindings, and context defaults.
-* link:configuration.adoc[Configuration] describes the accepted HOCON shape and
+* link:configuration.adoc[Configuration] describes the accepted configuration shape and
   how each supported value type is interpreted.
 * link:errors.adoc[Errors and API behavior] describes public Rust entry points
   and render error conditions.
@@ -24,10 +24,7 @@ The behavior documented here is exported by the Rust library in
 * `RuleSet::render_rule`
 * `render_config_rule`
 * `RenderError`
-* `ruleset_from_hocon_str`
-* `ruleset_from_hocon_file`
-* `render_hocon_str`
-* `render_hocon_file`
+* configuration file and string helper APIs
 
 The package also builds and packages:
 

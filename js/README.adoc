@@ -1,7 +1,7 @@
 = Copperlace JS/TS WebAssembly Package
 
 The JS/TS package is generated from the Rust renderer with `wasm-pack`. It is
-intended for websites and web apps that want to render Copperlace HOCON config
+intended for websites and web apps that want to render Copperlace configuration
 in the browser.
 
 == Build
@@ -80,10 +80,10 @@ Use `make js-web` for direct browser imports:
 == API
 
 `new Copperlace(config: string)`::
-Compiles HOCON config once and returns a renderer for repeated renders.
+Compiles configuration once and returns a renderer for repeated renders.
 
 `Copperlace.withProcessors(config: string, processors: Record<string, (value: string) => string>)`::
-Compiles HOCON config once with custom processor functions. Custom processor
+Compiles configuration once with custom processor functions. Custom processor
 names override builtin names.
 
 `Copperlace.render(rule: string): string`::

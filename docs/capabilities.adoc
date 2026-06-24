@@ -1,17 +1,17 @@
 = Copperlace Capabilities
 
-Copperlace renders text from named HOCON rules. A render starts from one rule
+Copperlace renders text from named rules. A render starts from one rule
 name, expands any template references it encounters, and returns a single
 string or a `RenderError`.
 
 == Named Rules
 
-Every top-level HOCON key is a renderable rule, except for the special
+Every top-level key is a renderable rule, except for the special
 top-level `context` object. Nested object leaves are available as dotted rule
 names, so `name.first = ["Mia"]` can be rendered as `{name.first}`. Object
 parents such as `name` are not directly renderable.
 
-[source,hocon]
+[source]
 ----
 name = ["Mia"]
 origin = "Hello {name}"
@@ -25,7 +25,7 @@ Rendering `name` directly is also valid.
 String values are parsed as templates. Literal text is copied into the output.
 Expressions inside braces are resolved at render time.
 
-[source,hocon]
+[source]
 ----
 adjective = ["bright"]
 story = "A {adjective} path"
@@ -40,7 +40,7 @@ as `{name}`.
 Template expressions can pipe rendered output through processors. Processors
 run left-to-right and transform strings only.
 
-[source,hocon]
+[source]
 ----
 name = ["  mIA  "]
 origin = "Hello {name | trim | capitalize}"
@@ -68,7 +68,7 @@ processors when names collide. The CLI uses the builtin processor registry only.
 Array values are random choices. Rendering an array-backed rule chooses one
 child value and renders that value.
 
-[source,hocon]
+[source]
 ----
 mood = [vexed, wistful, astute]
 origin = "The path felt {mood}."
@@ -81,7 +81,7 @@ weighted choice entries inside arrays.
 Weighted choices use object entries with `value` and `weight`. If any array
 entry is weighted, plain entries in the same array use weight `1.0`.
 
-[source,hocon]
+[source]
 ----
 mood = [
   { value = common, weight = 9.5 },
@@ -101,7 +101,7 @@ current render and emits no text directly. If `alias` is missing, Copperlace
 renders `rule` and stores the result under `alias`. If `alias` already exists,
 the expression leaves the existing value unchanged and does not render `rule`.
 
-[source,hocon]
+[source]
 ----
 name = ["Mia"]
 origin = "{hero:name}{hero}/{hero}"
@@ -112,7 +112,7 @@ Rendering `origin` produces `Mia/Mia`. The first expression binds `hero`; later
 
 Bindings do not overwrite an existing value:
 
-[source,hocon]
+[source]
 ----
 first = ["Mia"]
 second = ["Darcy"]
@@ -124,7 +124,7 @@ because `hero` already exists.
 
 Binding expressions store processed values when a pipeline is present:
 
-[source,hocon]
+[source]
 ----
 name = ["mia"]
 origin = "{hero:name | uppercase}{hero}"
@@ -137,7 +137,7 @@ Rendering `origin` produces `MIA`.
 An expression of the form `{alias:=rule}` always renders `rule`, stores the
 result under `alias`, and replaces any existing value for `alias`.
 
-[source,hocon]
+[source]
 ----
 first = ["Mia"]
 second = ["Darcy"]
@@ -159,7 +159,7 @@ templates. When a template references `{name}`, resolution uses this order:
 . Lazy default from top-level `context`.
 . Top-level rule with the same name.
 
-[source,hocon]
+[source]
 ----
 name = ["Mia"]
 animal = ["owl"]
@@ -187,7 +187,7 @@ Copperlace tracks the rule call stack during a render. If a rule attempts to
 render a rule already on the stack, rendering fails with
 `CircularRuleReference`.
 
-[source,hocon]
+[source]
 ----
 a = "{b}"
 b = "{a}"

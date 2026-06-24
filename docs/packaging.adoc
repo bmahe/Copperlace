@@ -99,7 +99,7 @@ Public entry points are:
 * `renderHoconStringWithProcessorsAndContext(config, rule, processors, context)`
 
 `Copperlace` is the recommended load-once API for repeated renders in browser
-apps. Browser callers should load HOCON text themselves, usually with `fetch`,
+apps. Browser callers should load rule text themselves, usually with `fetch`,
 and pass the config string into `Copperlace`; file-path APIs are not exported to
 WebAssembly.
 
