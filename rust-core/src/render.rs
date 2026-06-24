@@ -91,6 +91,13 @@ where
 /// builtin, the custom implementation takes precedence.
 pub type ProcessorRegistry = HashMap<String, Arc<dyn Processor>>;
 
+/// Initial variable bindings for one render operation.
+///
+/// Values in this map are available before top-level `context` defaults and
+/// named rules. A render may still update them with overwrite bindings such as
+/// `{alias:=rule}`.
+pub type RenderContext = HashMap<String, String>;
+
 /// Wraps a processor implementation for insertion into a [`ProcessorRegistry`].
 pub fn processor<F>(processor: F) -> Arc<dyn Processor>
 where
@@ -106,7 +113,7 @@ where
 /// random number generator used by choice nodes.
 pub struct RenderState<'a> {
     ruleset: &'a RuleSet,
-    context: HashMap<String, String>,
+    context: RenderContext,
     call_stack: Vec<String>,
     rng: rand::rngs::ThreadRng,
 }
@@ -114,9 +121,14 @@ pub struct RenderState<'a> {
 impl<'a> RenderState<'a> {
     /// Creates an empty render state for a ruleset.
     pub fn new(ruleset: &'a RuleSet) -> Self {
+        Self::with_context(ruleset, RenderContext::new())
+    }
+
+    /// Creates a render state with initial variable bindings.
+    pub fn with_context(ruleset: &'a RuleSet, context: RenderContext) -> Self {
         RenderState {
             ruleset,
-            context: HashMap::new(),
+            context,
             call_stack: Vec::new(),
             rng: rand::rngs::ThreadRng::default(),
         }
@@ -217,7 +229,20 @@ impl RuleSet {
     /// Each call starts with a fresh render context. Bindings and lazy context
     /// defaults are cached within one render, but not shared with later calls.
     pub fn render_rule(&self, rule_name: &str) -> Result<String, RenderError> {
-        let mut state = RenderState::new(self);
+        self.render_rule_with_context(rule_name, RenderContext::new())
+    }
+
+    /// Renders a named rule with initial render context values.
+    ///
+    /// Initial context values resolve before lazy `context` defaults and named
+    /// rules. They are scoped to this render call and are not stored on the
+    /// ruleset.
+    pub fn render_rule_with_context(
+        &self,
+        rule_name: &str,
+        context: RenderContext,
+    ) -> Result<String, RenderError> {
+        let mut state = RenderState::with_context(self, context);
         self.render_rule_with_state(rule_name, &mut state)
     }
 
@@ -286,8 +311,17 @@ impl RuleSet {
 /// This is a one-shot helper around [`RuleSet::from_config`] and
 /// [`RuleSet::render_rule`]. Use [`RuleSet`] directly for repeated renders.
 pub fn render_config_rule(config: hocon_rs::Value, rule_name: &str) -> Result<String, RenderError> {
+    render_config_rule_with_context(config, rule_name, RenderContext::new())
+}
+
+/// Compiles a HOCON root value and renders one rule with initial context.
+pub fn render_config_rule_with_context(
+    config: hocon_rs::Value,
+    rule_name: &str,
+    context: RenderContext,
+) -> Result<String, RenderError> {
     let ruleset = RuleSet::from_config(config)?;
-    ruleset.render_rule(rule_name)
+    ruleset.render_rule_with_context(rule_name, context)
 }
 
 /// Looks up a previously bound variable in the current render context.

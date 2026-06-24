@@ -1,5 +1,8 @@
 use copperlace::render::{ProcessorRegistry, processor};
-use copperlace::{Copperlace, RenderError, RuleSet};
+use copperlace::{
+    Copperlace, RenderContext, RenderError, RuleSet, render_config_rule_with_context,
+    render_hocon_file_with_context, render_hocon_str_with_context,
+};
 
 fn ruleset(config: &str) -> RuleSet {
     let value = hocon_rs::Config::parse_str::<hocon_rs::Value>(config, None).unwrap();
@@ -68,6 +71,195 @@ fn copperlace_renders_repeatedly_from_hocon_file() {
     assert_eq!(copperlace.render("origin").unwrap(), "Mia");
 
     let _ = std::fs::remove_file(config_path);
+}
+
+#[test]
+fn initial_context_resolves_template_reference() {
+    let rules = ruleset(
+        r#"
+        origin = "Hello {name}"
+        "#,
+    );
+    let mut context = RenderContext::new();
+    context.insert("name".to_string(), "Mia".to_string());
+
+    assert_eq!(
+        rules.render_rule_with_context("origin", context).unwrap(),
+        "Hello Mia"
+    );
+}
+
+#[test]
+fn initial_context_overrides_context_default() {
+    let rules = ruleset(
+        r#"
+        fallback = ["Darcy"]
+        origin = "{hero}"
+        context = {
+            hero = "{fallback}"
+        }
+        "#,
+    );
+    let mut context = RenderContext::new();
+    context.insert("hero".to_string(), "Mia".to_string());
+
+    assert_eq!(
+        rules.render_rule_with_context("origin", context).unwrap(),
+        "Mia"
+    );
+}
+
+#[test]
+fn initial_context_overrides_named_rule() {
+    let rules = ruleset(
+        r#"
+        hero = ["Darcy"]
+        origin = "{hero}"
+        "#,
+    );
+    let mut context = RenderContext::new();
+    context.insert("hero".to_string(), "Mia".to_string());
+
+    assert_eq!(
+        rules.render_rule_with_context("origin", context).unwrap(),
+        "Mia"
+    );
+}
+
+#[test]
+fn bind_if_missing_preserves_initial_context() {
+    let rules = ruleset(
+        r#"
+        fallback = ["Darcy"]
+        origin = "{hero:fallback}{hero}"
+        "#,
+    );
+    let mut context = RenderContext::new();
+    context.insert("hero".to_string(), "Mia".to_string());
+
+    assert_eq!(
+        rules.render_rule_with_context("origin", context).unwrap(),
+        "Mia"
+    );
+}
+
+#[test]
+fn overwrite_binding_replaces_initial_context() {
+    let rules = ruleset(
+        r#"
+        fallback = ["Darcy"]
+        origin = "{hero:=fallback}{hero}"
+        "#,
+    );
+    let mut context = RenderContext::new();
+    context.insert("hero".to_string(), "Mia".to_string());
+
+    assert_eq!(
+        rules.render_rule_with_context("origin", context).unwrap(),
+        "Darcy"
+    );
+}
+
+#[test]
+fn dotted_initial_context_key_resolves_template_reference() {
+    let rules = ruleset(
+        r#"
+        origin = "{hero.name}"
+        "#,
+    );
+    let mut context = RenderContext::new();
+    context.insert("hero.name".to_string(), "Mia".to_string());
+
+    assert_eq!(
+        rules.render_rule_with_context("origin", context).unwrap(),
+        "Mia"
+    );
+}
+
+#[test]
+fn initial_context_does_not_persist_between_renders() {
+    let rules = ruleset(
+        r#"
+        hero = ["Darcy"]
+        origin = "{hero}"
+        "#,
+    );
+    let mut context = RenderContext::new();
+    context.insert("hero".to_string(), "Mia".to_string());
+
+    assert_eq!(
+        rules.render_rule_with_context("origin", context).unwrap(),
+        "Mia"
+    );
+    assert_eq!(rules.render_rule("origin").unwrap(), "Darcy");
+}
+
+#[test]
+fn copperlace_renders_with_initial_context() {
+    let copperlace = Copperlace::from_hocon_str(
+        r#"
+        origin = "Hello {name}"
+        "#,
+    )
+    .unwrap();
+    let mut context = RenderContext::new();
+    context.insert("name".to_string(), "Mia".to_string());
+
+    assert_eq!(
+        copperlace.render_with_context("origin", context).unwrap(),
+        "Hello Mia"
+    );
+}
+
+#[test]
+fn render_hocon_str_renders_with_initial_context() {
+    let mut context = RenderContext::new();
+    context.insert("name".to_string(), "Mia".to_string());
+
+    assert_eq!(
+        render_hocon_str_with_context(r#"origin = "Hello {name}""#, "origin", context).unwrap(),
+        "Hello Mia"
+    );
+}
+
+#[test]
+fn render_hocon_file_renders_with_initial_context() {
+    let config_path =
+        std::env::temp_dir().join(format!("copperlace-context-{}.conf", std::process::id()));
+    std::fs::write(
+        &config_path,
+        r#"
+        origin = "Hello {name}"
+        "#,
+    )
+    .unwrap();
+    let mut context = RenderContext::new();
+    context.insert("name".to_string(), "Mia".to_string());
+
+    assert_eq!(
+        render_hocon_file_with_context(&config_path, "origin", context).unwrap(),
+        "Hello Mia"
+    );
+
+    let _ = std::fs::remove_file(config_path);
+}
+
+#[test]
+fn render_config_rule_renders_with_initial_context() {
+    let value = hocon_rs::Config::parse_str::<hocon_rs::Value>(
+        r#"
+        origin = "Hello {name}"
+        "#,
+        None,
+    )
+    .unwrap();
+    let mut context = RenderContext::new();
+    context.insert("name".to_string(), "Mia".to_string());
+
+    assert_eq!(
+        render_config_rule_with_context(value, "origin", context).unwrap(),
+        "Hello Mia"
+    );
 }
 
 #[test]

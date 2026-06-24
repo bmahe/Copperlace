@@ -4,6 +4,8 @@
 //! time. Templates can reference other rules, make random choices, bind values
 //! for the duration of one render, use lazy `context` defaults, and transform
 //! rendered text with processors.
+//! Rust callers can also provide initial render context values when rendering a
+//! rule.
 //!
 //! For repeated renders from the same config, use [`Copperlace`] or [`RuleSet`]
 //! so the config is parsed and compiled once. For one-off rendering, use
@@ -18,9 +20,10 @@ pub mod render;
 mod wasm;
 
 pub use config::{
-    ConfigError, Copperlace, render_hocon_file, render_hocon_str, ruleset_from_hocon_file,
-    ruleset_from_hocon_str,
+    ConfigError, Copperlace, render_hocon_file, render_hocon_file_with_context, render_hocon_str,
+    render_hocon_str_with_context, ruleset_from_hocon_file, ruleset_from_hocon_str,
 };
 pub use render::{
-    Processor, ProcessorRegistry, RenderError, RuleSet, processor, render_config_rule,
+    Processor, ProcessorRegistry, RenderContext, RenderError, RuleSet, processor,
+    render_config_rule, render_config_rule_with_context,
 };

@@ -175,6 +175,11 @@ Rendering `origin` renders `story`; the first `{hero}` reference renders and
 caches `context.hero`, and the first `{heroPet}` reference renders and caches
 `context.heroPet`.
 
+Rust callers can also provide initial render context values when rendering a
+rule. Initial values use the same resolution slot as existing bindings: they
+resolve before lazy `context` defaults and named rules, and they are scoped to
+one render call.
+
 == Cycle Detection
 
 Copperlace tracks the rule call stack during a render. If a rule attempts to

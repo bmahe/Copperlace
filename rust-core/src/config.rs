@@ -1,7 +1,7 @@
 use std::fmt;
 use std::path::Path;
 
-use crate::render::{RenderError, RuleSet};
+use crate::render::{RenderContext, RenderError, RuleSet};
 
 /// Error returned while loading, parsing, compiling, or rendering HOCON config.
 #[derive(Debug, PartialEq, Eq)]
@@ -68,6 +68,18 @@ impl Copperlace {
     pub fn render(&self, rule_name: &str) -> Result<String, RenderError> {
         self.ruleset.render_rule(rule_name)
     }
+
+    /// Renders a named rule from the compiled config with initial context.
+    ///
+    /// Initial context values are scoped to this render call. They resolve
+    /// before config-defined `context` defaults and named rules.
+    pub fn render_with_context(
+        &self,
+        rule_name: &str,
+        context: RenderContext,
+    ) -> Result<String, RenderError> {
+        self.ruleset.render_rule_with_context(rule_name, context)
+    }
 }
 
 /// Parses a HOCON string and compiles it into a reusable [`RuleSet`].
@@ -91,8 +103,17 @@ pub fn ruleset_from_hocon_file(path: impl AsRef<Path>) -> Result<RuleSet, Config
 /// and drops the compiled ruleset. Use [`Copperlace::from_hocon_str`] or
 /// [`ruleset_from_hocon_str`] for repeated renders.
 pub fn render_hocon_str(config: &str, rule_name: &str) -> Result<String, ConfigError> {
+    render_hocon_str_with_context(config, rule_name, RenderContext::new())
+}
+
+/// Renders one rule from a HOCON config string with initial context.
+pub fn render_hocon_str_with_context(
+    config: &str,
+    rule_name: &str,
+    context: RenderContext,
+) -> Result<String, ConfigError> {
     ruleset_from_hocon_str(config)?
-        .render_rule(rule_name)
+        .render_rule_with_context(rule_name, context)
         .map_err(ConfigError::Render)
 }
 
@@ -102,7 +123,16 @@ pub fn render_hocon_str(config: &str, rule_name: &str) -> Result<String, ConfigE
 /// drops the compiled ruleset. Use [`Copperlace::from_hocon_file`] or
 /// [`ruleset_from_hocon_file`] for repeated renders.
 pub fn render_hocon_file(path: impl AsRef<Path>, rule_name: &str) -> Result<String, ConfigError> {
+    render_hocon_file_with_context(path, rule_name, RenderContext::new())
+}
+
+/// Renders one rule from a HOCON config file with initial context.
+pub fn render_hocon_file_with_context(
+    path: impl AsRef<Path>,
+    rule_name: &str,
+    context: RenderContext,
+) -> Result<String, ConfigError> {
     ruleset_from_hocon_file(path)?
-        .render_rule(rule_name)
+        .render_rule_with_context(rule_name, context)
         .map_err(ConfigError::Render)
 }

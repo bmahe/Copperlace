@@ -15,6 +15,9 @@ to `Copperlace::render`.
 `Copperlace::render(&self, rule_name: &str) -> Result<String, RenderError>`::
 Starts a fresh render for `rule_name` using the previously loaded config.
 
+`Copperlace::render_with_context(&self, rule_name, context)`::
+Starts a fresh render with Rust-provided initial context values.
+
 `RuleSet::from_config(config: hocon_rs::Value) -> Result<RuleSet, RenderError>`::
 Compiles a HOCON root value into named render rules and context defaults. The
 root must be an object.
@@ -22,6 +25,9 @@ root must be an object.
 `RuleSet::render_rule(&self, rule_name: &str) -> Result<String, RenderError>`::
 Starts a fresh render for `rule_name`. Each call gets a new render context and a
 new thread-local random number generator.
+
+`RuleSet::render_rule_with_context(&self, rule_name, context)`::
+Starts a fresh render with Rust-provided initial context values.
 
 `render_config_rule(config: hocon_rs::Value, rule_name: &str) -> Result<String, RenderError>`::
 Convenience function that compiles the config and renders one rule.
@@ -73,13 +79,18 @@ Each render has an isolated context. Bindings created by `{alias:rule}` and
 lazy values created from top-level `context` defaults live only for the current
 `render_rule` call.
 
+Rust callers may provide initial context values for a render. Initial context
+values resolve before top-level `context` defaults and named rules. They are
+scoped to one render call and do not persist on the ruleset.
+
 Bind-if-missing expressions are idempotent within a render. If `{alias:rule}`
 runs after `alias` already exists, it leaves the existing value unchanged and
 does not render `rule`. Overwrite expressions with `{alias:=rule}` always render
 `rule` and replace the value.
 
-The renderer does not currently expose seeded randomness, deterministic replay,
-or a way to provide initial context values from the public entry points.
+The renderer does not currently expose seeded randomness or deterministic
+replay. Initial context is currently exposed only through Rust APIs, not through
+the CLI, C ABI, Python, Java, or JS/WASM wrappers.
 
 == Error Cases
 

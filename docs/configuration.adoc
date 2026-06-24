@@ -48,6 +48,10 @@ context = {
 If top-level `context` is not an object, it is treated as a normal rule named
 `context`.
 
+Rust callers may also pass initial render context values to a render call.
+Initial context values are strings, resolve before config-defined `context`
+defaults and named rules, and do not persist after the render finishes.
+
 == String Values
 
 Strings are parsed as templates. Each `{...}` section becomes a render-time
