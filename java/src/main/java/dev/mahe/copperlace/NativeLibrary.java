@@ -9,9 +9,13 @@ import java.lang.foreign.MemorySegment;
 import java.lang.foreign.SymbolLookup;
 import java.lang.foreign.ValueLayout;
 import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
+import java.lang.invoke.MethodType;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
@@ -29,14 +33,20 @@ final class NativeLibrary {
     private final Arena libraryArena = Arena.ofShared();
     private final MethodHandle rulesetFromFile;
     private final MethodHandle rulesetFromString;
+    private final MethodHandle rulesetFromFileWithProcessors;
+    private final MethodHandle rulesetFromStringWithProcessors;
     private final MethodHandle rulesetRender;
     private final MethodHandle rulesetRenderWithContext;
     private final MethodHandle rulesetFree;
     private final MethodHandle stringFree;
+    private final MethodHandle processorResultSetOutput;
+    private final MethodHandle processorResultSetError;
+    private final MethodHandle processorUpcall;
 
     private NativeLibrary() {
         final Linker linker = Linker.nativeLinker();
         final SymbolLookup lookup = SymbolLookup.libraryLookup(findLibrary(), libraryArena);
+        processorUpcall = processorUpcallHandle();
         rulesetFromFile = downcall(
                 linker,
                 lookup,
@@ -46,6 +56,19 @@ final class NativeLibrary {
                         ValueLayout.ADDRESS,
                         ValueLayout.ADDRESS,
                         ValueLayout.ADDRESS));
+        rulesetFromFileWithProcessors = downcall(
+                linker,
+                lookup,
+                "copperlace_ruleset_from_file_with_processors",
+                FunctionDescriptor.of(
+                        ValueLayout.JAVA_INT,
+                        ValueLayout.ADDRESS,
+                        ValueLayout.ADDRESS,
+                        ValueLayout.ADDRESS,
+                        ValueLayout.ADDRESS,
+                        ValueLayout.JAVA_LONG,
+                        ValueLayout.ADDRESS,
+                        ValueLayout.ADDRESS));
         rulesetFromString = downcall(
                 linker,
                 lookup,
@@ -53,6 +76,19 @@ final class NativeLibrary {
                 FunctionDescriptor.of(
                         ValueLayout.JAVA_INT,
                         ValueLayout.ADDRESS,
+                        ValueLayout.ADDRESS,
+                        ValueLayout.ADDRESS));
+        rulesetFromStringWithProcessors = downcall(
+                linker,
+                lookup,
+                "copperlace_ruleset_from_string_with_processors",
+                FunctionDescriptor.of(
+                        ValueLayout.JAVA_INT,
+                        ValueLayout.ADDRESS,
+                        ValueLayout.ADDRESS,
+                        ValueLayout.ADDRESS,
+                        ValueLayout.ADDRESS,
+                        ValueLayout.JAVA_LONG,
                         ValueLayout.ADDRESS,
                         ValueLayout.ADDRESS));
         rulesetRender = downcall(
@@ -88,6 +124,16 @@ final class NativeLibrary {
                 lookup,
                 "copperlace_string_free",
                 FunctionDescriptor.ofVoid(ValueLayout.ADDRESS));
+        processorResultSetOutput = downcall(
+                linker,
+                lookup,
+                "copperlace_processor_result_set_output",
+                FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
+        processorResultSetError = downcall(
+                linker,
+                lookup,
+                "copperlace_processor_result_set_error",
+                FunctionDescriptor.of(ValueLayout.JAVA_INT, ValueLayout.ADDRESS, ValueLayout.ADDRESS));
     }
 
     MemorySegment rulesetFromString(final String config) {
@@ -104,6 +150,36 @@ final class NativeLibrary {
         } catch (final CopperlaceException exception) {
             throw exception;
         } catch (final Throwable throwable) {
+            throw new CopperlaceException("Failed to create Copperlace ruleset", throwable);
+        }
+    }
+
+    RulesetHandle rulesetFromStringWithProcessors(
+            final String config, final Map<String, CopperlaceProcessor> processors) {
+        Validate.notBlank(config, "config must not be blank");
+        Objects.requireNonNull(processors, "processors");
+
+        final NativeProcessorRegistry registry = new NativeProcessorRegistry(processors);
+        try (Arena arena = Arena.ofConfined()) {
+            final MemorySegment outHandle = arena.allocate(ValueLayout.ADDRESS);
+            final MemorySegment outError = arena.allocate(ValueLayout.ADDRESS);
+            final MemorySegment configString = arena.allocateFrom(config);
+
+            final int status = (int) rulesetFromStringWithProcessors.invokeExact(
+                    configString,
+                    registry.names,
+                    registry.callbacks,
+                    registry.userData,
+                    registry.length,
+                    outHandle,
+                    outError);
+            checkStatus(status, outError);
+            return new RulesetHandle(outHandle.get(ValueLayout.ADDRESS, 0), registry);
+        } catch (final CopperlaceException exception) {
+            registry.close();
+            throw exception;
+        } catch (final Throwable throwable) {
+            registry.close();
             throw new CopperlaceException("Failed to create Copperlace ruleset", throwable);
         }
     }
@@ -176,6 +252,36 @@ final class NativeLibrary {
         }
     }
 
+    RulesetHandle rulesetFromFileWithProcessors(
+            final Path path, final Map<String, CopperlaceProcessor> processors) {
+        Objects.requireNonNull(path, "path");
+        Objects.requireNonNull(processors, "processors");
+
+        final NativeProcessorRegistry registry = new NativeProcessorRegistry(processors);
+        try (Arena arena = Arena.ofConfined()) {
+            final MemorySegment outHandle = arena.allocate(ValueLayout.ADDRESS);
+            final MemorySegment outError = arena.allocate(ValueLayout.ADDRESS);
+            final MemorySegment pathString = arena.allocateFrom(path.toString());
+
+            final int status = (int) rulesetFromFileWithProcessors.invokeExact(
+                    pathString,
+                    registry.names,
+                    registry.callbacks,
+                    registry.userData,
+                    registry.length,
+                    outHandle,
+                    outError);
+            checkStatus(status, outError);
+            return new RulesetHandle(outHandle.get(ValueLayout.ADDRESS, 0), registry);
+        } catch (final CopperlaceException exception) {
+            registry.close();
+            throw exception;
+        } catch (final Throwable throwable) {
+            registry.close();
+            throw new CopperlaceException("Failed to create Copperlace ruleset", throwable);
+        }
+    }
+
     String render(final MemorySegment handle, final String rule) {
         Validate.isTrue(!isNull(handle), "handle must not be null");
         Validate.notBlank(rule, "rule must not be blank");
@@ -218,6 +324,18 @@ final class NativeLibrary {
             } catch (final Throwable throwable) {
                 throw new CopperlaceException("Failed to free Copperlace string", throwable);
             }
+        }
+    }
+
+    private int processorResultSetOutput(final MemorySegment result, final String output) throws Throwable {
+        try (Arena arena = Arena.ofConfined()) {
+            return (int) processorResultSetOutput.invokeExact(result, arena.allocateFrom(output));
+        }
+    }
+
+    private int processorResultSetError(final MemorySegment result, final String message) throws Throwable {
+        try (Arena arena = Arena.ofConfined()) {
+            return (int) processorResultSetError.invokeExact(result, arena.allocateFrom(message));
         }
     }
 
@@ -266,6 +384,46 @@ final class NativeLibrary {
             throw new CopperlaceException("Could not find native symbol: " + symbol);
         }
         return linker.downcallHandle(address.get(), descriptor);
+    }
+
+    private static MethodHandle processorUpcallHandle() {
+        try {
+            return MethodHandles.lookup()
+                    .findStatic(
+                            NativeLibrary.class,
+                            "invokeProcessor",
+                            MethodType.methodType(
+                                    int.class,
+                                    ProcessorState.class,
+                                    MemorySegment.class,
+                                    MemorySegment.class,
+                                    MemorySegment.class));
+        } catch (final NoSuchMethodException | IllegalAccessException exception) {
+            throw new CopperlaceException("Failed to initialize processor upcall", exception);
+        }
+    }
+
+    @SuppressWarnings("unused")
+    private static int invokeProcessor(
+            final ProcessorState state,
+            final MemorySegment input,
+            final MemorySegment result,
+            final MemorySegment userData) {
+        Objects.requireNonNull(state, "state");
+        try {
+            final String output = state.processor().process(state.library().readNativeString(input));
+            if (output == null) {
+                return state.library().processorResultSetError(result, "processor returned null");
+            }
+            return state.library().processorResultSetOutput(result, output);
+        } catch (final Throwable throwable) {
+            final String message = throwable.getMessage() == null ? throwable.toString() : throwable.getMessage();
+            try {
+                return state.library().processorResultSetError(result, message);
+            } catch (final Throwable nested) {
+                return COPPERLACE_RENDER_ERROR;
+            }
+        }
     }
 
     static boolean isNull(final MemorySegment segment) {
@@ -376,5 +534,70 @@ final class NativeLibrary {
             return "aarch64";
         }
         throw new CopperlaceException("Unsupported native architecture: " + rawArch);
+    }
+
+    static final class RulesetHandle {
+        private final MemorySegment handle;
+        private final NativeProcessorRegistry processors;
+
+        private RulesetHandle(final MemorySegment handle, final NativeProcessorRegistry processors) {
+            Validate.isTrue(!isNull(handle), "handle must not be null");
+            this.handle = handle;
+            this.processors = processors;
+        }
+
+        MemorySegment handle() {
+            return handle;
+        }
+
+        void closeProcessors() {
+            if (processors != null) {
+                processors.close();
+            }
+        }
+    }
+
+    private record ProcessorState(NativeLibrary library, CopperlaceProcessor processor) {}
+
+    private final class NativeProcessorRegistry implements AutoCloseable {
+        private final Arena arena = Arena.ofConfined();
+        private final List<ProcessorState> states = new ArrayList<>();
+        private final long length;
+        private final MemorySegment names;
+        private final MemorySegment callbacks;
+        private final MemorySegment userData;
+
+        private NativeProcessorRegistry(final Map<String, CopperlaceProcessor> processors) {
+            length = processors.size();
+            final long bytes = ValueLayout.ADDRESS.byteSize() * length;
+            names = length == 0 ? MemorySegment.NULL : arena.allocate(bytes, ValueLayout.ADDRESS.byteAlignment());
+            callbacks = length == 0 ? MemorySegment.NULL : arena.allocate(bytes, ValueLayout.ADDRESS.byteAlignment());
+            userData = length == 0 ? MemorySegment.NULL : arena.allocate(bytes, ValueLayout.ADDRESS.byteAlignment());
+
+            long index = 0;
+            final FunctionDescriptor descriptor =
+                    FunctionDescriptor.of(
+                            ValueLayout.JAVA_INT,
+                            ValueLayout.ADDRESS,
+                            ValueLayout.ADDRESS,
+                            ValueLayout.ADDRESS);
+            for (final Map.Entry<String, CopperlaceProcessor> entry : processors.entrySet()) {
+                final String name = Objects.requireNonNull(entry.getKey(), "processor name");
+                final CopperlaceProcessor processor = Objects.requireNonNull(entry.getValue(), "processor");
+                final ProcessorState state = new ProcessorState(NativeLibrary.this, processor);
+                states.add(state);
+                final MethodHandle boundProcessor = processorUpcall.bindTo(state);
+                final MemorySegment callback = Linker.nativeLinker().upcallStub(boundProcessor, descriptor, arena);
+                names.setAtIndex(ValueLayout.ADDRESS, index, arena.allocateFrom(name));
+                callbacks.setAtIndex(ValueLayout.ADDRESS, index, callback);
+                userData.setAtIndex(ValueLayout.ADDRESS, index, MemorySegment.NULL);
+                index++;
+            }
+        }
+
+        @Override
+        public void close() {
+            arena.close();
+        }
     }
 }

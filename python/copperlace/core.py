@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import ctypes
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from pathlib import Path
 from types import TracebackType
 from typing import Self
@@ -23,16 +23,22 @@ class RuleSet:
     should use it as a context manager or call :meth:`close` when finished.
     """
 
-    def __init__(self, handle: ctypes.c_void_p) -> None:
+    def __init__(self, handle: ctypes.c_void_p, processor_registry: object | None = None) -> None:
         self._handle = handle
+        self._processor_registry = processor_registry
         self._closed = False
 
     @classmethod
-    def from_string(cls, config: str) -> Self:
+    def from_string(
+        cls,
+        config: str,
+        processors: Mapping[str, Callable[[str], str]] | None = None,
+    ) -> Self:
         """Compile a ruleset from a HOCON config string.
 
         Args:
             config: HOCON config text containing Copperlace rules.
+            processors: Optional custom processor callbacks.
 
         Returns:
             A ``RuleSet`` backed by a native Copperlace handle.
@@ -42,16 +48,24 @@ class RuleSet:
         """
 
         try:
-            return cls(native().ruleset_from_string(config))
+            handle, processor_registry = native().ruleset_from_string(
+                config, _validate_processors(processors)
+            )
+            return cls(handle, processor_registry)
         except NativeError as error:
             raise CopperlaceError(str(error)) from error
 
     @classmethod
-    def from_file(cls, path: str | Path) -> Self:
+    def from_file(
+        cls,
+        path: str | Path,
+        processors: Mapping[str, Callable[[str], str]] | None = None,
+    ) -> Self:
         """Compile a ruleset from a HOCON config file.
 
         Args:
             path: Path to the HOCON config file.
+            processors: Optional custom processor callbacks.
 
         Returns:
             A ``RuleSet`` backed by a native Copperlace handle.
@@ -61,7 +75,10 @@ class RuleSet:
         """
 
         try:
-            return cls(native().ruleset_from_file(path))
+            handle, processor_registry = native().ruleset_from_file(
+                path, _validate_processors(processors)
+            )
+            return cls(handle, processor_registry)
         except NativeError as error:
             raise CopperlaceError(str(error)) from error
 
@@ -108,6 +125,7 @@ class RuleSet:
         if not self._closed:
             native().ruleset_free(self._handle)
             self._closed = True
+            self._processor_registry = None
             self._handle = ctypes.c_void_p()
 
     def __enter__(self) -> Self:
@@ -145,11 +163,16 @@ class Copperlace:
         self._ruleset = ruleset
 
     @classmethod
-    def from_string(cls, config: str) -> Self:
+    def from_string(
+        cls,
+        config: str,
+        processors: Mapping[str, Callable[[str], str]] | None = None,
+    ) -> Self:
         """Create a renderer from a HOCON config string.
 
         Args:
             config: HOCON config text containing Copperlace rules.
+            processors: Optional custom processor callbacks.
 
         Returns:
             A ``Copperlace`` renderer that can render rules repeatedly.
@@ -158,14 +181,19 @@ class Copperlace:
             CopperlaceError: If the config cannot be parsed or compiled.
         """
 
-        return cls(RuleSet.from_string(config))
+        return cls(RuleSet.from_string(config, processors))
 
     @classmethod
-    def from_file(cls, path: str | Path) -> Self:
+    def from_file(
+        cls,
+        path: str | Path,
+        processors: Mapping[str, Callable[[str], str]] | None = None,
+    ) -> Self:
         """Create a renderer from a HOCON config file.
 
         Args:
             path: Path to the HOCON config file.
+            processors: Optional custom processor callbacks.
 
         Returns:
             A ``Copperlace`` renderer that can render rules repeatedly.
@@ -174,7 +202,7 @@ class Copperlace:
             CopperlaceError: If the file cannot be loaded, parsed, or compiled.
         """
 
-        return cls(RuleSet.from_file(path))
+        return cls(RuleSet.from_file(path, processors))
 
     def render(self, rule: str, context: Mapping[str, str] | None = None) -> str:
         """Render a named rule from the loaded config.
@@ -217,7 +245,11 @@ class Copperlace:
 
 
 def render_hocon_str(
-    config: str, rule: str, context: Mapping[str, str] | None = None
+    config: str,
+    rule: str,
+    context: Mapping[str, str] | None = None,
+    *,
+    processors: Mapping[str, Callable[[str], str]] | None = None,
 ) -> str:
     """Render one rule from a HOCON config string.
 
@@ -228,6 +260,7 @@ def render_hocon_str(
         config: HOCON config text containing Copperlace rules.
         rule: Name of the rule to render.
         context: Optional initial render context values.
+        processors: Optional custom processor callbacks.
 
     Returns:
         Rendered text for the requested rule.
@@ -236,12 +269,16 @@ def render_hocon_str(
         CopperlaceError: If parsing, compilation, or rendering fails.
     """
 
-    with RuleSet.from_string(config) as ruleset:
+    with RuleSet.from_string(config, processors) as ruleset:
         return ruleset.render(rule, context)
 
 
 def render_hocon_file(
-    path: str | Path, rule: str, context: Mapping[str, str] | None = None
+    path: str | Path,
+    rule: str,
+    context: Mapping[str, str] | None = None,
+    *,
+    processors: Mapping[str, Callable[[str], str]] | None = None,
 ) -> str:
     """Render one rule from a HOCON config file.
 
@@ -252,6 +289,7 @@ def render_hocon_file(
         path: Path to the HOCON config file.
         rule: Name of the rule to render.
         context: Optional initial render context values.
+        processors: Optional custom processor callbacks.
 
     Returns:
         Rendered text for the requested rule.
@@ -260,7 +298,7 @@ def render_hocon_file(
         CopperlaceError: If loading, parsing, compilation, or rendering fails.
     """
 
-    with RuleSet.from_file(path) as ruleset:
+    with RuleSet.from_file(path, processors) as ruleset:
         return ruleset.render(rule, context)
 
 
@@ -272,4 +310,19 @@ def _validate_context(context: Mapping[str, str]) -> dict[str, str]:
         if not isinstance(value, str):
             raise TypeError("context values must be strings")
         validated[key] = value
+    return validated
+
+
+def _validate_processors(
+    processors: Mapping[str, Callable[[str], str]] | None,
+) -> dict[str, Callable[[str], str]] | None:
+    if processors is None:
+        return None
+    validated = dict[str, Callable[[str], str]]()
+    for name, processor in processors.items():
+        if not isinstance(name, str):
+            raise TypeError("processor names must be strings")
+        if not callable(processor):
+            raise TypeError("processors must be callable")
+        validated[name] = processor
     return validated

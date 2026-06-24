@@ -42,6 +42,11 @@ Parse HOCON input and render one rule in a single call.
 Compiles a config with the builtin processor registry plus Rust-provided custom
 processors. Custom processor names override builtin names when they collide.
 
+Wrapper processor constructors::
+The C ABI, Python, Java, and JS/WASM wrappers also expose construction-time
+custom processor registration. Callback failures are reported as
+`ProcessorError`.
+
 == CLI
 
 The package builds a `copperlace` binary:
@@ -64,15 +69,22 @@ and argument errors are written to stderr and return a nonzero exit code.
 The dynamic library exposes an opaque ruleset handle API:
 
 * `copperlace_ruleset_from_file`
+* `copperlace_ruleset_from_file_with_processors`
 * `copperlace_ruleset_from_string`
+* `copperlace_ruleset_from_string_with_processors`
 * `copperlace_ruleset_render`
 * `copperlace_ruleset_render_with_context`
+* `copperlace_processor_result_set_output`
+* `copperlace_processor_result_set_error`
 * `copperlace_ruleset_free`
 * `copperlace_string_free`
 
 Returned strings are allocated by Copperlace and must be released with
 `copperlace_string_free`. Ruleset handles must be released with
 `copperlace_ruleset_free`.
+
+Custom processor callbacks are owned by the caller and must remain valid until
+the ruleset handle is freed.
 
 == Render Context
 

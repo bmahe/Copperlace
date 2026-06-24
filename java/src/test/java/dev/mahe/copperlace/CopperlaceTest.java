@@ -85,6 +85,64 @@ final class CopperlaceTest {
     }
 
     @Test
+    void rendersCustomProcessor() {
+        assertEquals(
+                "'Mia'",
+                Copperlace.renderHoconStringWithProcessors(
+                        """
+                        name = ["Mia"]
+                        origin = "{name | surround}"
+                        """,
+                        "origin",
+                        Map.of("surround", value -> "'" + value + "'")));
+    }
+
+    @Test
+    void customProcessorOverridesBuiltinProcessor() {
+        assertEquals(
+                "custom",
+                Copperlace.renderHoconStringWithProcessors(
+                        """
+                        name = ["Mia"]
+                        origin = "{name | uppercase}"
+                        """,
+                        "origin",
+                        Map.of("uppercase", value -> "custom")));
+    }
+
+    @Test
+    void customProcessorExceptionRaisesCopperlaceException() {
+        final CopperlaceException exception = assertThrows(
+                CopperlaceException.class,
+                () -> Copperlace.renderHoconStringWithProcessors(
+                        """
+                        name = ["Mia"]
+                        origin = "{name | fail}"
+                        """,
+                        "origin",
+                        Map.of("fail", value -> {
+                            throw new IllegalStateException("not allowed");
+                        })));
+
+        assertTrue(exception.getMessage().contains("not allowed"));
+    }
+
+    @Test
+    void customProcessorNullReturnRaisesCopperlaceException() {
+        final CopperlaceException exception = assertThrows(
+                CopperlaceException.class,
+                () -> Copperlace.renderHoconStringWithProcessors(
+                        """
+                        name = ["Mia"]
+                        origin = "{name | missing_return}"
+                        """,
+                        "origin",
+                        Map.of("missing_return", value -> null)));
+
+        assertTrue(exception.getMessage().contains("returned null"));
+    }
+
+    @Test
     void rendersBuiltinArticleProcessor() {
         assertEquals(
                 "an apple/a user",
@@ -237,6 +295,19 @@ final class CopperlaceTest {
     }
 
     @Test
+    void rulesetRendersWithCustomProcessor() {
+        try (final RuleSet rules = RuleSet.fromStringWithProcessors(
+                """
+                name = ["Mia"]
+                origin = "{name | surround}"
+                """,
+                Map.of("surround", value -> "[" + value + "]"))) {
+            assertEquals("[Mia]", rules.render("origin"));
+            assertEquals("[Mia]", rules.render("origin"));
+        }
+    }
+
+    @Test
     void rendersRepeatedlyFromOneCopperlaceInstance() {
         try (final Copperlace copperlace = Copperlace.fromString("""
                 name = ["Mia"]
@@ -290,6 +361,58 @@ final class CopperlaceTest {
                 """)) {
             assertThrows(NullPointerException.class, () -> rules.render("origin", context));
         }
+    }
+
+    @Test
+    void customProcessorWorksWithInitialContext() {
+        assertEquals(
+                "[Mia]",
+                Copperlace.renderHoconStringWithProcessors(
+                        """
+                        origin = "{name | surround}"
+                        """,
+                        "origin",
+                        Map.of("name", "Mia"),
+                        Map.of("surround", value -> "[" + value + "]")));
+    }
+
+    @Test
+    void customProcessorsRejectNullMap() {
+        assertThrows(
+                NullPointerException.class,
+                () -> RuleSet.fromStringWithProcessors(
+                        """
+                        origin = "Mia"
+                        """,
+                        null));
+    }
+
+    @Test
+    void customProcessorsRejectNullProcessorName() {
+        final Map<String, CopperlaceProcessor> processors = new HashMap<>();
+        processors.put(null, value -> value);
+
+        assertThrows(
+                NullPointerException.class,
+                () -> RuleSet.fromStringWithProcessors(
+                        """
+                        origin = "Mia"
+                        """,
+                        processors));
+    }
+
+    @Test
+    void customProcessorsRejectNullProcessor() {
+        final Map<String, CopperlaceProcessor> processors = new HashMap<>();
+        processors.put("custom", null);
+
+        assertThrows(
+                NullPointerException.class,
+                () -> RuleSet.fromStringWithProcessors(
+                        """
+                        origin = "Mia"
+                        """,
+                        processors));
     }
 
     @Test

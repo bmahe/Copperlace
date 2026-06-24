@@ -3,7 +3,7 @@ from __future__ import annotations
 import ctypes
 import os
 import platform
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from pathlib import Path
 
 
@@ -11,6 +11,10 @@ COPPERLACE_OK = 0
 COPPERLACE_INVALID_ARGUMENT = 1
 COPPERLACE_PARSE_ERROR = 2
 COPPERLACE_RENDER_ERROR = 3
+
+_PROCESSOR_CALLBACK = ctypes.CFUNCTYPE(
+    ctypes.c_int, ctypes.c_char_p, ctypes.c_void_p, ctypes.c_void_p
+)
 
 
 class NativeError(RuntimeError):
@@ -24,7 +28,13 @@ class NativeLibrary:
         self._library = ctypes.CDLL(str(find_library()))
         self._configure_signatures()
 
-    def ruleset_from_string(self, config: str) -> ctypes.c_void_p:
+    def ruleset_from_string(
+        self, config: str, processors: Mapping[str, Callable[[str], str]] | None = None
+    ) -> tuple[ctypes.c_void_p, object | None]:
+        if processors:
+            registry = NativeProcessorRegistry(self, processors)
+            return self._ruleset_from_string_with_processors(config, registry), registry
+
         handle = ctypes.c_void_p()
         error = ctypes.c_void_p()
         status = self._library.copperlace_ruleset_from_string(
@@ -33,13 +43,55 @@ class NativeLibrary:
             ctypes.byref(error),
         )
         self._raise_for_status(status, error)
-        return handle
+        return handle, None
 
-    def ruleset_from_file(self, path: str | os.PathLike[str]) -> ctypes.c_void_p:
+    def ruleset_from_file(
+        self,
+        path: str | os.PathLike[str],
+        processors: Mapping[str, Callable[[str], str]] | None = None,
+    ) -> tuple[ctypes.c_void_p, object | None]:
+        if processors:
+            registry = NativeProcessorRegistry(self, processors)
+            return self._ruleset_from_file_with_processors(path, registry), registry
+
         handle = ctypes.c_void_p()
         error = ctypes.c_void_p()
         status = self._library.copperlace_ruleset_from_file(
             os.fsencode(path),
+            ctypes.byref(handle),
+            ctypes.byref(error),
+        )
+        self._raise_for_status(status, error)
+        return handle, None
+
+    def _ruleset_from_string_with_processors(
+        self, config: str, registry: NativeProcessorRegistry
+    ) -> ctypes.c_void_p:
+        handle = ctypes.c_void_p()
+        error = ctypes.c_void_p()
+        status = self._library.copperlace_ruleset_from_string_with_processors(
+            config.encode("utf-8"),
+            registry.names,
+            registry.callbacks,
+            registry.user_data,
+            ctypes.c_size_t(registry.length),
+            ctypes.byref(handle),
+            ctypes.byref(error),
+        )
+        self._raise_for_status(status, error)
+        return handle
+
+    def _ruleset_from_file_with_processors(
+        self, path: str | os.PathLike[str], registry: NativeProcessorRegistry
+    ) -> ctypes.c_void_p:
+        handle = ctypes.c_void_p()
+        error = ctypes.c_void_p()
+        status = self._library.copperlace_ruleset_from_file_with_processors(
+            os.fsencode(path),
+            registry.names,
+            registry.callbacks,
+            registry.user_data,
+            ctypes.c_size_t(registry.length),
             ctypes.byref(handle),
             ctypes.byref(error),
         )
@@ -92,6 +144,20 @@ class NativeLibrary:
     def string_free(self, value: ctypes.c_void_p) -> None:
         self._library.copperlace_string_free(value)
 
+    def processor_result_set_output(self, result: ctypes.c_void_p, value: str) -> int:
+        return int(
+            self._library.copperlace_processor_result_set_output(
+                result, value.encode("utf-8")
+            )
+        )
+
+    def processor_result_set_error(self, result: ctypes.c_void_p, message: str) -> int:
+        return int(
+            self._library.copperlace_processor_result_set_error(
+                result, message.encode("utf-8")
+            )
+        )
+
     def _configure_signatures(self) -> None:
         self._library.copperlace_ruleset_from_string.argtypes = [
             ctypes.c_char_p,
@@ -106,6 +172,28 @@ class NativeLibrary:
             ctypes.POINTER(ctypes.c_void_p),
         ]
         self._library.copperlace_ruleset_from_file.restype = ctypes.c_int
+
+        self._library.copperlace_ruleset_from_string_with_processors.argtypes = [
+            ctypes.c_char_p,
+            ctypes.POINTER(ctypes.c_char_p),
+            ctypes.POINTER(_PROCESSOR_CALLBACK),
+            ctypes.POINTER(ctypes.c_void_p),
+            ctypes.c_size_t,
+            ctypes.POINTER(ctypes.c_void_p),
+            ctypes.POINTER(ctypes.c_void_p),
+        ]
+        self._library.copperlace_ruleset_from_string_with_processors.restype = ctypes.c_int
+
+        self._library.copperlace_ruleset_from_file_with_processors.argtypes = [
+            ctypes.c_char_p,
+            ctypes.POINTER(ctypes.c_char_p),
+            ctypes.POINTER(_PROCESSOR_CALLBACK),
+            ctypes.POINTER(ctypes.c_void_p),
+            ctypes.c_size_t,
+            ctypes.POINTER(ctypes.c_void_p),
+            ctypes.POINTER(ctypes.c_void_p),
+        ]
+        self._library.copperlace_ruleset_from_file_with_processors.restype = ctypes.c_int
 
         self._library.copperlace_ruleset_render.argtypes = [
             ctypes.c_void_p,
@@ -132,6 +220,18 @@ class NativeLibrary:
         self._library.copperlace_string_free.argtypes = [ctypes.c_void_p]
         self._library.copperlace_string_free.restype = None
 
+        self._library.copperlace_processor_result_set_output.argtypes = [
+            ctypes.c_void_p,
+            ctypes.c_char_p,
+        ]
+        self._library.copperlace_processor_result_set_output.restype = ctypes.c_int
+
+        self._library.copperlace_processor_result_set_error.argtypes = [
+            ctypes.c_void_p,
+            ctypes.c_char_p,
+        ]
+        self._library.copperlace_processor_result_set_error.restype = ctypes.c_int
+
     def _raise_for_status(self, status: int, error: ctypes.c_void_p) -> None:
         if status == COPPERLACE_OK:
             return
@@ -143,6 +243,44 @@ class NativeLibrary:
             finally:
                 self.string_free(error)
         raise NativeError(status, message)
+
+
+class NativeProcessorRegistry:
+    def __init__(
+        self, library: NativeLibrary, processors: Mapping[str, Callable[[str], str]]
+    ) -> None:
+        self._library = library
+        self._callbacks: list[_PROCESSOR_CALLBACK] = []
+        encoded_names = []
+        user_data = []
+
+        for name, processor in processors.items():
+            encoded_names.append(name.encode("utf-8"))
+            self._callbacks.append(self._callback_for(processor))
+            user_data.append(ctypes.c_void_p())
+
+        self.length = len(encoded_names)
+        self.names = (ctypes.c_char_p * self.length)(*encoded_names)
+        self.callbacks = (_PROCESSOR_CALLBACK * self.length)(*self._callbacks)
+        self.user_data = (ctypes.c_void_p * self.length)(*user_data)
+
+    def _callback_for(self, processor: Callable[[str], str]) -> _PROCESSOR_CALLBACK:
+        def callback(
+            input_value: bytes, result: ctypes.c_void_p, _user_data: ctypes.c_void_p
+        ) -> int:
+            try:
+                output = processor(input_value.decode("utf-8"))
+                if not isinstance(output, str):
+                    self._library.processor_result_set_error(
+                        result, "processor returned a non-string value"
+                    )
+                    return COPPERLACE_RENDER_ERROR
+                return self._library.processor_result_set_output(result, output)
+            except Exception as error:
+                self._library.processor_result_set_error(result, str(error))
+                return COPPERLACE_RENDER_ERROR
+
+        return _PROCESSOR_CALLBACK(callback)
 
 
 def find_library() -> Path:

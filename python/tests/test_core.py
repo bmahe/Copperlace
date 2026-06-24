@@ -48,6 +48,43 @@ class CopperlaceTests(unittest.TestCase):
 
         self.assertEqual(output, "Mia")
 
+    def test_custom_processor(self) -> None:
+        output = render_hocon_str(
+            'name = ["Mia"]\norigin = "{name | surround}"',
+            "origin",
+            processors={"surround": lambda value: f"'{value}'"},
+        )
+
+        self.assertEqual(output, "'Mia'")
+
+    def test_custom_processor_overrides_builtin(self) -> None:
+        output = render_hocon_str(
+            'name = ["Mia"]\norigin = "{name | uppercase}"',
+            "origin",
+            processors={"uppercase": lambda _value: "custom"},
+        )
+
+        self.assertEqual(output, "custom")
+
+    def test_custom_processor_exception_raises_error(self) -> None:
+        def fail(_value: str) -> str:
+            raise ValueError("not allowed")
+
+        with self.assertRaisesRegex(CopperlaceError, "not allowed"):
+            render_hocon_str(
+                'name = ["Mia"]\norigin = "{name | fail}"',
+                "origin",
+                processors={"fail": fail},
+            )
+
+    def test_custom_processor_rejects_non_string_return(self) -> None:
+        with self.assertRaisesRegex(CopperlaceError, "non-string"):
+            render_hocon_str(
+                'name = ["Mia"]\norigin = "{name | bad}"',
+                "origin",
+                processors={"bad": lambda _value: 1},  # type: ignore[dict-item,return-value]
+            )
+
     def test_builtin_article_processor(self) -> None:
         output = render_hocon_str(
             'apple = ["apple"]\nuser = ["user"]\norigin = "{apple | article}/{user | article}"',
@@ -119,6 +156,14 @@ class CopperlaceTests(unittest.TestCase):
             self.assertEqual(ruleset.render("origin", {"name": "Lina"}), "Lina")
             self.assertEqual(ruleset.render("origin", {"name": "Lina"}), "Lina")
 
+    def test_ruleset_renders_with_custom_processor(self) -> None:
+        with RuleSet.from_string(
+            'name = ["Mia"]\norigin = "{name | surround}"',
+            {"surround": lambda value: f"[{value}]"},
+        ) as ruleset:
+            self.assertEqual(ruleset.render("origin"), "[Mia]")
+            self.assertEqual(ruleset.render("origin"), "[Mia]")
+
     def test_repeated_renders_on_one_copperlace_instance(self) -> None:
         copperlace = Copperlace.from_string(
             'name = ["Mia"]\npet = ["owl"]\norigin = "{name}"\ncompanion = "{name} and {pet}"'
@@ -143,6 +188,20 @@ class CopperlaceTests(unittest.TestCase):
         with RuleSet.from_string('origin = "{name}"') as ruleset:
             with self.assertRaisesRegex(TypeError, "context values"):
                 ruleset.render("origin", {"name": 1})  # type: ignore[dict-item]
+
+    def test_processors_reject_non_string_name(self) -> None:
+        with self.assertRaisesRegex(TypeError, "processor names"):
+            RuleSet.from_string(
+                'origin = "{name | custom}"',
+                {1: lambda value: value},  # type: ignore[dict-item]
+            )
+
+    def test_processors_reject_non_callable_value(self) -> None:
+        with self.assertRaisesRegex(TypeError, "callable"):
+            RuleSet.from_string(
+                'origin = "{name | custom}"',
+                {"custom": "nope"},  # type: ignore[dict-item]
+            )
 
     def test_copperlace_loads_from_file(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

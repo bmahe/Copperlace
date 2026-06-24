@@ -19,11 +19,18 @@ import org.apache.commons.lang3.Validate;
  */
 public final class RuleSet implements AutoCloseable {
     private MemorySegment handle;
+    private final NativeLibrary.RulesetHandle ownedHandle;
     private boolean closed;
 
     private RuleSet(final MemorySegment handle) {
         Validate.isTrue(!NativeLibrary.isNull(handle), "handle must not be null");
         this.handle = handle;
+        ownedHandle = null;
+    }
+
+    private RuleSet(final NativeLibrary.RulesetHandle ownedHandle) {
+        this.ownedHandle = Validate.notNull(ownedHandle, "ownedHandle must not be null");
+        handle = ownedHandle.handle();
     }
 
     /**
@@ -40,6 +47,23 @@ public final class RuleSet implements AutoCloseable {
     }
 
     /**
+     * Compiles a HOCON config string into a reusable ruleset with custom processors.
+     *
+     * @param config HOCON config text containing Copperlace rules
+     * @param processors custom processor callbacks keyed by processor name
+     * @return a ruleset backed by a native Copperlace handle
+     * @throws NullPointerException if {@code processors}, a processor name, or a processor is null
+     * @throws IllegalArgumentException if {@code config} is blank
+     * @throws CopperlaceException if the config cannot be parsed or compiled
+     */
+    public static RuleSet fromStringWithProcessors(
+            final String config, final Map<String, CopperlaceProcessor> processors) {
+        Validate.notBlank(config, "config must not be blank");
+        validateProcessors(processors);
+        return new RuleSet(NativeLibrary.INSTANCE.rulesetFromStringWithProcessors(config, processors));
+    }
+
+    /**
      * Loads and compiles a HOCON config file into a reusable ruleset.
      *
      * @param path path to the HOCON config file
@@ -50,6 +74,22 @@ public final class RuleSet implements AutoCloseable {
     public static RuleSet fromFile(final Path path) {
         Objects.requireNonNull(path, "path");
         return new RuleSet(NativeLibrary.INSTANCE.rulesetFromFile(path));
+    }
+
+    /**
+     * Loads and compiles a HOCON config file into a reusable ruleset with custom processors.
+     *
+     * @param path path to the HOCON config file
+     * @param processors custom processor callbacks keyed by processor name
+     * @return a ruleset backed by a native Copperlace handle
+     * @throws NullPointerException if {@code path}, {@code processors}, a processor name, or a processor is null
+     * @throws CopperlaceException if the file cannot be loaded, parsed, or compiled
+     */
+    public static RuleSet fromFileWithProcessors(
+            final Path path, final Map<String, CopperlaceProcessor> processors) {
+        Objects.requireNonNull(path, "path");
+        validateProcessors(processors);
+        return new RuleSet(NativeLibrary.INSTANCE.rulesetFromFileWithProcessors(path, processors));
     }
 
     /**
@@ -99,6 +139,9 @@ public final class RuleSet implements AutoCloseable {
     public void close() {
         if (!closed) {
             NativeLibrary.INSTANCE.rulesetFree(handle);
+            if (ownedHandle != null) {
+                ownedHandle.closeProcessors();
+            }
             handle = MemorySegment.NULL;
             closed = true;
         }
@@ -114,6 +157,14 @@ public final class RuleSet implements AutoCloseable {
         for (final Map.Entry<String, String> entry : context.entrySet()) {
             Objects.requireNonNull(entry.getKey(), "context key");
             Objects.requireNonNull(entry.getValue(), "context value");
+        }
+    }
+
+    private static void validateProcessors(final Map<String, CopperlaceProcessor> processors) {
+        Objects.requireNonNull(processors, "processors");
+        for (final Map.Entry<String, CopperlaceProcessor> entry : processors.entrySet()) {
+            Objects.requireNonNull(entry.getKey(), "processor name");
+            Objects.requireNonNull(entry.getValue(), "processor");
         }
     }
 }

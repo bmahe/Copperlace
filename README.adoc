@@ -123,6 +123,12 @@ with Copperlace.from_file("examples/character_scene.conf") as copperlace:
     first = copperlace.render("origin")
     second = copperlace.render("origin")
     seeded = copperlace.render("origin", {"hero": "Mia"})
+
+with Copperlace.from_string(
+    'name = ["Mia"]\norigin = "{name | shout}"',
+    {"shout": lambda value: value.upper()},
+) as copperlace:
+    shouted = copperlace.render("origin")
 ----
 
 Python also exposes `RuleSet`, `render_hocon_file`, and `render_hocon_str`.
@@ -139,6 +145,12 @@ try (final Copperlace copperlace = Copperlace.fromFile("examples/character_scene
     final String first = copperlace.render("origin");
     final String second = copperlace.render("origin");
     final String seeded = copperlace.render("origin", Map.of("hero", "Mia"));
+}
+
+try (final Copperlace copperlace = Copperlace.fromStringWithProcessors(
+        "name = [\"Mia\"]\norigin = \"{name | shout}\"",
+        Map.of("shout", value -> value.toUpperCase()))) {
+    final String shouted = copperlace.render("origin");
 }
 ----
 
@@ -157,6 +169,9 @@ const config = await response.text();
 const copperlace = new Copperlace(config);
 const output = copperlace.render("origin");
 const seeded = copperlace.renderWithContext("origin", { hero: "Mia" });
+const custom = Copperlace.withProcessors(config, {
+  shout: (value) => value.toUpperCase(),
+}).render("origin");
 ----
 
 The JS/TS package is generated with `wasm-pack`. Bundler output can be imported

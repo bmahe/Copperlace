@@ -1,9 +1,9 @@
 use std::ffi::{CStr, CString};
-use std::os::raw::{c_char, c_int};
+use std::os::raw::{c_char, c_int, c_void};
 use std::ptr;
 
-use crate::config::{ruleset_from_hocon_file, ruleset_from_hocon_str};
-use crate::render::{RenderContext, RuleSet};
+use crate::config::{ConfigError, ruleset_from_hocon_file, ruleset_from_hocon_str};
+use crate::render::{Processor, ProcessorRegistry, RenderContext, RuleSet};
 
 /// Status code for a successful C ABI call.
 pub const COPPERLACE_OK: c_int = 0;
@@ -14,6 +14,14 @@ pub const COPPERLACE_PARSE_ERROR: c_int = 2;
 /// Status code for rule rendering failures.
 pub const COPPERLACE_RENDER_ERROR: c_int = 3;
 
+/// Host callback used by custom C ABI processors.
+///
+/// The callback receives a UTF-8 input string, an opaque result handle, and the
+/// user data pointer provided when creating the ruleset. It should set either
+/// output or error on `result` and return [`COPPERLACE_OK`] on success.
+pub type CopperlaceProcessorCallback =
+    unsafe extern "C" fn(*const c_char, *mut CopperlaceProcessorResult, *mut c_void) -> c_int;
+
 /// Opaque C ABI handle for a compiled Copperlace ruleset.
 ///
 /// Handles are allocated by `copperlace_ruleset_from_file` or
@@ -21,6 +29,42 @@ pub const COPPERLACE_RENDER_ERROR: c_int = 3;
 /// `copperlace_ruleset_free`.
 pub struct CopperlaceRuleSet {
     ruleset: RuleSet,
+}
+
+/// Opaque C ABI result handle passed to custom processor callbacks.
+pub struct CopperlaceProcessorResult {
+    output: Option<String>,
+    error: Option<String>,
+}
+
+struct CallbackProcessor {
+    callback: CopperlaceProcessorCallback,
+    user_data: *mut c_void,
+}
+
+unsafe impl Send for CallbackProcessor {}
+unsafe impl Sync for CallbackProcessor {}
+
+impl Processor for CallbackProcessor {
+    fn process(&self, value: &str) -> Result<String, String> {
+        let input =
+            CString::new(value).map_err(|_| "processor input contains an interior NUL byte")?;
+        let mut result = CopperlaceProcessorResult {
+            output: None,
+            error: None,
+        };
+        let status = unsafe { (self.callback)(input.as_ptr(), &mut result, self.user_data) };
+
+        if let Some(error) = result.error {
+            return Err(error);
+        }
+        if status != COPPERLACE_OK {
+            return Err(format!("processor callback failed with status {status}"));
+        }
+        result
+            .output
+            .ok_or_else(|| "processor callback did not set output".to_string())
+    }
 }
 
 /// Loads a HOCON config file and returns an opaque ruleset handle.
@@ -43,6 +87,44 @@ pub extern "C" fn copperlace_ruleset_from_file(
     };
 
     match ruleset_from_hocon_file(path) {
+        Ok(ruleset) => write_handle(ruleset, out_handle, out_error),
+        Err(error) => {
+            write_null_handle(out_handle);
+            write_out_string(out_error, &error.to_string());
+            COPPERLACE_PARSE_ERROR
+        }
+    }
+}
+
+/// Loads a HOCON config file and returns a ruleset handle with custom processors.
+#[unsafe(no_mangle)]
+pub extern "C" fn copperlace_ruleset_from_file_with_processors(
+    path: *const c_char,
+    processor_names: *const *const c_char,
+    processor_callbacks: *const Option<CopperlaceProcessorCallback>,
+    processor_user_data: *const *mut c_void,
+    processor_len: usize,
+    out_handle: *mut *mut CopperlaceRuleSet,
+    out_error: *mut *mut c_char,
+) -> c_int {
+    clear_out_error(out_error);
+
+    let Some(path) = read_c_string(path, out_error) else {
+        write_null_handle(out_handle);
+        return COPPERLACE_INVALID_ARGUMENT;
+    };
+    let Some(processors) = read_processors(
+        processor_names,
+        processor_callbacks,
+        processor_user_data,
+        processor_len,
+        out_error,
+    ) else {
+        write_null_handle(out_handle);
+        return COPPERLACE_INVALID_ARGUMENT;
+    };
+
+    match ruleset_from_hocon_file_with_processors(path, processors) {
         Ok(ruleset) => write_handle(ruleset, out_handle, out_error),
         Err(error) => {
             write_null_handle(out_handle);
@@ -79,6 +161,80 @@ pub extern "C" fn copperlace_ruleset_from_string(
             COPPERLACE_PARSE_ERROR
         }
     }
+}
+
+/// Compiles a HOCON config string and returns a ruleset handle with custom processors.
+#[unsafe(no_mangle)]
+pub extern "C" fn copperlace_ruleset_from_string_with_processors(
+    config: *const c_char,
+    processor_names: *const *const c_char,
+    processor_callbacks: *const Option<CopperlaceProcessorCallback>,
+    processor_user_data: *const *mut c_void,
+    processor_len: usize,
+    out_handle: *mut *mut CopperlaceRuleSet,
+    out_error: *mut *mut c_char,
+) -> c_int {
+    clear_out_error(out_error);
+
+    let Some(config) = read_c_string(config, out_error) else {
+        write_null_handle(out_handle);
+        return COPPERLACE_INVALID_ARGUMENT;
+    };
+    let Some(processors) = read_processors(
+        processor_names,
+        processor_callbacks,
+        processor_user_data,
+        processor_len,
+        out_error,
+    ) else {
+        write_null_handle(out_handle);
+        return COPPERLACE_INVALID_ARGUMENT;
+    };
+
+    match ruleset_from_hocon_str_with_processors(&config, processors) {
+        Ok(ruleset) => write_handle(ruleset, out_handle, out_error),
+        Err(error) => {
+            write_null_handle(out_handle);
+            write_out_string(out_error, &error.to_string());
+            COPPERLACE_PARSE_ERROR
+        }
+    }
+}
+
+/// Sets the output for a custom processor callback result.
+#[unsafe(no_mangle)]
+pub extern "C" fn copperlace_processor_result_set_output(
+    result: *mut CopperlaceProcessorResult,
+    value: *const c_char,
+) -> c_int {
+    if result.is_null() {
+        return COPPERLACE_INVALID_ARGUMENT;
+    }
+    let Some(value) = read_c_string(value, ptr::null_mut()) else {
+        return COPPERLACE_INVALID_ARGUMENT;
+    };
+    unsafe {
+        (*result).output = Some(value);
+    }
+    COPPERLACE_OK
+}
+
+/// Sets the error for a custom processor callback result.
+#[unsafe(no_mangle)]
+pub extern "C" fn copperlace_processor_result_set_error(
+    result: *mut CopperlaceProcessorResult,
+    message: *const c_char,
+) -> c_int {
+    if result.is_null() {
+        return COPPERLACE_INVALID_ARGUMENT;
+    }
+    let Some(message) = read_c_string(message, ptr::null_mut()) else {
+        return COPPERLACE_INVALID_ARGUMENT;
+    };
+    unsafe {
+        (*result).error = Some(message);
+    }
+    COPPERLACE_OK
 }
 
 /// Renders a named rule from a ruleset handle.
@@ -187,6 +343,69 @@ fn read_context(
     }
 
     Some(context)
+}
+
+fn read_processors(
+    names: *const *const c_char,
+    callbacks: *const Option<CopperlaceProcessorCallback>,
+    user_data: *const *mut c_void,
+    len: usize,
+    out_error: *mut *mut c_char,
+) -> Option<ProcessorRegistry> {
+    let mut processors = ProcessorRegistry::new();
+    if len == 0 {
+        return Some(processors);
+    }
+    if names.is_null() {
+        write_out_string(out_error, "processor names array is null");
+        return None;
+    }
+    if callbacks.is_null() {
+        write_out_string(out_error, "processor callbacks array is null");
+        return None;
+    }
+    if user_data.is_null() {
+        write_out_string(out_error, "processor user data array is null");
+        return None;
+    }
+
+    for index in 0..len {
+        let name_ptr = unsafe { *names.add(index) };
+        let callback = unsafe { *callbacks.add(index) };
+        let Some(callback) = callback else {
+            write_out_string(out_error, "processor callback is null");
+            return None;
+        };
+        let name = read_c_string(name_ptr, out_error)?;
+        let user_data = unsafe { *user_data.add(index) };
+        processors.insert(
+            name,
+            std::sync::Arc::new(CallbackProcessor {
+                callback,
+                user_data,
+            }),
+        );
+    }
+
+    Some(processors)
+}
+
+fn ruleset_from_hocon_str_with_processors(
+    config: &str,
+    processors: ProcessorRegistry,
+) -> Result<RuleSet, ConfigError> {
+    let value = hocon_rs::Config::parse_str::<hocon_rs::Value>(config, None)
+        .map_err(|error| ConfigError::Parse(format!("{error:?}")))?;
+    RuleSet::from_config_with_processors(value, processors).map_err(ConfigError::Render)
+}
+
+fn ruleset_from_hocon_file_with_processors(
+    path: String,
+    processors: ProcessorRegistry,
+) -> Result<RuleSet, ConfigError> {
+    let value = hocon_rs::Config::load(&path, None)
+        .map_err(|error| ConfigError::Parse(format!("{error:?}")))?;
+    RuleSet::from_config_with_processors(value, processors).map_err(ConfigError::Render)
 }
 
 /// Releases a ruleset handle returned by the C ABI.

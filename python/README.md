@@ -12,4 +12,10 @@ with Copperlace.from_string('name = ["Mia"]\norigin = "{name}"') as copperlace:
     print(copperlace.render("origin"))
     print(copperlace.render("origin"))
     print(copperlace.render("origin", {"name": "Darcy"}))
+
+with Copperlace.from_string(
+    'name = ["Mia"]\norigin = "{name | shout}"',
+    {"shout": lambda value: value.upper()},
+) as copperlace:
+    print(copperlace.render("origin"))
 ```

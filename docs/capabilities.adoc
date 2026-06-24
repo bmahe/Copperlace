@@ -58,9 +58,10 @@ processors convert one noun token between singular and plural forms,
 `possessive` adds an English possessive suffix, `ordinal` adds an ordinal suffix
 to one integer token, `sentence` capitalizes the first alphabetic character, and
 `quote` wraps rendered text in escaped double quotes. The `slug` processor
-normalizes rendered text into a lowercase hyphenated slug. Rust callers can
-register custom processors when constructing a `RuleSet`; CLI, Python, Java,
-and C ABI callers use the builtin registry.
+normalizes rendered text into a lowercase hyphenated slug. Rust, C ABI, Python,
+Java, and JS/WASM callers can register custom processors when constructing a
+ruleset. Custom processors extend the builtin registry and override builtin
+processors when names collide. The CLI uses the builtin processor registry only.
 
 == Random Choices
 
