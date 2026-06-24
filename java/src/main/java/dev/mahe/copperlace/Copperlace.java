@@ -7,7 +7,7 @@ import java.util.Objects;
 import org.apache.commons.lang3.Validate;
 
 /**
- * High-level Copperlace renderer for repeated renders from one HOCON config.
+ * High-level Copperlace renderer for repeated renders from one configuration.
  *
  * <p>{@code Copperlace} compiles a config once and owns the resulting native
  * ruleset until {@link #close()} is called. Use this class when rendering more
@@ -25,9 +25,9 @@ public final class Copperlace implements AutoCloseable {
     }
 
     /**
-     * Compiles a HOCON config string into a reusable renderer.
+     * Compiles a configuration string into a reusable renderer.
      *
-     * @param config HOCON config text containing Copperlace rules
+     * @param config configuration text containing Copperlace rules
      * @return a renderer backed by a native Copperlace ruleset
      * @throws IllegalArgumentException if {@code config} is blank
      * @throws CopperlaceException if the config cannot be parsed or compiled
@@ -38,9 +38,9 @@ public final class Copperlace implements AutoCloseable {
     }
 
     /**
-     * Compiles a HOCON config string into a reusable renderer with custom processors.
+     * Compiles a configuration string into a reusable renderer with custom processors.
      *
-     * @param config HOCON config text containing Copperlace rules
+     * @param config configuration text containing Copperlace rules
      * @param processors custom processor callbacks keyed by processor name
      * @return a renderer backed by a native Copperlace ruleset
      * @throws NullPointerException if {@code processors}, a processor name, or a processor is null
@@ -55,9 +55,9 @@ public final class Copperlace implements AutoCloseable {
     }
 
     /**
-     * Loads and compiles a HOCON config file into a reusable renderer.
+     * Loads and compiles a configuration file into a reusable renderer.
      *
-     * @param path path to the HOCON config file
+     * @param path path to the configuration file
      * @return a renderer backed by a native Copperlace ruleset
      * @throws NullPointerException if {@code path} is null
      * @throws CopperlaceException if the file cannot be loaded, parsed, or compiled
@@ -68,9 +68,9 @@ public final class Copperlace implements AutoCloseable {
     }
 
     /**
-     * Loads and compiles a HOCON config file into a reusable renderer with custom processors.
+     * Loads and compiles a configuration file into a reusable renderer with custom processors.
      *
-     * @param path path to the HOCON config file
+     * @param path path to the configuration file
      * @param processors custom processor callbacks keyed by processor name
      * @return a renderer backed by a native Copperlace ruleset
      * @throws NullPointerException if {@code path}, {@code processors}, a processor name, or a processor is null
@@ -84,9 +84,9 @@ public final class Copperlace implements AutoCloseable {
     }
 
     /**
-     * Loads and compiles a HOCON config file into a reusable renderer.
+     * Loads and compiles a configuration file into a reusable renderer.
      *
-     * @param path path to the HOCON config file
+     * @param path path to the configuration file
      * @return a renderer backed by a native Copperlace ruleset
      * @throws IllegalArgumentException if {@code path} is blank
      * @throws CopperlaceException if the file cannot be loaded, parsed, or compiled
@@ -97,9 +97,9 @@ public final class Copperlace implements AutoCloseable {
     }
 
     /**
-     * Loads and compiles a HOCON config file into a reusable renderer with custom processors.
+     * Loads and compiles a configuration file into a reusable renderer with custom processors.
      *
-     * @param path path to the HOCON config file
+     * @param path path to the configuration file
      * @param processors custom processor callbacks keyed by processor name
      * @return a renderer backed by a native Copperlace ruleset
      * @throws NullPointerException if {@code processors}, a processor name, or a processor is null
@@ -114,19 +114,19 @@ public final class Copperlace implements AutoCloseable {
     }
 
     /**
-     * Renders one rule from a HOCON config string.
+     * Renders one rule from a configuration string.
      *
      * <p>This convenience method compiles the config, renders one rule, and
      * releases the native ruleset. Use {@link #fromString(String)} for repeated
      * renders from the same config.
      *
-     * @param config HOCON config text containing Copperlace rules
+     * @param config configuration text containing Copperlace rules
      * @param rule name of the rule to render
      * @return rendered text for {@code rule}
      * @throws IllegalArgumentException if {@code config} or {@code rule} is blank
      * @throws CopperlaceException if parsing, compilation, or rendering fails
      */
-    public static String renderHoconString(final String config, final String rule) {
+    public static String renderString(final String config, final String rule) {
         Validate.notBlank(config, "config must not be blank");
         Validate.notBlank(rule, "rule must not be blank");
 
@@ -136,9 +136,9 @@ public final class Copperlace implements AutoCloseable {
     }
 
     /**
-     * Renders one rule from a HOCON config string with custom processors.
+     * Renders one rule from a configuration string with custom processors.
      *
-     * @param config HOCON config text containing Copperlace rules
+     * @param config configuration text containing Copperlace rules
      * @param rule name of the rule to render
      * @param processors custom processor callbacks keyed by processor name
      * @return rendered text for {@code rule}
@@ -146,7 +146,7 @@ public final class Copperlace implements AutoCloseable {
      * @throws IllegalArgumentException if {@code config} or {@code rule} is blank
      * @throws CopperlaceException if parsing, compilation, or rendering fails
      */
-    public static String renderHoconStringWithProcessors(
+    public static String renderStringWithProcessors(
             final String config, final String rule, final Map<String, CopperlaceProcessor> processors) {
         Validate.notBlank(config, "config must not be blank");
         Validate.notBlank(rule, "rule must not be blank");
@@ -158,9 +158,9 @@ public final class Copperlace implements AutoCloseable {
     }
 
     /**
-     * Renders one rule from a HOCON config string with custom processors and initial context values.
+     * Renders one rule from a configuration string with custom processors and initial context values.
      *
-     * @param config HOCON config text containing Copperlace rules
+     * @param config configuration text containing Copperlace rules
      * @param rule name of the rule to render
      * @param context initial render context values
      * @param processors custom processor callbacks keyed by processor name
@@ -169,7 +169,7 @@ public final class Copperlace implements AutoCloseable {
      * @throws IllegalArgumentException if {@code config} or {@code rule} is blank
      * @throws CopperlaceException if parsing, compilation, or rendering fails
      */
-    public static String renderHoconStringWithProcessors(
+    public static String renderStringWithProcessors(
             final String config,
             final String rule,
             final Map<String, String> context,
@@ -185,13 +185,13 @@ public final class Copperlace implements AutoCloseable {
     }
 
     /**
-     * Renders one rule from a HOCON config string with initial context values.
+     * Renders one rule from a configuration string with initial context values.
      *
      * <p>This convenience method compiles the config, renders one rule, and
      * releases the native ruleset. Use {@link #fromString(String)} for repeated
      * renders from the same config.
      *
-     * @param config HOCON config text containing Copperlace rules
+     * @param config configuration text containing Copperlace rules
      * @param rule name of the rule to render
      * @param context initial render context values
      * @return rendered text for {@code rule}
@@ -199,7 +199,7 @@ public final class Copperlace implements AutoCloseable {
      * @throws IllegalArgumentException if {@code config} or {@code rule} is blank
      * @throws CopperlaceException if parsing, compilation, or rendering fails
      */
-    public static String renderHoconString(
+    public static String renderString(
             final String config, final String rule, final Map<String, String> context) {
         Validate.notBlank(config, "config must not be blank");
         Validate.notBlank(rule, "rule must not be blank");
@@ -211,20 +211,20 @@ public final class Copperlace implements AutoCloseable {
     }
 
     /**
-     * Renders one rule from a HOCON config file.
+     * Renders one rule from a configuration file.
      *
      * <p>This convenience method loads and compiles the file, renders one rule,
      * and releases the native ruleset. Use {@link #fromFile(Path)} for repeated
      * renders from the same config.
      *
-     * @param path path to the HOCON config file
+     * @param path path to the configuration file
      * @param rule name of the rule to render
      * @return rendered text for {@code rule}
      * @throws NullPointerException if {@code path} is null
      * @throws IllegalArgumentException if {@code rule} is blank
      * @throws CopperlaceException if loading, parsing, compilation, or rendering fails
      */
-    public static String renderHoconFile(final Path path, final String rule) {
+    public static String renderFile(final Path path, final String rule) {
         Validate.notNull(path, "path must not be null");
         Validate.notBlank(rule, "rule must not be blank");
 
@@ -234,9 +234,9 @@ public final class Copperlace implements AutoCloseable {
     }
 
     /**
-     * Renders one rule from a HOCON config file with custom processors.
+     * Renders one rule from a configuration file with custom processors.
      *
-     * @param path path to the HOCON config file
+     * @param path path to the configuration file
      * @param rule name of the rule to render
      * @param processors custom processor callbacks keyed by processor name
      * @return rendered text for {@code rule}
@@ -244,7 +244,7 @@ public final class Copperlace implements AutoCloseable {
      * @throws IllegalArgumentException if {@code rule} is blank
      * @throws CopperlaceException if loading, parsing, compilation, or rendering fails
      */
-    public static String renderHoconFileWithProcessors(
+    public static String renderFileWithProcessors(
             final Path path, final String rule, final Map<String, CopperlaceProcessor> processors) {
         Validate.notNull(path, "path must not be null");
         Validate.notBlank(rule, "rule must not be blank");
@@ -256,9 +256,9 @@ public final class Copperlace implements AutoCloseable {
     }
 
     /**
-     * Renders one rule from a HOCON config file with custom processors and initial context values.
+     * Renders one rule from a configuration file with custom processors and initial context values.
      *
-     * @param path path to the HOCON config file
+     * @param path path to the configuration file
      * @param rule name of the rule to render
      * @param context initial render context values
      * @param processors custom processor callbacks keyed by processor name
@@ -267,7 +267,7 @@ public final class Copperlace implements AutoCloseable {
      * @throws IllegalArgumentException if {@code rule} is blank
      * @throws CopperlaceException if loading, parsing, compilation, or rendering fails
      */
-    public static String renderHoconFileWithProcessors(
+    public static String renderFileWithProcessors(
             final Path path,
             final String rule,
             final Map<String, String> context,
@@ -283,13 +283,13 @@ public final class Copperlace implements AutoCloseable {
     }
 
     /**
-     * Renders one rule from a HOCON config file with initial context values.
+     * Renders one rule from a configuration file with initial context values.
      *
      * <p>This convenience method loads and compiles the file, renders one rule,
      * and releases the native ruleset. Use {@link #fromFile(Path)} for repeated
      * renders from the same config.
      *
-     * @param path path to the HOCON config file
+     * @param path path to the configuration file
      * @param rule name of the rule to render
      * @param context initial render context values
      * @return rendered text for {@code rule}
@@ -297,7 +297,7 @@ public final class Copperlace implements AutoCloseable {
      * @throws IllegalArgumentException if {@code rule} is blank
      * @throws CopperlaceException if loading, parsing, compilation, or rendering fails
      */
-    public static String renderHoconFile(final Path path, final String rule, final Map<String, String> context) {
+    public static String renderFile(final Path path, final String rule, final Map<String, String> context) {
         Validate.notNull(path, "path must not be null");
         Validate.notBlank(rule, "rule must not be blank");
         Objects.requireNonNull(context, "context");
@@ -308,29 +308,29 @@ public final class Copperlace implements AutoCloseable {
     }
 
     /**
-     * Renders one rule from a HOCON config file.
+     * Renders one rule from a configuration file.
      *
      * <p>This convenience method loads and compiles the file, renders one rule,
      * and releases the native ruleset. Use {@link #fromFile(String)} for
      * repeated renders from the same config.
      *
-     * @param path path to the HOCON config file
+     * @param path path to the configuration file
      * @param rule name of the rule to render
      * @return rendered text for {@code rule}
      * @throws IllegalArgumentException if {@code path} or {@code rule} is blank
      * @throws CopperlaceException if loading, parsing, compilation, or rendering fails
      */
-    public static String renderHoconFile(final String path, final String rule) {
+    public static String renderFile(final String path, final String rule) {
         Validate.notBlank(path, "path must not be blank");
         Validate.notBlank(rule, "rule must not be blank");
 
-        return renderHoconFile(Path.of(path), rule);
+        return renderFile(Path.of(path), rule);
     }
 
     /**
-     * Renders one rule from a HOCON config file with custom processors.
+     * Renders one rule from a configuration file with custom processors.
      *
-     * @param path path to the HOCON config file
+     * @param path path to the configuration file
      * @param rule name of the rule to render
      * @param processors custom processor callbacks keyed by processor name
      * @return rendered text for {@code rule}
@@ -338,19 +338,19 @@ public final class Copperlace implements AutoCloseable {
      * @throws IllegalArgumentException if {@code path} or {@code rule} is blank
      * @throws CopperlaceException if loading, parsing, compilation, or rendering fails
      */
-    public static String renderHoconFileWithProcessors(
+    public static String renderFileWithProcessors(
             final String path, final String rule, final Map<String, CopperlaceProcessor> processors) {
         Validate.notBlank(path, "path must not be blank");
         Validate.notBlank(rule, "rule must not be blank");
         Objects.requireNonNull(processors, "processors");
 
-        return renderHoconFileWithProcessors(Path.of(path), rule, processors);
+        return renderFileWithProcessors(Path.of(path), rule, processors);
     }
 
     /**
-     * Renders one rule from a HOCON config file with custom processors and initial context values.
+     * Renders one rule from a configuration file with custom processors and initial context values.
      *
-     * @param path path to the HOCON config file
+     * @param path path to the configuration file
      * @param rule name of the rule to render
      * @param context initial render context values
      * @param processors custom processor callbacks keyed by processor name
@@ -359,7 +359,7 @@ public final class Copperlace implements AutoCloseable {
      * @throws IllegalArgumentException if {@code path} or {@code rule} is blank
      * @throws CopperlaceException if loading, parsing, compilation, or rendering fails
      */
-    public static String renderHoconFileWithProcessors(
+    public static String renderFileWithProcessors(
             final String path,
             final String rule,
             final Map<String, String> context,
@@ -369,17 +369,17 @@ public final class Copperlace implements AutoCloseable {
         Objects.requireNonNull(context, "context");
         Objects.requireNonNull(processors, "processors");
 
-        return renderHoconFileWithProcessors(Path.of(path), rule, context, processors);
+        return renderFileWithProcessors(Path.of(path), rule, context, processors);
     }
 
     /**
-     * Renders one rule from a HOCON config file with initial context values.
+     * Renders one rule from a configuration file with initial context values.
      *
      * <p>This convenience method loads and compiles the file, renders one rule,
      * and releases the native ruleset. Use {@link #fromFile(String)} for
      * repeated renders from the same config.
      *
-     * @param path path to the HOCON config file
+     * @param path path to the configuration file
      * @param rule name of the rule to render
      * @param context initial render context values
      * @return rendered text for {@code rule}
@@ -387,12 +387,12 @@ public final class Copperlace implements AutoCloseable {
      * @throws IllegalArgumentException if {@code path} or {@code rule} is blank
      * @throws CopperlaceException if loading, parsing, compilation, or rendering fails
      */
-    public static String renderHoconFile(final String path, final String rule, final Map<String, String> context) {
+    public static String renderFile(final String path, final String rule, final Map<String, String> context) {
         Validate.notBlank(path, "path must not be blank");
         Validate.notBlank(rule, "rule must not be blank");
         Objects.requireNonNull(context, "context");
 
-        return renderHoconFile(Path.of(path), rule, context);
+        return renderFile(Path.of(path), rule, context);
     }
 
     /**

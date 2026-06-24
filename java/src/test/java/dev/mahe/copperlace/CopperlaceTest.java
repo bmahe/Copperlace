@@ -16,7 +16,7 @@ final class CopperlaceTest {
     void rendersFromString() {
         assertEquals(
                 "Mia",
-                Copperlace.renderHoconString("""
+                Copperlace.renderString("""
                         name = ["Mia"]
                         origin = "{name}"
                         """, "origin"));
@@ -31,7 +31,7 @@ final class CopperlaceTest {
                     origin = "{name}"
                     """);
 
-            assertEquals("Mia", Copperlace.renderHoconFile(config, "origin"));
+            assertEquals("Mia", Copperlace.renderFile(config, "origin"));
         } finally {
             Files.deleteIfExists(config);
         }
@@ -41,7 +41,7 @@ final class CopperlaceTest {
     void rendersFromStringWithContext() {
         assertEquals(
                 "Hello Darcy",
-                Copperlace.renderHoconString("""
+                Copperlace.renderString("""
                         context {
                             name = "Mia"
                         }
@@ -57,7 +57,7 @@ final class CopperlaceTest {
                     origin = "Hello {name}"
                     """);
 
-            assertEquals("Hello Lina", Copperlace.renderHoconFile(config, "origin", Map.of("name", "Lina")));
+            assertEquals("Hello Lina", Copperlace.renderFile(config, "origin", Map.of("name", "Lina")));
         } finally {
             Files.deleteIfExists(config);
         }
@@ -67,7 +67,7 @@ final class CopperlaceTest {
     void missingRuleRaisesException() {
         final CopperlaceException exception = assertThrows(
                 CopperlaceException.class,
-                () -> Copperlace.renderHoconString("""
+                () -> Copperlace.renderString("""
                         origin = "{missing}"
                         """, "origin"));
 
@@ -78,7 +78,7 @@ final class CopperlaceTest {
     void rendersBuiltinProcessorPipeline() {
         assertEquals(
                 "Mia",
-                Copperlace.renderHoconString("""
+                Copperlace.renderString("""
                         name = ["  mIA  "]
                         origin = "{name | trim | capitalize}"
                         """, "origin"));
@@ -88,7 +88,7 @@ final class CopperlaceTest {
     void rendersCustomProcessor() {
         assertEquals(
                 "'Mia'",
-                Copperlace.renderHoconStringWithProcessors(
+                Copperlace.renderStringWithProcessors(
                         """
                         name = ["Mia"]
                         origin = "{name | surround}"
@@ -101,7 +101,7 @@ final class CopperlaceTest {
     void customProcessorOverridesBuiltinProcessor() {
         assertEquals(
                 "custom",
-                Copperlace.renderHoconStringWithProcessors(
+                Copperlace.renderStringWithProcessors(
                         """
                         name = ["Mia"]
                         origin = "{name | uppercase}"
@@ -114,7 +114,7 @@ final class CopperlaceTest {
     void customProcessorExceptionRaisesCopperlaceException() {
         final CopperlaceException exception = assertThrows(
                 CopperlaceException.class,
-                () -> Copperlace.renderHoconStringWithProcessors(
+                () -> Copperlace.renderStringWithProcessors(
                         """
                         name = ["Mia"]
                         origin = "{name | fail}"
@@ -131,7 +131,7 @@ final class CopperlaceTest {
     void customProcessorNullReturnRaisesCopperlaceException() {
         final CopperlaceException exception = assertThrows(
                 CopperlaceException.class,
-                () -> Copperlace.renderHoconStringWithProcessors(
+                () -> Copperlace.renderStringWithProcessors(
                         """
                         name = ["Mia"]
                         origin = "{name | missing_return}"
@@ -146,7 +146,7 @@ final class CopperlaceTest {
     void rendersBuiltinArticleProcessor() {
         assertEquals(
                 "an apple/a user",
-                Copperlace.renderHoconString("""
+                Copperlace.renderString("""
                         apple = ["apple"]
                         user = ["user"]
                         origin = "{apple | article}/{user | article}"
@@ -157,7 +157,7 @@ final class CopperlaceTest {
     void rendersBuiltinPastTenseProcessor() {
         assertEquals(
                 "walked/ran",
-                Copperlace.renderHoconString("""
+                Copperlace.renderString("""
                         walk = ["walk"]
                         run = ["run"]
                         origin = "{walk | past_tense}/{run | past_tense}"
@@ -168,7 +168,7 @@ final class CopperlaceTest {
     void rendersBuiltinPluralizeProcessor() {
         assertEquals(
                 "cats/people",
-                Copperlace.renderHoconString("""
+                Copperlace.renderString("""
                         cat = ["cat"]
                         person = ["person"]
                         origin = "{cat | pluralize}/{person | pluralize}"
@@ -179,7 +179,7 @@ final class CopperlaceTest {
     void rendersBuiltinPossessiveProcessor() {
         assertEquals(
                 "Mia's/James'",
-                Copperlace.renderHoconString("""
+                Copperlace.renderString("""
                         mia = ["Mia"]
                         james = ["James"]
                         origin = "{mia | possessive}/{james | possessive}"
@@ -190,7 +190,7 @@ final class CopperlaceTest {
     void rendersBuiltinOrdinalProcessor() {
         assertEquals(
                 "1st/11th/23rd",
-                Copperlace.renderHoconString("""
+                Copperlace.renderString("""
                         one = [1]
                         eleven = [11]
                         twenty_three = [23]
@@ -202,7 +202,7 @@ final class CopperlaceTest {
     void rendersBuiltinSlugProcessor() {
         assertEquals(
                 "mias-story",
-                Copperlace.renderHoconString("""
+                Copperlace.renderString("""
                         title = ["Mia's Story"]
                         origin = "{title | slug}"
                         """, "origin"));
@@ -212,7 +212,7 @@ final class CopperlaceTest {
     void rendersWeightedChoice() {
         assertEquals(
                 "rare",
-                Copperlace.renderHoconString("""
+                Copperlace.renderString("""
                         origin = [
                             { value = "common", weight = 0 },
                             { value = "rare", weight = 2.5 }
@@ -225,7 +225,7 @@ final class CopperlaceTest {
         final IllegalArgumentException exception =
                 assertThrows(
                         IllegalArgumentException.class,
-                        () -> Copperlace.renderHoconString(" ", "origin"));
+                        () -> Copperlace.renderString(" ", "origin"));
 
         assertTrue(exception.getMessage().contains("config"));
     }
@@ -235,7 +235,7 @@ final class CopperlaceTest {
         final IllegalArgumentException exception =
                 assertThrows(
                         IllegalArgumentException.class,
-                        () -> Copperlace.renderHoconString("name = [\"Mia\"]", " "));
+                        () -> Copperlace.renderString("name = [\"Mia\"]", " "));
 
         assertTrue(exception.getMessage().contains("rule"));
     }
@@ -243,7 +243,7 @@ final class CopperlaceTest {
     @Test
     void rejectsBlankPath() {
         final IllegalArgumentException exception =
-                assertThrows(IllegalArgumentException.class, () -> Copperlace.renderHoconFile(" ", "origin"));
+                assertThrows(IllegalArgumentException.class, () -> Copperlace.renderFile(" ", "origin"));
 
         assertTrue(exception.getMessage().contains("path"));
     }
@@ -367,7 +367,7 @@ final class CopperlaceTest {
     void customProcessorWorksWithInitialContext() {
         assertEquals(
                 "[Mia]",
-                Copperlace.renderHoconStringWithProcessors(
+                Copperlace.renderStringWithProcessors(
                         """
                         origin = "{name | surround}"
                         """,

@@ -2,7 +2,7 @@ use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_int, c_void};
 use std::ptr;
 
-use crate::config::{ConfigError, ruleset_from_hocon_file, ruleset_from_hocon_str};
+use crate::config::{ConfigError, ruleset_from_file, ruleset_from_str};
 use crate::render::{Processor, ProcessorRegistry, RenderContext, RuleSet};
 
 /// Status code for a successful C ABI call.
@@ -67,7 +67,7 @@ impl Processor for CallbackProcessor {
     }
 }
 
-/// Loads a HOCON config file and returns an opaque ruleset handle.
+/// Loads a configuration file and returns an opaque ruleset handle.
 ///
 /// On success, writes a non-null handle to `out_handle` and returns
 /// [`COPPERLACE_OK`]. On failure, writes null to `out_handle`, writes an owned
@@ -86,7 +86,7 @@ pub extern "C" fn copperlace_ruleset_from_file(
         return COPPERLACE_INVALID_ARGUMENT;
     };
 
-    match ruleset_from_hocon_file(path) {
+    match ruleset_from_file(path) {
         Ok(ruleset) => write_handle(ruleset, out_handle, out_error),
         Err(error) => {
             write_null_handle(out_handle);
@@ -96,7 +96,7 @@ pub extern "C" fn copperlace_ruleset_from_file(
     }
 }
 
-/// Loads a HOCON config file and returns a ruleset handle with custom processors.
+/// Loads a configuration file and returns a ruleset handle with custom processors.
 #[unsafe(no_mangle)]
 pub extern "C" fn copperlace_ruleset_from_file_with_processors(
     path: *const c_char,
@@ -124,7 +124,7 @@ pub extern "C" fn copperlace_ruleset_from_file_with_processors(
         return COPPERLACE_INVALID_ARGUMENT;
     };
 
-    match ruleset_from_hocon_file_with_processors(path, processors) {
+    match ruleset_from_file_with_processors(path, processors) {
         Ok(ruleset) => write_handle(ruleset, out_handle, out_error),
         Err(error) => {
             write_null_handle(out_handle);
@@ -134,7 +134,7 @@ pub extern "C" fn copperlace_ruleset_from_file_with_processors(
     }
 }
 
-/// Compiles a HOCON config string and returns an opaque ruleset handle.
+/// Compiles a configuration string and returns an opaque ruleset handle.
 ///
 /// On success, writes a non-null handle to `out_handle` and returns
 /// [`COPPERLACE_OK`]. On failure, writes null to `out_handle`, writes an owned
@@ -153,7 +153,7 @@ pub extern "C" fn copperlace_ruleset_from_string(
         return COPPERLACE_INVALID_ARGUMENT;
     };
 
-    match ruleset_from_hocon_str(&config) {
+    match ruleset_from_str(&config) {
         Ok(ruleset) => write_handle(ruleset, out_handle, out_error),
         Err(error) => {
             write_null_handle(out_handle);
@@ -163,7 +163,7 @@ pub extern "C" fn copperlace_ruleset_from_string(
     }
 }
 
-/// Compiles a HOCON config string and returns a ruleset handle with custom processors.
+/// Compiles a configuration string and returns a ruleset handle with custom processors.
 #[unsafe(no_mangle)]
 pub extern "C" fn copperlace_ruleset_from_string_with_processors(
     config: *const c_char,
@@ -191,7 +191,7 @@ pub extern "C" fn copperlace_ruleset_from_string_with_processors(
         return COPPERLACE_INVALID_ARGUMENT;
     };
 
-    match ruleset_from_hocon_str_with_processors(&config, processors) {
+    match ruleset_from_str_with_processors(&config, processors) {
         Ok(ruleset) => write_handle(ruleset, out_handle, out_error),
         Err(error) => {
             write_null_handle(out_handle);
@@ -390,7 +390,7 @@ fn read_processors(
     Some(processors)
 }
 
-fn ruleset_from_hocon_str_with_processors(
+fn ruleset_from_str_with_processors(
     config: &str,
     processors: ProcessorRegistry,
 ) -> Result<RuleSet, ConfigError> {
@@ -399,7 +399,7 @@ fn ruleset_from_hocon_str_with_processors(
     RuleSet::from_config_with_processors(value, processors).map_err(ConfigError::Render)
 }
 
-fn ruleset_from_hocon_file_with_processors(
+fn ruleset_from_file_with_processors(
     path: String,
     processors: ProcessorRegistry,
 ) -> Result<RuleSet, ConfigError> {

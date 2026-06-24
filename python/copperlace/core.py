@@ -16,7 +16,7 @@ class CopperlaceError(RuntimeError):
 
 
 class RuleSet:
-    """Compiled Copperlace rules loaded from HOCON config.
+    """Compiled Copperlace rules loaded from configuration.
 
     Use :meth:`from_string` or :meth:`from_file` to compile config once, then
     call :meth:`render` repeatedly. ``RuleSet`` owns a native handle, so callers
@@ -34,10 +34,10 @@ class RuleSet:
         config: str,
         processors: Mapping[str, Callable[[str], str]] | None = None,
     ) -> Self:
-        """Compile a ruleset from a HOCON config string.
+        """Compile a ruleset from a configuration string.
 
         Args:
-            config: HOCON config text containing Copperlace rules.
+            config: configuration text containing Copperlace rules.
             processors: Optional custom processor callbacks.
 
         Returns:
@@ -61,10 +61,10 @@ class RuleSet:
         path: str | Path,
         processors: Mapping[str, Callable[[str], str]] | None = None,
     ) -> Self:
-        """Compile a ruleset from a HOCON config file.
+        """Compile a ruleset from a configuration file.
 
         Args:
-            path: Path to the HOCON config file.
+            path: Path to the configuration file.
             processors: Optional custom processor callbacks.
 
         Returns:
@@ -168,10 +168,10 @@ class Copperlace:
         config: str,
         processors: Mapping[str, Callable[[str], str]] | None = None,
     ) -> Self:
-        """Create a renderer from a HOCON config string.
+        """Create a renderer from a configuration string.
 
         Args:
-            config: HOCON config text containing Copperlace rules.
+            config: configuration text containing Copperlace rules.
             processors: Optional custom processor callbacks.
 
         Returns:
@@ -189,10 +189,10 @@ class Copperlace:
         path: str | Path,
         processors: Mapping[str, Callable[[str], str]] | None = None,
     ) -> Self:
-        """Create a renderer from a HOCON config file.
+        """Create a renderer from a configuration file.
 
         Args:
-            path: Path to the HOCON config file.
+            path: Path to the configuration file.
             processors: Optional custom processor callbacks.
 
         Returns:
@@ -244,20 +244,20 @@ class Copperlace:
             pass
 
 
-def render_hocon_str(
+def render_str(
     config: str,
     rule: str,
     context: Mapping[str, str] | None = None,
     *,
     processors: Mapping[str, Callable[[str], str]] | None = None,
 ) -> str:
-    """Render one rule from a HOCON config string.
+    """Render one rule from a configuration string.
 
     This convenience helper compiles the config, renders one rule, and releases
     the native handle. Use ``Copperlace.from_string`` for repeated renders.
 
     Args:
-        config: HOCON config text containing Copperlace rules.
+        config: configuration text containing Copperlace rules.
         rule: Name of the rule to render.
         context: Optional initial render context values.
         processors: Optional custom processor callbacks.
@@ -273,20 +273,20 @@ def render_hocon_str(
         return ruleset.render(rule, context)
 
 
-def render_hocon_file(
+def render_file(
     path: str | Path,
     rule: str,
     context: Mapping[str, str] | None = None,
     *,
     processors: Mapping[str, Callable[[str], str]] | None = None,
 ) -> str:
-    """Render one rule from a HOCON config file.
+    """Render one rule from a configuration file.
 
     This convenience helper loads the file, renders one rule, and releases the
     native handle. Use ``Copperlace.from_file`` for repeated renders.
 
     Args:
-        path: Path to the HOCON config file.
+        path: Path to the configuration file.
         rule: Name of the rule to render.
         context: Optional initial render context values.
         processors: Optional custom processor callbacks.

@@ -8,7 +8,7 @@ import java.util.Objects;
 import org.apache.commons.lang3.Validate;
 
 /**
- * Compiled Copperlace rules loaded from HOCON config.
+ * Compiled Copperlace rules loaded from configuration.
  *
  * <p>{@code RuleSet} is the lower-level load-once API. It owns a native
  * Copperlace ruleset handle and can render named rules repeatedly until
@@ -34,9 +34,9 @@ public final class RuleSet implements AutoCloseable {
     }
 
     /**
-     * Compiles a HOCON config string into a reusable ruleset.
+     * Compiles a configuration string into a reusable ruleset.
      *
-     * @param config HOCON config text containing Copperlace rules
+     * @param config configuration text containing Copperlace rules
      * @return a ruleset backed by a native Copperlace handle
      * @throws IllegalArgumentException if {@code config} is blank
      * @throws CopperlaceException if the config cannot be parsed or compiled
@@ -47,9 +47,9 @@ public final class RuleSet implements AutoCloseable {
     }
 
     /**
-     * Compiles a HOCON config string into a reusable ruleset with custom processors.
+     * Compiles a configuration string into a reusable ruleset with custom processors.
      *
-     * @param config HOCON config text containing Copperlace rules
+     * @param config configuration text containing Copperlace rules
      * @param processors custom processor callbacks keyed by processor name
      * @return a ruleset backed by a native Copperlace handle
      * @throws NullPointerException if {@code processors}, a processor name, or a processor is null
@@ -64,9 +64,9 @@ public final class RuleSet implements AutoCloseable {
     }
 
     /**
-     * Loads and compiles a HOCON config file into a reusable ruleset.
+     * Loads and compiles a configuration file into a reusable ruleset.
      *
-     * @param path path to the HOCON config file
+     * @param path path to the configuration file
      * @return a ruleset backed by a native Copperlace handle
      * @throws NullPointerException if {@code path} is null
      * @throws CopperlaceException if the file cannot be loaded, parsed, or compiled
@@ -77,9 +77,9 @@ public final class RuleSet implements AutoCloseable {
     }
 
     /**
-     * Loads and compiles a HOCON config file into a reusable ruleset with custom processors.
+     * Loads and compiles a configuration file into a reusable ruleset with custom processors.
      *
-     * @param path path to the HOCON config file
+     * @param path path to the configuration file
      * @param processors custom processor callbacks keyed by processor name
      * @return a ruleset backed by a native Copperlace handle
      * @throws NullPointerException if {@code path}, {@code processors}, a processor name, or a processor is null

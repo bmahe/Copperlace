@@ -4,12 +4,12 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from copperlace import Copperlace, CopperlaceError, RuleSet, render_hocon_file, render_hocon_str
+from copperlace import Copperlace, CopperlaceError, RuleSet, render_file, render_str
 
 
 class CopperlaceTests(unittest.TestCase):
     def test_render_from_config_string(self) -> None:
-        output = render_hocon_str('name = ["Mia"]\norigin = "{name}"', "origin")
+        output = render_str('name = ["Mia"]\norigin = "{name}"', "origin")
 
         self.assertEqual(output, "Mia")
 
@@ -18,10 +18,10 @@ class CopperlaceTests(unittest.TestCase):
             path = Path(directory) / "story.conf"
             path.write_text('name = ["Mia"]\norigin = "{name}"', encoding="utf-8")
 
-            self.assertEqual(render_hocon_file(path, "origin"), "Mia")
+            self.assertEqual(render_file(path, "origin"), "Mia")
 
     def test_render_from_config_string_with_context(self) -> None:
-        output = render_hocon_str(
+        output = render_str(
             'context { name = "Mia" }\norigin = "Hello {name}"',
             "origin",
             {"name": "Darcy"},
@@ -34,14 +34,14 @@ class CopperlaceTests(unittest.TestCase):
             path = Path(directory) / "story.conf"
             path.write_text('origin = "Hello {name}"', encoding="utf-8")
 
-            self.assertEqual(render_hocon_file(path, "origin", {"name": "Lina"}), "Hello Lina")
+            self.assertEqual(render_file(path, "origin", {"name": "Lina"}), "Hello Lina")
 
     def test_missing_rule_raises_error(self) -> None:
         with self.assertRaisesRegex(CopperlaceError, "unknown rule"):
-            render_hocon_str('origin = "{missing}"', "origin")
+            render_str('origin = "{missing}"', "origin")
 
     def test_builtin_processor_pipeline(self) -> None:
-        output = render_hocon_str(
+        output = render_str(
             'name = ["  mIA  "]\norigin = "{name | trim | capitalize}"',
             "origin",
         )
@@ -49,7 +49,7 @@ class CopperlaceTests(unittest.TestCase):
         self.assertEqual(output, "Mia")
 
     def test_custom_processor(self) -> None:
-        output = render_hocon_str(
+        output = render_str(
             'name = ["Mia"]\norigin = "{name | surround}"',
             "origin",
             processors={"surround": lambda value: f"'{value}'"},
@@ -58,7 +58,7 @@ class CopperlaceTests(unittest.TestCase):
         self.assertEqual(output, "'Mia'")
 
     def test_custom_processor_overrides_builtin(self) -> None:
-        output = render_hocon_str(
+        output = render_str(
             'name = ["Mia"]\norigin = "{name | uppercase}"',
             "origin",
             processors={"uppercase": lambda _value: "custom"},
@@ -71,7 +71,7 @@ class CopperlaceTests(unittest.TestCase):
             raise ValueError("not allowed")
 
         with self.assertRaisesRegex(CopperlaceError, "not allowed"):
-            render_hocon_str(
+            render_str(
                 'name = ["Mia"]\norigin = "{name | fail}"',
                 "origin",
                 processors={"fail": fail},
@@ -79,14 +79,14 @@ class CopperlaceTests(unittest.TestCase):
 
     def test_custom_processor_rejects_non_string_return(self) -> None:
         with self.assertRaisesRegex(CopperlaceError, "non-string"):
-            render_hocon_str(
+            render_str(
                 'name = ["Mia"]\norigin = "{name | bad}"',
                 "origin",
                 processors={"bad": lambda _value: 1},  # type: ignore[dict-item,return-value]
             )
 
     def test_builtin_article_processor(self) -> None:
-        output = render_hocon_str(
+        output = render_str(
             'apple = ["apple"]\nuser = ["user"]\norigin = "{apple | article}/{user | article}"',
             "origin",
         )
@@ -94,7 +94,7 @@ class CopperlaceTests(unittest.TestCase):
         self.assertEqual(output, "an apple/a user")
 
     def test_builtin_past_tense_processor(self) -> None:
-        output = render_hocon_str(
+        output = render_str(
             'walk = ["walk"]\nrun = ["run"]\norigin = "{walk | past_tense}/{run | past_tense}"',
             "origin",
         )
@@ -102,7 +102,7 @@ class CopperlaceTests(unittest.TestCase):
         self.assertEqual(output, "walked/ran")
 
     def test_builtin_pluralize_processor(self) -> None:
-        output = render_hocon_str(
+        output = render_str(
             'cat = ["cat"]\nperson = ["person"]\norigin = "{cat | pluralize}/{person | pluralize}"',
             "origin",
         )
@@ -110,7 +110,7 @@ class CopperlaceTests(unittest.TestCase):
         self.assertEqual(output, "cats/people")
 
     def test_builtin_possessive_processor(self) -> None:
-        output = render_hocon_str(
+        output = render_str(
             'mia = ["Mia"]\njames = ["James"]\norigin = "{mia | possessive}/{james | possessive}"',
             "origin",
         )
@@ -118,7 +118,7 @@ class CopperlaceTests(unittest.TestCase):
         self.assertEqual(output, "Mia's/James'")
 
     def test_builtin_ordinal_processor(self) -> None:
-        output = render_hocon_str(
+        output = render_str(
             'one = [1]\neleven = [11]\ntwenty_three = [23]\norigin = "{one | ordinal}/{eleven | ordinal}/{twenty_three | ordinal}"',
             "origin",
         )
@@ -126,7 +126,7 @@ class CopperlaceTests(unittest.TestCase):
         self.assertEqual(output, "1st/11th/23rd")
 
     def test_builtin_slug_processor(self) -> None:
-        output = render_hocon_str(
+        output = render_str(
             'title = ["Mia\'s Story"]\norigin = "{title | slug}"',
             "origin",
         )
@@ -134,7 +134,7 @@ class CopperlaceTests(unittest.TestCase):
         self.assertEqual(output, "mias-story")
 
     def test_weighted_choice(self) -> None:
-        output = render_hocon_str(
+        output = render_str(
             'origin = [{ value = "common", weight = 0 }, { value = "rare", weight = 2.5 }]',
             "origin",
         )

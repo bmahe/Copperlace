@@ -549,7 +549,7 @@ fn checks_config_string() {
 }
 
 #[test]
-fn check_rejects_invalid_hocon_string() {
+fn check_rejects_invalid_config_string() {
     let output = Command::new(env!("CARGO_BIN_EXE_copperlace"))
         .args(["check", "--string", "[\"Mia\"]"])
         .output()
@@ -560,7 +560,7 @@ fn check_rejects_invalid_hocon_string() {
 }
 
 #[test]
-fn check_rejects_invalid_hocon_from_stdin() {
+fn check_rejects_invalid_config_from_stdin() {
     let mut child = Command::new(env!("CARGO_BIN_EXE_copperlace"))
         .args(["check", "--config", "-"])
         .stdin(Stdio::piped())

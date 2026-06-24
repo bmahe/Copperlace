@@ -100,7 +100,7 @@ times. This avoids recompiling the rule set for each render.
 ----
 use copperlace::Copperlace;
 
-let copperlace = Copperlace::from_hocon_file("examples/character_scene.conf")?;
+let copperlace = Copperlace::from_file("examples/character_scene.conf")?;
 let first = copperlace.render("origin")?;
 let second = copperlace.render("origin")?;
 let seeded = copperlace.render_with_context(

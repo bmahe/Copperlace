@@ -30,7 +30,7 @@ pub enum RenderError {
     CircularRuleReference(Vec<String>),
     /// A config value type was parsed but is not renderable.
     UnsupportedValue(String),
-    /// The root HOCON value was not an object.
+    /// The root configuration value was not an object.
     InvalidConfigRoot,
 }
 
@@ -169,16 +169,16 @@ pub struct RuleSet {
 }
 
 impl RuleSet {
-    /// Compiles a HOCON root value using the builtin processor registry.
+    /// Compiles a parsed configuration root value using the builtin processor registry.
     ///
-    /// The root value must be a HOCON object. Top-level entries become named
+    /// The root value must be a configuration object. Top-level entries become named
     /// rules, except a top-level object named `context`, whose entries become
     /// lazy defaults available to template references.
     pub fn from_config(config: hocon_rs::Value) -> Result<Self, RenderError> {
         Self::from_config_with_processors(config, ProcessorRegistry::new())
     }
 
-    /// Compiles a HOCON root value with additional custom processors.
+    /// Compiles a parsed configuration root value with additional custom processors.
     ///
     /// Custom processors are merged into the builtin registry before templates
     /// are compiled, so unknown processor names fail during compilation. A
@@ -305,7 +305,7 @@ impl RuleSet {
     }
 }
 
-/// Compiles a HOCON root value and renders one rule.
+/// Compiles a parsed configuration root value and renders one rule.
 ///
 /// This is a one-shot helper around [`RuleSet::from_config`] and
 /// [`RuleSet::render_rule`]. Use [`RuleSet`] directly for repeated renders.
@@ -313,7 +313,7 @@ pub fn render_config_rule(config: hocon_rs::Value, rule_name: &str) -> Result<St
     render_config_rule_with_context(config, rule_name, RenderContext::new())
 }
 
-/// Compiles a HOCON root value and renders one rule with initial context.
+/// Compiles a parsed configuration root value and renders one rule with initial context.
 pub fn render_config_rule_with_context(
     config: hocon_rs::Value,
     rule_name: &str,

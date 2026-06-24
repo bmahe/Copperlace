@@ -2,7 +2,7 @@ use js_sys::{Function, Object, Reflect};
 use wasm_bindgen::JsError;
 use wasm_bindgen::prelude::*;
 
-/// JavaScript-facing load-once renderer for Copperlace HOCON config.
+/// JavaScript-facing load-once renderer for Copperlace configuration.
 #[wasm_bindgen]
 pub struct Copperlace {
     inner: crate::RuleSet,
@@ -29,19 +29,18 @@ impl crate::Processor for JsProcessor {
 
 #[wasm_bindgen]
 impl Copperlace {
-    /// Compiles a HOCON config string into a renderer that can be reused.
+    /// Compiles a configuration string into a renderer that can be reused.
     #[wasm_bindgen(constructor)]
     pub fn new(config: &str) -> Result<Copperlace, JsError> {
-        crate::ruleset_from_hocon_str(config)
+        crate::ruleset_from_str(config)
             .map(|inner| Copperlace { inner })
             .map_err(to_js_error)
     }
 
-    /// Compiles a HOCON config string with custom processor functions.
+    /// Compiles a configuration string with custom processor functions.
     #[wasm_bindgen(js_name = withProcessors)]
     pub fn with_processors(config: &str, processors: JsValue) -> Result<Copperlace, JsError> {
-        ruleset_from_hocon_string_with_processors(config, processors)
-            .map(|inner| Copperlace { inner })
+        ruleset_from_string_with_processors(config, processors).map(|inner| Copperlace { inner })
     }
 
     /// Renders a named rule from the loaded config.
@@ -58,43 +57,43 @@ impl Copperlace {
     }
 }
 
-/// Renders one rule from a HOCON config string.
-#[wasm_bindgen(js_name = renderHoconString)]
-pub fn render_hocon_string(config: &str, rule: &str) -> Result<String, JsError> {
-    crate::render_hocon_str(config, rule).map_err(to_js_error)
+/// Renders one rule from a configuration string.
+#[wasm_bindgen(js_name = renderString)]
+pub fn render_string(config: &str, rule: &str) -> Result<String, JsError> {
+    crate::render_str(config, rule).map_err(to_js_error)
 }
 
-/// Renders one rule from a HOCON config string with custom processor functions.
-#[wasm_bindgen(js_name = renderHoconStringWithProcessors)]
-pub fn render_hocon_string_with_processors(
+/// Renders one rule from a configuration string with custom processor functions.
+#[wasm_bindgen(js_name = renderStringWithProcessors)]
+pub fn render_string_with_processors(
     config: &str,
     rule: &str,
     processors: JsValue,
 ) -> Result<String, JsError> {
-    ruleset_from_hocon_string_with_processors(config, processors)?
+    ruleset_from_string_with_processors(config, processors)?
         .render_rule(rule)
         .map_err(to_js_error)
 }
 
-/// Renders one rule from a HOCON config string with initial context values.
-#[wasm_bindgen(js_name = renderHoconStringWithContext)]
-pub fn render_hocon_string_with_context(
+/// Renders one rule from a configuration string with initial context values.
+#[wasm_bindgen(js_name = renderStringWithContext)]
+pub fn render_string_with_context(
     config: &str,
     rule: &str,
     context: JsValue,
 ) -> Result<String, JsError> {
-    crate::render_hocon_str_with_context(config, rule, read_context(context)?).map_err(to_js_error)
+    crate::render_str_with_context(config, rule, read_context(context)?).map_err(to_js_error)
 }
 
-/// Renders one rule from a HOCON config string with custom processors and initial context.
-#[wasm_bindgen(js_name = renderHoconStringWithProcessorsAndContext)]
-pub fn render_hocon_string_with_processors_and_context(
+/// Renders one rule from a configuration string with custom processors and initial context.
+#[wasm_bindgen(js_name = renderStringWithProcessorsAndContext)]
+pub fn render_string_with_processors_and_context(
     config: &str,
     rule: &str,
     processors: JsValue,
     context: JsValue,
 ) -> Result<String, JsError> {
-    ruleset_from_hocon_string_with_processors(config, processors)?
+    ruleset_from_string_with_processors(config, processors)?
         .render_rule_with_context(rule, read_context(context)?)
         .map_err(to_js_error)
 }
@@ -147,7 +146,7 @@ fn read_processors(processors: JsValue) -> Result<crate::ProcessorRegistry, JsEr
     Ok(registry)
 }
 
-fn ruleset_from_hocon_string_with_processors(
+fn ruleset_from_string_with_processors(
     config: &str,
     processors: JsValue,
 ) -> Result<crate::RuleSet, JsError> {

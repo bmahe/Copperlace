@@ -1,7 +1,7 @@
 use copperlace::render::{ProcessorRegistry, processor};
 use copperlace::{
     Copperlace, RenderContext, RenderError, RuleSet, render_config_rule_with_context,
-    render_hocon_file_with_context, render_hocon_str_with_context,
+    render_file_with_context, render_str_with_context,
 };
 
 fn ruleset(config: &str) -> RuleSet {
@@ -36,8 +36,8 @@ fn renders_from_multiple_named_rules() {
 }
 
 #[test]
-fn copperlace_renders_repeatedly_from_hocon_string() {
-    let copperlace = Copperlace::from_hocon_str(
+fn copperlace_renders_repeatedly_from_string() {
+    let copperlace = Copperlace::from_str(
         r#"
         name = ["Mia"]
         pet = ["owl"]
@@ -53,7 +53,7 @@ fn copperlace_renders_repeatedly_from_hocon_string() {
 }
 
 #[test]
-fn copperlace_renders_repeatedly_from_hocon_file() {
+fn copperlace_renders_repeatedly_from_file() {
     let config_path =
         std::env::temp_dir().join(format!("copperlace-reusable-{}.conf", std::process::id()));
     std::fs::write(
@@ -65,7 +65,7 @@ fn copperlace_renders_repeatedly_from_hocon_file() {
     )
     .unwrap();
 
-    let copperlace = Copperlace::from_hocon_file(&config_path).unwrap();
+    let copperlace = Copperlace::from_file(&config_path).unwrap();
 
     assert_eq!(copperlace.render("origin").unwrap(), "Mia");
     assert_eq!(copperlace.render("origin").unwrap(), "Mia");
@@ -196,7 +196,7 @@ fn initial_context_does_not_persist_between_renders() {
 
 #[test]
 fn copperlace_renders_with_initial_context() {
-    let copperlace = Copperlace::from_hocon_str(
+    let copperlace = Copperlace::from_str(
         r#"
         origin = "Hello {name}"
         "#,
@@ -212,18 +212,18 @@ fn copperlace_renders_with_initial_context() {
 }
 
 #[test]
-fn render_hocon_str_renders_with_initial_context() {
+fn render_str_renders_with_initial_context() {
     let mut context = RenderContext::new();
     context.insert("name".to_string(), "Mia".to_string());
 
     assert_eq!(
-        render_hocon_str_with_context(r#"origin = "Hello {name}""#, "origin", context).unwrap(),
+        render_str_with_context(r#"origin = "Hello {name}""#, "origin", context).unwrap(),
         "Hello Mia"
     );
 }
 
 #[test]
-fn render_hocon_file_renders_with_initial_context() {
+fn render_file_renders_with_initial_context() {
     let config_path =
         std::env::temp_dir().join(format!("copperlace-context-{}.conf", std::process::id()));
     std::fs::write(
@@ -237,7 +237,7 @@ fn render_hocon_file_renders_with_initial_context() {
     context.insert("name".to_string(), "Mia".to_string());
 
     assert_eq!(
-        render_hocon_file_with_context(&config_path, "origin", context).unwrap(),
+        render_file_with_context(&config_path, "origin", context).unwrap(),
         "Hello Mia"
     );
 
@@ -694,7 +694,7 @@ fn escaped_template_braces_work_next_to_expressions() {
 }
 
 #[test]
-fn normal_hocon_strings_can_escape_template_braces() {
+fn normal_config_strings_can_escape_template_braces() {
     let rules = ruleset(
         r#"
         origin = "\\{name\\}"
@@ -741,8 +741,7 @@ fn unmatched_closing_template_brace_is_invalid() {
 
 #[test]
 fn item_json_example_renders_valid_json_with_escaped_braces() {
-    let copperlace =
-        Copperlace::from_hocon_str(include_str!("../../examples/item_json.conf")).unwrap();
+    let copperlace = Copperlace::from_str(include_str!("../../examples/item_json.conf")).unwrap();
     let rendered = copperlace.render("origin").unwrap();
     let json: serde_json::Value = serde_json::from_str(&rendered).unwrap();
 

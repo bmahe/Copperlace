@@ -33,9 +33,9 @@ Use this shape with Vite, Webpack, SvelteKit, Next, or similar bundlers:
 ----
 import {
   Copperlace,
-  renderHoconString,
-  renderHoconStringWithContext,
-  renderHoconStringWithProcessors,
+  renderString,
+  renderStringWithContext,
+  renderStringWithProcessors,
 } from "./pkg/copperlace";
 
 const config = `
@@ -51,9 +51,9 @@ const custom = Copperlace.withProcessors(config, {
   shout: (value) => value.toUpperCase(),
 }).render("origin");
 
-const oneShot = renderHoconString(config, "origin");
-const seededOneShot = renderHoconStringWithContext(config, "origin", { name: "Lina" });
-const customOneShot = renderHoconStringWithProcessors(config, "origin", {
+const oneShot = renderString(config, "origin");
+const seededOneShot = renderStringWithContext(config, "origin", { name: "Lina" });
+const customOneShot = renderStringWithProcessors(config, "origin", {
   shout: (value) => value.toUpperCase(),
 });
 ----
@@ -92,18 +92,18 @@ Renders a named rule. Each call uses a fresh render context.
 `Copperlace.renderWithContext(rule: string, context: Record<string, string>): string`::
 Renders a named rule with initial context values for this render only.
 
-`renderHoconString(config: string, rule: string): string`::
+`renderString(config: string, rule: string): string`::
 Compiles config, renders one rule, and releases the compiled ruleset.
 
-`renderHoconStringWithContext(config: string, rule: string, context: Record<string, string>): string`::
+`renderStringWithContext(config: string, rule: string, context: Record<string, string>): string`::
 Compiles config, renders one rule with initial context values, and releases the
 compiled ruleset.
 
-`renderHoconStringWithProcessors(config: string, rule: string, processors: Record<string, (value: string) => string>): string`::
+`renderStringWithProcessors(config: string, rule: string, processors: Record<string, (value: string) => string>): string`::
 Compiles config with custom processor functions, renders one rule, and releases
 the compiled ruleset.
 
-`renderHoconStringWithProcessorsAndContext(config: string, rule: string, processors: Record<string, (value: string) => string>, context: Record<string, string>): string`::
+`renderStringWithProcessorsAndContext(config: string, rule: string, processors: Record<string, (value: string) => string>, context: Record<string, string>): string`::
 Compiles config with custom processor functions, renders one rule with initial
 context values, and releases the compiled ruleset.
 

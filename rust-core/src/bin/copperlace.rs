@@ -2,7 +2,7 @@ use std::env;
 use std::io::{self, Read};
 use std::process;
 
-use copperlace::{Copperlace, RenderContext, ruleset_from_hocon_file, ruleset_from_hocon_str};
+use copperlace::{Copperlace, RenderContext, ruleset_from_file, ruleset_from_str};
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -105,9 +105,9 @@ fn render(args: &[String], start_index: usize) -> Result<Option<String>, String>
 fn copperlace_from_render_config(config: &str) -> Result<Copperlace, String> {
     if config == "-" {
         let input = read_stdin_config()?;
-        Copperlace::from_hocon_str(&input).map_err(|error| error.to_string())
+        Copperlace::from_str(&input).map_err(|error| error.to_string())
     } else {
-        Copperlace::from_hocon_file(config).map_err(|error| error.to_string())
+        Copperlace::from_file(config).map_err(|error| error.to_string())
     }
 }
 
@@ -145,7 +145,7 @@ fn check(args: &[String], start_index: usize) -> Result<Option<String>, String> 
             check_config(&path)?;
         }
         (None, Some(config)) => {
-            ruleset_from_hocon_str(&config).map_err(|error| error.to_string())?;
+            ruleset_from_str(&config).map_err(|error| error.to_string())?;
         }
         (None, None) => {
             return Err(format!(
@@ -167,11 +167,11 @@ fn check(args: &[String], start_index: usize) -> Result<Option<String>, String> 
 fn check_config(config: &str) -> Result<(), String> {
     if config == "-" {
         let input = read_stdin_config()?;
-        ruleset_from_hocon_str(&input)
+        ruleset_from_str(&input)
             .map(|_| ())
             .map_err(|error| error.to_string())
     } else {
-        ruleset_from_hocon_file(config)
+        ruleset_from_file(config)
             .map(|_| ())
             .map_err(|error| error.to_string())
     }
@@ -240,13 +240,13 @@ fn top_level_help() -> String {
   copperlace [render] --config <path> [--rule <name>] [--count <n>] [--set <key=value>...]
   copperlace check --config <path>
   copperlace check --config -
-  copperlace check --string <hocon>
+  copperlace check --string <config>
   copperlace --help
   copperlace --version
 
 Commands:
-  render    Render a named rule from a HOCON config file or stdin (optional when first argument is a flag)
-  check     Parse and compile a HOCON config without rendering
+  render    Render a named rule from a configuration file or stdin (optional when first argument is a flag)
+  check     Parse and compile a configuration without rendering
 
 Run `copperlace render --help` or `copperlace check --help` for command options.
 "
@@ -261,11 +261,11 @@ fn render_help() -> String {
   copperlace --version
 
 Commands:
-  render    Render a named rule from a HOCON config file or stdin (optional when first argument is a flag)
-  check     Parse and compile a HOCON config without rendering
+  render    Render a named rule from a configuration file or stdin (optional when first argument is a flag)
+  check     Parse and compile a configuration without rendering
 
 Render options:
-  -c, --config <path>    HOCON config file to load, or - to read stdin
+  -c, --config <path>    configuration file to load, or - to read stdin
   -r, --rule <name>      Rule name to render (default: origin)
   -n, --count <n>        Number of outputs to render from one loaded config
       --set <key=value>  Initial render context value; may be repeated
@@ -278,12 +278,12 @@ fn check_help() -> String {
     "Usage:
   copperlace check --config <path>
   copperlace check -c <path>
-  copperlace check --string <hocon>
-  copperlace check -s <hocon>
+  copperlace check --string <config>
+  copperlace check -s <config>
 
 Check options:
-  -c, --config <path>    HOCON config file to parse and compile, or - to read stdin
-  -s, --string <hocon>   HOCON config string to parse and compile
+  -c, --config <path>    configuration file to parse and compile, or - to read stdin
+  -s, --string <config>   configuration string to parse and compile
   -h, --help             Show check help"
         .to_string()
 }

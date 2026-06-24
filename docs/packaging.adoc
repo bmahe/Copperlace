@@ -71,8 +71,8 @@ points are:
 * `RuleSet.from_string(config, processors=None)`
 * `RuleSet.from_file(path, processors=None)`
 * `RuleSet.render(rule, context=None)`
-* `render_hocon_str(config, rule, context=None, processors=None)`
-* `render_hocon_file(path, rule, context=None, processors=None)`
+* `render_str(config, rule, context=None, processors=None)`
+* `render_file(path, rule, context=None, processors=None)`
 
 `Copperlace` is the recommended load-once API for repeated renders. `Copperlace`
 and `RuleSet` are context managers and release the native handle when closed.
@@ -93,10 +93,10 @@ Public entry points are:
 * `Copperlace.withProcessors(config, processors)`
 * `Copperlace.render(rule)`
 * `Copperlace.renderWithContext(rule, context)`
-* `renderHoconString(config, rule)`
-* `renderHoconStringWithContext(config, rule, context)`
-* `renderHoconStringWithProcessors(config, rule, processors)`
-* `renderHoconStringWithProcessorsAndContext(config, rule, processors, context)`
+* `renderString(config, rule)`
+* `renderStringWithContext(config, rule, context)`
+* `renderStringWithProcessors(config, rule, processors)`
+* `renderStringWithProcessorsAndContext(config, rule, processors, context)`
 
 `Copperlace` is the recommended load-once API for repeated renders in browser
 apps. Browser callers should load rule text themselves, usually with `fetch`,
@@ -132,14 +132,14 @@ are `dev.mahe.copperlace:copperlace`. Public entry points are:
 * `Copperlace.fromFileWithProcessors(path, processors)`
 * `Copperlace.render(rule)`
 * `Copperlace.render(rule, context)`
-* `Copperlace.renderHoconString(config, rule)`
-* `Copperlace.renderHoconString(config, rule, context)`
-* `Copperlace.renderHoconStringWithProcessors(config, rule, processors)`
-* `Copperlace.renderHoconStringWithProcessors(config, rule, context, processors)`
-* `Copperlace.renderHoconFile(path, rule)`
-* `Copperlace.renderHoconFile(path, rule, context)`
-* `Copperlace.renderHoconFileWithProcessors(path, rule, processors)`
-* `Copperlace.renderHoconFileWithProcessors(path, rule, context, processors)`
+* `Copperlace.renderString(config, rule)`
+* `Copperlace.renderString(config, rule, context)`
+* `Copperlace.renderStringWithProcessors(config, rule, processors)`
+* `Copperlace.renderStringWithProcessors(config, rule, context, processors)`
+* `Copperlace.renderFile(path, rule)`
+* `Copperlace.renderFile(path, rule, context)`
+* `Copperlace.renderFileWithProcessors(path, rule, processors)`
+* `Copperlace.renderFileWithProcessors(path, rule, context, processors)`
 * `RuleSet.fromString(config)`
 * `RuleSet.fromStringWithProcessors(config, processors)`
 * `RuleSet.fromFile(path)`
