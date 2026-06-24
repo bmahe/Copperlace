@@ -63,6 +63,13 @@ cd rust-core
 cargo run --bin copperlace -- render --config ../examples/character_scene.conf
 ----
 
+Use `-` as the config path to read HOCON from standard input:
+
+[source,sh]
+----
+cat ../examples/character_scene.conf | cargo run --bin copperlace -- render --config -
+----
+
 Render several outputs from one loaded config:
 
 [source,sh]

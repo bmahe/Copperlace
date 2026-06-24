@@ -1,4 +1,5 @@
 use std::env;
+use std::io::{self, Read};
 use std::process;
 
 use copperlace::{Copperlace, ruleset_from_hocon_file, ruleset_from_hocon_str};
@@ -54,7 +55,7 @@ fn render(args: &[String], start_index: usize) -> Result<Option<String>, String>
         match args[index].as_str() {
             "--config" | "-c" => {
                 index += 1;
-                config = Some(required_value(args, index, "--config", render_help)?);
+                config = Some(required_config_value(args, index, "--config", render_help)?);
             }
             "--rule" | "-r" => {
                 index += 1;
@@ -78,7 +79,7 @@ fn render(args: &[String], start_index: usize) -> Result<Option<String>, String>
         .ok_or_else(|| format!("missing required argument: --config\n\n{}", render_help()))?;
     let rule = rule.unwrap_or_else(|| "origin".to_string());
 
-    let copperlace = Copperlace::from_hocon_file(config).map_err(|error| error.to_string())?;
+    let copperlace = copperlace_from_render_config(&config)?;
     let mut output = String::new();
     for render_index in 0..count {
         if render_index > 0 {
@@ -92,6 +93,18 @@ fn render(args: &[String], start_index: usize) -> Result<Option<String>, String>
     }
     output.push('\n');
     Ok(Some(output))
+}
+
+fn copperlace_from_render_config(config: &str) -> Result<Copperlace, String> {
+    if config == "-" {
+        let mut input = String::new();
+        io::stdin()
+            .read_to_string(&mut input)
+            .map_err(|error| format!("failed to read config from stdin: {error}"))?;
+        Copperlace::from_hocon_str(&input).map_err(|error| error.to_string())
+    } else {
+        Copperlace::from_hocon_file(config).map_err(|error| error.to_string())
+    }
 }
 
 fn check(args: &[String], start_index: usize) -> Result<Option<String>, String> {
@@ -154,6 +167,21 @@ fn required_value(
     Ok(value.clone())
 }
 
+fn required_config_value(
+    args: &[String],
+    index: usize,
+    flag: &str,
+    help: fn() -> String,
+) -> Result<String, String> {
+    let Some(value) = args.get(index) else {
+        return Err(format!("missing value for {flag}\n\n{}", help()));
+    };
+    if value != "-" && value.starts_with('-') {
+        return Err(format!("missing value for {flag}\n\n{}", help()));
+    }
+    Ok(value.clone())
+}
+
 fn parse_count(value: &str) -> Result<usize, String> {
     let count = value
         .parse::<usize>()
@@ -181,7 +209,7 @@ fn top_level_help() -> String {
   copperlace --version
 
 Commands:
-  render    Render a named rule from a HOCON config file (optional when first argument is a flag)
+  render    Render a named rule from a HOCON config file or stdin (optional when first argument is a flag)
   check     Parse and compile a HOCON config without rendering
 
 Run `copperlace render --help` or `copperlace check --help` for command options.
@@ -197,11 +225,11 @@ fn render_help() -> String {
   copperlace --version
 
 Commands:
-  render    Render a named rule from a HOCON config file (optional when first argument is a flag)
+  render    Render a named rule from a HOCON config file or stdin (optional when first argument is a flag)
   check     Parse and compile a HOCON config without rendering
 
 Render options:
-  -c, --config <path>    HOCON config file to load
+  -c, --config <path>    HOCON config file to load, or - to read stdin
   -r, --rule <name>      Rule name to render (default: origin)
   -n, --count <n>        Number of outputs to render from one loaded config
   -h, --help             Show render help

@@ -43,12 +43,14 @@ The package builds a `copperlace` binary:
 [source,sh]
 ----
 copperlace render --config <path>
+copperlace render --config -
 copperlace render -c <path> -r <name> --count <n>
 ----
 
-The CLI renders `origin` when `--rule` is omitted. It writes rendered output,
-help, and version text to stdout. Parse, render, and argument errors are written
-to stderr and return a nonzero exit code.
+The CLI renders `origin` when `--rule` is omitted. Passing `-` as the render
+config path reads HOCON from standard input. It writes rendered output, help,
+and version text to stdout. Parse, render, and argument errors are written to
+stderr and return a nonzero exit code.
 
 == C ABI
 

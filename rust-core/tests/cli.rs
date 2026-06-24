@@ -1,5 +1,7 @@
 use std::fs;
+use std::io::Write;
 use std::process::Command;
+use std::process::Stdio;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 #[test]
@@ -143,6 +145,59 @@ fn renders_config_file_with_short_flags() {
     assert_eq!(String::from_utf8_lossy(&output.stdout).trim(), "Mia");
 
     let _ = fs::remove_file(config_path);
+}
+
+#[test]
+fn renders_config_from_stdin() {
+    let mut child = Command::new(env!("CARGO_BIN_EXE_copperlace"))
+        .args(["render", "--config", "-", "--rule", "origin"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .unwrap();
+
+    child
+        .stdin
+        .as_mut()
+        .unwrap()
+        .write_all(
+            br#"
+            name = ["Mia"]
+            origin = "{name}"
+            "#,
+        )
+        .unwrap();
+
+    let output = child.wait_with_output().unwrap();
+
+    assert!(output.status.success());
+    assert_eq!(String::from_utf8_lossy(&output.stdout).trim(), "Mia");
+}
+
+#[test]
+fn default_command_renders_config_from_stdin_with_short_flag() {
+    let mut child = Command::new(env!("CARGO_BIN_EXE_copperlace"))
+        .args(["-c", "-", "-r", "origin"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .unwrap();
+
+    child
+        .stdin
+        .as_mut()
+        .unwrap()
+        .write_all(
+            br#"
+            origin = "Mia"
+            "#,
+        )
+        .unwrap();
+
+    let output = child.wait_with_output().unwrap();
+
+    assert!(output.status.success());
+    assert_eq!(String::from_utf8_lossy(&output.stdout).trim(), "Mia");
 }
 
 #[test]
