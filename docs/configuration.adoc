@@ -200,6 +200,25 @@ rules as a top-level config value.
 mood = [vexed, wistful, astute]
 ----
 
+Arrays may contain weighted entries. A weighted entry is an object with only
+`value` and `weight` fields. The `value` field is rendered using the same rules
+as any other array element, and `weight` must be a finite non-negative number.
+If any array entry is weighted, plain entries in the same array receive weight
+`1.0`.
+
+[source,hocon]
+----
+mood = [
+  { value = vexed, weight = 6 },
+  { value = wistful, weight = 2.5 },
+  astute
+]
+----
+
+Individual zero weights are accepted, but a weighted choice must have at least
+one entry with a positive weight. Invalid weighted choices fail during
+`RuleSet` construction.
+
 An empty array is accepted during `RuleSet` construction, but rendering it fails
 with `EmptyChoice`.
 
@@ -216,9 +235,9 @@ origin = "Count: {count}"
 
 == Object Values
 
-Objects are supported only as the special top-level `context` value. Any other
-object compiles to an unsupported node and fails at render time with
-`UnsupportedValue("object")`.
+Objects are supported only as the special top-level `context` value and as
+weighted choice entries inside arrays. Any other object compiles to an
+unsupported node and fails at render time with `UnsupportedValue("object")`.
 
 [source,hocon]
 ----

@@ -1,6 +1,6 @@
 use copperlace::render::{
     BindMode, BindNode, ChoiceNode, Node, ProcessorPipelineNode, RenderError, RenderState,
-    RuleCallNode, RuleSet, UnsupportedValueNode, VariableNode, VecNode,
+    RuleCallNode, RuleSet, UnsupportedValueNode, VariableNode, VecNode, WeightedChoiceNode,
 };
 
 fn ruleset(config: &str) -> RuleSet {
@@ -134,6 +134,29 @@ fn choice_node_returns_empty_choice_for_no_children() {
     let node = ChoiceNode::new(Vec::new());
 
     assert_eq!(node.render(&mut state), Err(RenderError::EmptyChoice));
+}
+
+#[test]
+fn weighted_choice_node_renders_positive_weight_child() {
+    let rules = empty_ruleset();
+    let mut state = RenderState::new(&rules);
+    let node = WeightedChoiceNode::new(vec![
+        (Box::new("Mia".to_string()) as Box<dyn Node>, 0.0),
+        (Box::new("Darcy".to_string()) as Box<dyn Node>, 2.5),
+    ])
+    .unwrap();
+
+    assert_eq!(node.render(&mut state).unwrap(), "Darcy");
+}
+
+#[test]
+fn weighted_choice_node_rejects_all_zero_weights() {
+    let node = WeightedChoiceNode::new(vec![
+        (Box::new("Mia".to_string()) as Box<dyn Node>, 0.0),
+        (Box::new("Darcy".to_string()) as Box<dyn Node>, 0.0),
+    ]);
+
+    assert!(matches!(node, Err(RenderError::InvalidWeightedChoice(_))));
 }
 
 #[test]

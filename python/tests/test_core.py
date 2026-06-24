@@ -80,6 +80,14 @@ class CopperlaceTests(unittest.TestCase):
 
         self.assertEqual(output, "mias-story")
 
+    def test_weighted_choice(self) -> None:
+        output = render_hocon_str(
+            'origin = [{ value = "common", weight = 0 }, { value = "rare", weight = 2.5 }]',
+            "origin",
+        )
+
+        self.assertEqual(output, "rare")
+
     def test_repeated_renders_on_one_ruleset(self) -> None:
         ruleset = RuleSet.from_string('name = ["Mia"]\norigin = "{name}"')
         try:

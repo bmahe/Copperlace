@@ -6,6 +6,11 @@ fn ruleset(config: &str) -> RuleSet {
     RuleSet::from_config(value).unwrap()
 }
 
+fn ruleset_result(config: &str) -> Result<RuleSet, RenderError> {
+    let value = hocon_rs::Config::parse_str::<hocon_rs::Value>(config, None).unwrap();
+    RuleSet::from_config(value)
+}
+
 #[test]
 fn renders_from_multiple_named_rules() {
     let rules = ruleset(
@@ -217,6 +222,147 @@ fn multi_choice_rule_renders_one_allowed_value() {
     let output = rules.render_rule("origin").unwrap();
 
     assert!(["red", "blue"].contains(&output.as_str()));
+}
+
+#[test]
+fn weighted_choice_rule_renders_only_positive_weight_value() {
+    let rules = ruleset(
+        r#"
+        origin = [
+            { value = red, weight = 0 },
+            { value = blue, weight = 2.5 }
+        ]
+        "#,
+    );
+
+    assert_eq!(rules.render_rule("origin").unwrap(), "blue");
+}
+
+#[test]
+fn weighted_choice_rule_treats_plain_entries_as_weight_one() {
+    let rules = ruleset(
+        r#"
+        origin = [
+            { value = red, weight = 0 },
+            blue
+        ]
+        "#,
+    );
+
+    assert_eq!(rules.render_rule("origin").unwrap(), "blue");
+}
+
+#[test]
+fn weighted_choice_value_uses_normal_rendering_rules() {
+    let rules = ruleset(
+        r#"
+        name = ["Mia"]
+        origin = [
+            { value = "Hello {name}", weight = 1.5 }
+        ]
+        "#,
+    );
+
+    assert_eq!(rules.render_rule("origin").unwrap(), "Hello Mia");
+}
+
+#[test]
+fn weighted_choice_value_can_be_nested_array() {
+    let rules = ruleset(
+        r#"
+        origin = [
+            { value = [red], weight = 1 }
+        ]
+        "#,
+    );
+
+    assert_eq!(rules.render_rule("origin").unwrap(), "red");
+}
+
+#[test]
+fn weighted_choice_rejects_missing_value() {
+    assert!(matches!(
+        ruleset_result(
+            r#"
+            origin = [
+                { weight = 1 }
+            ]
+            "#
+        ),
+        Err(RenderError::InvalidWeightedChoice(_))
+    ));
+}
+
+#[test]
+fn weighted_choice_rejects_missing_weight() {
+    assert!(matches!(
+        ruleset_result(
+            r#"
+            origin = [
+                { value = red }
+            ]
+            "#
+        ),
+        Err(RenderError::InvalidWeightedChoice(_))
+    ));
+}
+
+#[test]
+fn weighted_choice_rejects_string_weight() {
+    assert!(matches!(
+        ruleset_result(
+            r#"
+            origin = [
+                { value = red, weight = "often" }
+            ]
+            "#
+        ),
+        Err(RenderError::InvalidWeightedChoice(_))
+    ));
+}
+
+#[test]
+fn weighted_choice_rejects_negative_weight() {
+    assert!(matches!(
+        ruleset_result(
+            r#"
+            origin = [
+                { value = red, weight = -1 }
+            ]
+            "#
+        ),
+        Err(RenderError::InvalidWeightedChoice(_))
+    ));
+}
+
+#[test]
+fn weighted_choice_rejects_all_zero_weights() {
+    assert!(matches!(
+        ruleset_result(
+            r#"
+            origin = [
+                { value = red, weight = 0 },
+                { value = blue, weight = 0 }
+            ]
+            "#
+        ),
+        Err(RenderError::InvalidWeightedChoice(_))
+    ));
+}
+
+#[test]
+fn weighted_choice_rejects_malformed_object_in_weighted_array() {
+    assert!(matches!(
+        ruleset_result(
+            r#"
+            origin = [
+                { value = red, weight = 1 },
+                { nested = blue }
+            ]
+            "#
+        ),
+        Err(RenderError::InvalidWeightedChoice(_))
+    ));
 }
 
 #[test]

@@ -72,7 +72,20 @@ origin = "The path felt {mood}."
 ----
 
 Choice elements may be strings, arrays, or scalar values. Nested object values
-are not renderable outside the special top-level `context` object.
+are not renderable outside the special top-level `context` object, except for
+weighted choice entries inside arrays.
+
+Weighted choices use object entries with `value` and `weight`. If any array
+entry is weighted, plain entries in the same array use weight `1.0`.
+
+[source,hocon]
+----
+mood = [
+  { value = common, weight = 9.5 },
+  { value = rare, weight = 0.5 },
+  ordinary
+]
+----
 
 == Bindings
 

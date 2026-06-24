@@ -97,6 +97,10 @@ Returned when a template expression is malformed, such as `{name | }` or
 `EmptyChoice`::
 Returned when rendering an array value with no elements.
 
+`InvalidWeightedChoice(String)`::
+Returned during `RuleSet` construction when a weighted choice entry is
+malformed, has a missing or invalid weight, or has no positive-weight entries.
+
 `CircularRuleReference(Vec<String>)`::
 Returned when rule expansion re-enters a rule already on the call stack. The
 vector contains the detected path, including the repeated final rule name.
@@ -115,6 +119,5 @@ object.
 The current implementation does not define these as supported behavior:
 
 * Escaping literal `{` or `}` characters in templates.
-* Weighted choices.
 * Seeded or deterministic random output.
 * Nested object rendering outside top-level `context`.

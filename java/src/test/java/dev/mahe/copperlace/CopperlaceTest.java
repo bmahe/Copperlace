@@ -123,6 +123,18 @@ final class CopperlaceTest {
     }
 
     @Test
+    void rendersWeightedChoice() {
+        assertEquals(
+                "rare",
+                Copperlace.renderHoconString("""
+                        origin = [
+                            { value = "common", weight = 0 },
+                            { value = "rare", weight = 2.5 }
+                        ]
+                        """, "origin"));
+    }
+
+    @Test
     void rejectsBlankConfig() {
         final IllegalArgumentException exception =
                 assertThrows(

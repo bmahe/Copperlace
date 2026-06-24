@@ -2,10 +2,15 @@ use std::collections::HashMap;
 use std::fmt;
 use std::sync::Arc;
 
+use rand::distr::Distribution;
+use rand::distr::weighted::WeightedIndex;
 use rand::seq::IndexedRandom;
 use regex::Regex;
 
 use crate::processors::builtin_processors;
+
+const WEIGHTED_CHOICE_VALUE_KEY: &str = "value";
+const WEIGHTED_CHOICE_WEIGHT_KEY: &str = "weight";
 
 /// Error returned while compiling or rendering Copperlace rules.
 #[derive(Debug, PartialEq, Eq)]
@@ -20,6 +25,8 @@ pub enum RenderError {
     InvalidExpression(String),
     /// An array-backed choice rule had no alternatives.
     EmptyChoice,
+    /// A weighted choice config entry is malformed.
+    InvalidWeightedChoice(String),
     /// Rendering detected a recursive rule cycle.
     CircularRuleReference(Vec<String>),
     /// A config value type was parsed but is not renderable.
@@ -42,6 +49,9 @@ impl fmt::Display for RenderError {
                 write!(formatter, "invalid template expression: {expression}")
             }
             RenderError::EmptyChoice => write!(formatter, "cannot render an empty choice"),
+            RenderError::InvalidWeightedChoice(message) => {
+                write!(formatter, "invalid weighted choice: {message}")
+            }
             RenderError::CircularRuleReference(cycle) => {
                 write!(formatter, "circular rule reference: {}", cycle.join(" -> "))
             }
@@ -429,6 +439,36 @@ impl Node for ChoiceNode {
     }
 }
 
+/// Randomly renders one child node using per-child weights.
+///
+/// Weighted choices are produced from arrays containing at least one weighted
+/// object entry, such as `{ value = "common", weight = 9 }`. Plain entries in
+/// the same array receive weight `1.0`.
+pub struct WeightedChoiceNode {
+    nodes: Vec<Box<dyn Node>>,
+    distribution: WeightedIndex<f64>,
+}
+
+impl WeightedChoiceNode {
+    /// Creates a weighted choice node from renderable alternatives and weights.
+    pub fn new(entries: Vec<(Box<dyn Node>, f64)>) -> Result<Self, RenderError> {
+        let (nodes, weights): (Vec<_>, Vec<_>) = entries.into_iter().unzip();
+        let distribution = WeightedIndex::new(weights)
+            .map_err(|error| RenderError::InvalidWeightedChoice(error.to_string()))?;
+        Ok(WeightedChoiceNode {
+            nodes,
+            distribution,
+        })
+    }
+}
+
+impl Node for WeightedChoiceNode {
+    fn render(&self, state: &mut RenderState) -> Result<String, RenderError> {
+        let index = self.distribution.sample(&mut state.rng);
+        self.nodes[index].render(state)
+    }
+}
+
 /// Renders a sequence of child nodes and concatenates their output.
 ///
 /// This is produced from string templates after splitting literal text and
@@ -464,15 +504,95 @@ fn value_to_node(
     Ok(match value {
         hocon_rs::Value::String(template) => template_to_node(&template, processors)?,
         hocon_rs::Value::Array(values) => {
-            let nodes = values
-                .into_iter()
-                .map(|value| value_to_node(value, processors))
-                .collect::<Result<Vec<_>, _>>()?;
-            Box::new(ChoiceNode::new(nodes))
+            if array_contains_weighted_entry(&values) {
+                Box::new(weighted_choice_node(values, processors)?)
+            } else {
+                let nodes = values
+                    .into_iter()
+                    .map(|value| value_to_node(value, processors))
+                    .collect::<Result<Vec<_>, _>>()?;
+                Box::new(ChoiceNode::new(nodes))
+            }
         }
         hocon_rs::Value::Object(_) => Box::new(UnsupportedValueNode::new("object".to_string())),
         _ => Box::new(value.to_string()),
     })
+}
+
+fn array_contains_weighted_entry(values: &[hocon_rs::Value]) -> bool {
+    values.iter().any(|value| {
+        matches!(
+            value,
+            hocon_rs::Value::Object(object)
+                if object.contains_key(WEIGHTED_CHOICE_VALUE_KEY)
+                    || object.contains_key(WEIGHTED_CHOICE_WEIGHT_KEY)
+        )
+    })
+}
+
+fn weighted_choice_node(
+    values: Vec<hocon_rs::Value>,
+    processors: &ProcessorRegistry,
+) -> Result<WeightedChoiceNode, RenderError> {
+    let entries = values
+        .into_iter()
+        .map(|value| weighted_choice_entry(value, processors))
+        .collect::<Result<Vec<_>, _>>()?;
+    WeightedChoiceNode::new(entries)
+}
+
+fn weighted_choice_entry(
+    value: hocon_rs::Value,
+    processors: &ProcessorRegistry,
+) -> Result<(Box<dyn Node>, f64), RenderError> {
+    let mut object = match value {
+        hocon_rs::Value::Object(object) => object,
+        value => return Ok((value_to_node(value, processors)?, 1.0)),
+    };
+
+    if !(object.contains_key(WEIGHTED_CHOICE_VALUE_KEY)
+        || object.contains_key(WEIGHTED_CHOICE_WEIGHT_KEY))
+    {
+        return Err(RenderError::InvalidWeightedChoice(format!(
+            "object entries in weighted arrays must use {WEIGHTED_CHOICE_VALUE_KEY} and {WEIGHTED_CHOICE_WEIGHT_KEY}"
+        )));
+    }
+
+    if object.len() != 2
+        || !object.contains_key(WEIGHTED_CHOICE_VALUE_KEY)
+        || !object.contains_key(WEIGHTED_CHOICE_WEIGHT_KEY)
+    {
+        return Err(RenderError::InvalidWeightedChoice(format!(
+            "weighted entries must contain only {WEIGHTED_CHOICE_VALUE_KEY} and {WEIGHTED_CHOICE_WEIGHT_KEY}"
+        )));
+    }
+
+    let weight = object.remove(WEIGHTED_CHOICE_WEIGHT_KEY).unwrap();
+    let value = object.remove(WEIGHTED_CHOICE_VALUE_KEY).unwrap();
+    let weight = weight_to_f64(weight)?;
+    Ok((value_to_node(value, processors)?, weight))
+}
+
+fn weight_to_f64(value: hocon_rs::Value) -> Result<f64, RenderError> {
+    let hocon_rs::Value::Number(number) = value else {
+        return Err(RenderError::InvalidWeightedChoice(
+            "weight must be numeric".to_string(),
+        ));
+    };
+
+    let Some(weight) = number.as_f64() else {
+        return Err(RenderError::InvalidWeightedChoice(
+            "weight must be representable as a number".to_string(),
+        ));
+    };
+
+    if !weight.is_finite() || weight < 0.0 {
+        return Err(RenderError::InvalidWeightedChoice(
+            "weight must be finite and non-negative".to_string(),
+        ));
+    }
+
+    Ok(weight)
 }
 
 fn template_to_node(
