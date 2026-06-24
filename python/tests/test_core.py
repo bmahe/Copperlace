@@ -20,6 +20,22 @@ class CopperlaceTests(unittest.TestCase):
 
             self.assertEqual(render_hocon_file(path, "origin"), "Mia")
 
+    def test_render_from_config_string_with_context(self) -> None:
+        output = render_hocon_str(
+            'context { name = "Mia" }\norigin = "Hello {name}"',
+            "origin",
+            {"name": "Darcy"},
+        )
+
+        self.assertEqual(output, "Hello Darcy")
+
+    def test_render_from_config_file_with_context(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "story.conf"
+            path.write_text('origin = "Hello {name}"', encoding="utf-8")
+
+            self.assertEqual(render_hocon_file(path, "origin", {"name": "Lina"}), "Hello Lina")
+
     def test_missing_rule_raises_error(self) -> None:
         with self.assertRaisesRegex(CopperlaceError, "unknown rule"):
             render_hocon_str('origin = "{missing}"', "origin")
@@ -96,6 +112,13 @@ class CopperlaceTests(unittest.TestCase):
         finally:
             ruleset.close()
 
+    def test_ruleset_renders_with_context(self) -> None:
+        with RuleSet.from_string(
+            'context { name = "Mia" }\nnext = "Darcy"\norigin = "{name}{name:=next}"'
+        ) as ruleset:
+            self.assertEqual(ruleset.render("origin", {"name": "Lina"}), "Lina")
+            self.assertEqual(ruleset.render("origin", {"name": "Lina"}), "Lina")
+
     def test_repeated_renders_on_one_copperlace_instance(self) -> None:
         copperlace = Copperlace.from_string(
             'name = ["Mia"]\npet = ["owl"]\norigin = "{name}"\ncompanion = "{name} and {pet}"'
@@ -106,6 +129,20 @@ class CopperlaceTests(unittest.TestCase):
             self.assertEqual(copperlace.render("origin"), "Mia")
         finally:
             copperlace.close()
+
+    def test_copperlace_renders_with_context(self) -> None:
+        with Copperlace.from_string('origin = "{name}"') as copperlace:
+            self.assertEqual(copperlace.render("origin", {"name": "Mia"}), "Mia")
+
+    def test_context_rejects_non_string_key(self) -> None:
+        with RuleSet.from_string('origin = "{name}"') as ruleset:
+            with self.assertRaisesRegex(TypeError, "context keys"):
+                ruleset.render("origin", {1: "Mia"})  # type: ignore[dict-item]
+
+    def test_context_rejects_non_string_value(self) -> None:
+        with RuleSet.from_string('origin = "{name}"') as ruleset:
+            with self.assertRaisesRegex(TypeError, "context values"):
+                ruleset.render("origin", {"name": 1})  # type: ignore[dict-item]
 
     def test_copperlace_loads_from_file(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

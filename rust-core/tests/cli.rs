@@ -175,6 +175,168 @@ fn renders_config_from_stdin() {
 }
 
 #[test]
+fn renders_with_initial_context() {
+    let config_path = write_temp_config(
+        r#"
+        context {
+            name = "Mia"
+        }
+        origin = "Hello {name}"
+        "#,
+    );
+    let output = Command::new(env!("CARGO_BIN_EXE_copperlace"))
+        .args([
+            "render",
+            "--config",
+            &config_path.to_string_lossy(),
+            "--rule",
+            "origin",
+            "--set",
+            "name=Darcy",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    assert_eq!(
+        String::from_utf8_lossy(&output.stdout).trim(),
+        "Hello Darcy"
+    );
+
+    let _ = fs::remove_file(config_path);
+}
+
+#[test]
+fn repeated_context_keys_use_last_value() {
+    let config_path = write_temp_config(
+        r#"
+        origin = "{name}"
+        "#,
+    );
+    let output = Command::new(env!("CARGO_BIN_EXE_copperlace"))
+        .args([
+            "render",
+            "--config",
+            &config_path.to_string_lossy(),
+            "--set",
+            "name=Mia",
+            "--set",
+            "name=Lina",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    assert_eq!(String::from_utf8_lossy(&output.stdout).trim(), "Lina");
+
+    let _ = fs::remove_file(config_path);
+}
+
+#[test]
+fn renders_empty_context_value() {
+    let config_path = write_temp_config(
+        r#"
+        origin = "Hello{name}"
+        "#,
+    );
+    let output = Command::new(env!("CARGO_BIN_EXE_copperlace"))
+        .args([
+            "render",
+            "--config",
+            &config_path.to_string_lossy(),
+            "--set",
+            "name=",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    assert_eq!(String::from_utf8_lossy(&output.stdout).trim(), "Hello");
+
+    let _ = fs::remove_file(config_path);
+}
+
+#[test]
+fn render_count_reuses_initial_context_without_persisting_overwrites() {
+    let config_path = write_temp_config(
+        r#"
+        next = "Darcy"
+        origin = "{name}{name:=next}"
+        "#,
+    );
+    let output = Command::new(env!("CARGO_BIN_EXE_copperlace"))
+        .args([
+            "render",
+            "--config",
+            &config_path.to_string_lossy(),
+            "--set",
+            "name=Mia",
+            "--count",
+            "2",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    assert_eq!(
+        String::from_utf8_lossy(&output.stdout)
+            .lines()
+            .collect::<Vec<_>>(),
+        vec!["Mia", "Mia"]
+    );
+
+    let _ = fs::remove_file(config_path);
+}
+
+#[test]
+fn rejects_set_without_equals() {
+    let config_path = write_temp_config(
+        r#"
+        origin = "Mia"
+        "#,
+    );
+    let output = Command::new(env!("CARGO_BIN_EXE_copperlace"))
+        .args([
+            "render",
+            "--config",
+            &config_path.to_string_lossy(),
+            "--set",
+            "name",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("--set must use key=value"));
+
+    let _ = fs::remove_file(config_path);
+}
+
+#[test]
+fn rejects_set_with_empty_key() {
+    let config_path = write_temp_config(
+        r#"
+        origin = "Mia"
+        "#,
+    );
+    let output = Command::new(env!("CARGO_BIN_EXE_copperlace"))
+        .args([
+            "render",
+            "--config",
+            &config_path.to_string_lossy(),
+            "--set",
+            "=Mia",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("--set key must not be empty"));
+
+    let _ = fs::remove_file(config_path);
+}
+
+#[test]
 fn default_command_renders_config_from_stdin_with_short_flag() {
     let mut child = Command::new(env!("CARGO_BIN_EXE_copperlace"))
         .args(["-c", "-", "-r", "origin"])

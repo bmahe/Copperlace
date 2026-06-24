@@ -1,6 +1,8 @@
 package dev.mahe.copperlace;
 
 import java.nio.file.Path;
+import java.util.Map;
+import java.util.Objects;
 
 import org.apache.commons.lang3.Validate;
 
@@ -84,6 +86,32 @@ public final class Copperlace implements AutoCloseable {
     }
 
     /**
+     * Renders one rule from a HOCON config string with initial context values.
+     *
+     * <p>This convenience method compiles the config, renders one rule, and
+     * releases the native ruleset. Use {@link #fromString(String)} for repeated
+     * renders from the same config.
+     *
+     * @param config HOCON config text containing Copperlace rules
+     * @param rule name of the rule to render
+     * @param context initial render context values
+     * @return rendered text for {@code rule}
+     * @throws NullPointerException if {@code context}, a context key, or a context value is null
+     * @throws IllegalArgumentException if {@code config} or {@code rule} is blank
+     * @throws CopperlaceException if parsing, compilation, or rendering fails
+     */
+    public static String renderHoconString(
+            final String config, final String rule, final Map<String, String> context) {
+        Validate.notBlank(config, "config must not be blank");
+        Validate.notBlank(rule, "rule must not be blank");
+        Objects.requireNonNull(context, "context");
+
+        try (final Copperlace copperlace = Copperlace.fromString(config)) {
+            return copperlace.render(rule, context);
+        }
+    }
+
+    /**
      * Renders one rule from a HOCON config file.
      *
      * <p>This convenience method loads and compiles the file, renders one rule,
@@ -103,6 +131,31 @@ public final class Copperlace implements AutoCloseable {
 
         try (final Copperlace copperlace = Copperlace.fromFile(path)) {
             return copperlace.render(rule);
+        }
+    }
+
+    /**
+     * Renders one rule from a HOCON config file with initial context values.
+     *
+     * <p>This convenience method loads and compiles the file, renders one rule,
+     * and releases the native ruleset. Use {@link #fromFile(Path)} for repeated
+     * renders from the same config.
+     *
+     * @param path path to the HOCON config file
+     * @param rule name of the rule to render
+     * @param context initial render context values
+     * @return rendered text for {@code rule}
+     * @throws NullPointerException if {@code path}, {@code context}, a context key, or a context value is null
+     * @throws IllegalArgumentException if {@code rule} is blank
+     * @throws CopperlaceException if loading, parsing, compilation, or rendering fails
+     */
+    public static String renderHoconFile(final Path path, final String rule, final Map<String, String> context) {
+        Validate.notNull(path, "path must not be null");
+        Validate.notBlank(rule, "rule must not be blank");
+        Objects.requireNonNull(context, "context");
+
+        try (final Copperlace copperlace = Copperlace.fromFile(path)) {
+            return copperlace.render(rule, context);
         }
     }
 
@@ -127,6 +180,29 @@ public final class Copperlace implements AutoCloseable {
     }
 
     /**
+     * Renders one rule from a HOCON config file with initial context values.
+     *
+     * <p>This convenience method loads and compiles the file, renders one rule,
+     * and releases the native ruleset. Use {@link #fromFile(String)} for
+     * repeated renders from the same config.
+     *
+     * @param path path to the HOCON config file
+     * @param rule name of the rule to render
+     * @param context initial render context values
+     * @return rendered text for {@code rule}
+     * @throws NullPointerException if {@code context}, a context key, or a context value is null
+     * @throws IllegalArgumentException if {@code path} or {@code rule} is blank
+     * @throws CopperlaceException if loading, parsing, compilation, or rendering fails
+     */
+    public static String renderHoconFile(final String path, final String rule, final Map<String, String> context) {
+        Validate.notBlank(path, "path must not be blank");
+        Validate.notBlank(rule, "rule must not be blank");
+        Objects.requireNonNull(context, "context");
+
+        return renderHoconFile(Path.of(path), rule, context);
+    }
+
+    /**
      * Renders a named rule from the loaded config.
      *
      * <p>Each call uses a fresh render context, so per-render bindings are
@@ -140,6 +216,25 @@ public final class Copperlace implements AutoCloseable {
     public String render(final String rule) {
         Validate.notBlank(rule, "rule must not be blank");
         return ruleset.render(rule);
+    }
+
+    /**
+     * Renders a named rule from the loaded config with initial context values.
+     *
+     * <p>The provided context is scoped to this render only. Values resolve
+     * before config-defined {@code context} defaults and named rules.
+     *
+     * @param rule name of the rule to render
+     * @param context initial render context values
+     * @return rendered text for {@code rule}
+     * @throws NullPointerException if {@code context}, a context key, or a context value is null
+     * @throws IllegalArgumentException if {@code rule} is blank
+     * @throws CopperlaceException if this renderer is closed or rendering fails
+     */
+    public String render(final String rule, final Map<String, String> context) {
+        Validate.notBlank(rule, "rule must not be blank");
+        Objects.requireNonNull(context, "context");
+        return ruleset.render(rule, context);
     }
 
     /**

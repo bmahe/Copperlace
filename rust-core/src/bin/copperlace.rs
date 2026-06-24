@@ -2,7 +2,7 @@ use std::env;
 use std::io::{self, Read};
 use std::process;
 
-use copperlace::{Copperlace, ruleset_from_hocon_file, ruleset_from_hocon_str};
+use copperlace::{Copperlace, RenderContext, ruleset_from_hocon_file, ruleset_from_hocon_str};
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -48,6 +48,7 @@ fn run(args: &[String]) -> Result<Option<String>, String> {
 fn render(args: &[String], start_index: usize) -> Result<Option<String>, String> {
     let mut config = None;
     let mut rule = None;
+    let mut context = RenderContext::new();
     let mut count = 1usize;
     let mut index = start_index;
 
@@ -65,6 +66,12 @@ fn render(args: &[String], start_index: usize) -> Result<Option<String>, String>
                 index += 1;
                 let value = required_value(args, index, "--count", render_help)?;
                 count = parse_count(&value)?;
+            }
+            "--set" => {
+                index += 1;
+                let value = required_value(args, index, "--set", render_help)?;
+                let (key, context_value) = parse_context_binding(&value)?;
+                context.insert(key, context_value);
             }
             "--help" | "-h" => return Ok(Some(render_help())),
             "--version" | "-V" => {
@@ -87,7 +94,7 @@ fn render(args: &[String], start_index: usize) -> Result<Option<String>, String>
         }
         output.push_str(
             &copperlace
-                .render(&rule)
+                .render_with_context(&rule, context.clone())
                 .map_err(|error| error.to_string())?,
         );
     }
@@ -210,6 +217,16 @@ fn parse_count(value: &str) -> Result<usize, String> {
     Ok(count)
 }
 
+fn parse_context_binding(value: &str) -> Result<(String, String), String> {
+    let Some((key, context_value)) = value.split_once('=') else {
+        return Err(format!("--set must use key=value: {value}"));
+    };
+    if key.is_empty() {
+        return Err("--set key must not be empty".to_string());
+    }
+    Ok((key.to_string(), context_value.to_string()))
+}
+
 fn help() -> String {
     format!(
         "Copperlace {}\n\n{}",
@@ -220,7 +237,7 @@ fn help() -> String {
 
 fn top_level_help() -> String {
     "Usage:
-  copperlace [render] --config <path> [--rule <name>] [--count <n>]
+  copperlace [render] --config <path> [--rule <name>] [--count <n>] [--set <key=value>...]
   copperlace check --config <path>
   copperlace check --config -
   copperlace check --string <hocon>
@@ -238,8 +255,8 @@ Run `copperlace render --help` or `copperlace check --help` for command options.
 
 fn render_help() -> String {
     "Usage:
-  copperlace [render] --config <path> [--rule <name>] [--count <n>]
-  copperlace [render] -c <path> [-r <name>] [-n <n>]
+  copperlace [render] --config <path> [--rule <name>] [--count <n>] [--set <key=value>...]
+  copperlace [render] -c <path> [-r <name>] [-n <n>] [--set <key=value>...]
   copperlace --help
   copperlace --version
 
@@ -251,6 +268,7 @@ Render options:
   -c, --config <path>    HOCON config file to load, or - to read stdin
   -r, --rule <name>      Rule name to render (default: origin)
   -n, --count <n>        Number of outputs to render from one loaded config
+      --set <key=value>  Initial render context value; may be repeated
   -h, --help             Show render help
   -V, --version          Show version"
         .to_string()

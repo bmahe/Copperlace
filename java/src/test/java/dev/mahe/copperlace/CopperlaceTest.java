@@ -7,6 +7,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashMap;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 
 final class CopperlaceTest {
@@ -30,6 +32,32 @@ final class CopperlaceTest {
                     """);
 
             assertEquals("Mia", Copperlace.renderHoconFile(config, "origin"));
+        } finally {
+            Files.deleteIfExists(config);
+        }
+    }
+
+    @Test
+    void rendersFromStringWithContext() {
+        assertEquals(
+                "Hello Darcy",
+                Copperlace.renderHoconString("""
+                        context {
+                            name = "Mia"
+                        }
+                        origin = "Hello {name}"
+                        """, "origin", Map.of("name", "Darcy")));
+    }
+
+    @Test
+    void rendersFromFileWithContext() throws IOException {
+        final Path config = Files.createTempFile("copperlace", ".conf");
+        try {
+            Files.writeString(config, """
+                    origin = "Hello {name}"
+                    """);
+
+            assertEquals("Hello Lina", Copperlace.renderHoconFile(config, "origin", Map.of("name", "Lina")));
         } finally {
             Files.deleteIfExists(config);
         }
@@ -195,6 +223,20 @@ final class CopperlaceTest {
     }
 
     @Test
+    void rulesetRendersWithContext() {
+        try (final RuleSet rules = RuleSet.fromString("""
+                context {
+                    name = "Mia"
+                }
+                next = "Darcy"
+                origin = "{name}{name:=next}"
+                """)) {
+            assertEquals("Lina", rules.render("origin", Map.of("name", "Lina")));
+            assertEquals("Lina", rules.render("origin", Map.of("name", "Lina")));
+        }
+    }
+
+    @Test
     void rendersRepeatedlyFromOneCopperlaceInstance() {
         try (final Copperlace copperlace = Copperlace.fromString("""
                 name = ["Mia"]
@@ -205,6 +247,48 @@ final class CopperlaceTest {
             assertEquals("Mia", copperlace.render("origin"));
             assertEquals("Mia and owl", copperlace.render("companion"));
             assertEquals("Mia", copperlace.render("origin"));
+        }
+    }
+
+    @Test
+    void copperlaceRendersWithContext() {
+        try (final Copperlace copperlace = Copperlace.fromString("""
+                origin = "{name}"
+                """)) {
+            assertEquals("Mia", copperlace.render("origin", Map.of("name", "Mia")));
+        }
+    }
+
+    @Test
+    void renderWithContextRejectsNullContext() {
+        try (final RuleSet rules = RuleSet.fromString("""
+                origin = "{name}"
+                """)) {
+            assertThrows(NullPointerException.class, () -> rules.render("origin", null));
+        }
+    }
+
+    @Test
+    void renderWithContextRejectsNullContextKey() {
+        final Map<String, String> context = new HashMap<>();
+        context.put(null, "Mia");
+
+        try (final RuleSet rules = RuleSet.fromString("""
+                origin = "{name}"
+                """)) {
+            assertThrows(NullPointerException.class, () -> rules.render("origin", context));
+        }
+    }
+
+    @Test
+    void renderWithContextRejectsNullContextValue() {
+        final Map<String, String> context = new HashMap<>();
+        context.put("name", null);
+
+        try (final RuleSet rules = RuleSet.fromString("""
+                origin = "{name}"
+                """)) {
+            assertThrows(NullPointerException.class, () -> rules.render("origin", context));
         }
     }
 

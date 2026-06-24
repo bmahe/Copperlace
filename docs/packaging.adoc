@@ -32,11 +32,13 @@ The CLI supports:
 [source,sh]
 ----
 copperlace render --config <path>
-copperlace render -c <path> -r <name> --count <n>
+copperlace render -c <path> -r <name> --count <n> --set name=Mia
 ----
 
 CLI rendering uses the builtin processor registry. If `--rule` is omitted, the
 CLI renders `origin`. `--count` renders multiple outputs from one loaded config.
+`--set key=value` provides initial context values for each render and may be
+repeated; duplicate keys use the last value.
 
 == C ABI
 
@@ -45,6 +47,7 @@ The native dynamic library exposes an opaque ruleset handle API:
 * `copperlace_ruleset_from_file`
 * `copperlace_ruleset_from_string`
 * `copperlace_ruleset_render`
+* `copperlace_ruleset_render_with_context`
 * `copperlace_ruleset_free`
 * `copperlace_string_free`
 
@@ -59,12 +62,12 @@ points are:
 
 * `Copperlace.from_string(config)`
 * `Copperlace.from_file(path)`
-* `Copperlace.render(rule)`
+* `Copperlace.render(rule, context=None)`
 * `RuleSet.from_string(config)`
 * `RuleSet.from_file(path)`
-* `RuleSet.render(rule)`
-* `render_hocon_str(config, rule)`
-* `render_hocon_file(path, rule)`
+* `RuleSet.render(rule, context=None)`
+* `render_hocon_str(config, rule, context=None)`
+* `render_hocon_file(path, rule, context=None)`
 
 `Copperlace` is the recommended load-once API for repeated renders. `Copperlace`
 and `RuleSet` are context managers and release the native handle when closed.
@@ -82,7 +85,9 @@ Public entry points are:
 
 * `new Copperlace(config)`
 * `Copperlace.render(rule)`
+* `Copperlace.renderWithContext(rule, context)`
 * `renderHoconString(config, rule)`
+* `renderHoconStringWithContext(config, rule, context)`
 
 `Copperlace` is the recommended load-once API for repeated renders in browser
 apps. Browser callers should load HOCON text themselves, usually with `fetch`,
@@ -114,11 +119,15 @@ are `dev.mahe.copperlace:copperlace`. Public entry points are:
 * `Copperlace.fromString(config)`
 * `Copperlace.fromFile(path)`
 * `Copperlace.render(rule)`
+* `Copperlace.render(rule, context)`
 * `Copperlace.renderHoconString(config, rule)`
+* `Copperlace.renderHoconString(config, rule, context)`
 * `Copperlace.renderHoconFile(path, rule)`
+* `Copperlace.renderHoconFile(path, rule, context)`
 * `RuleSet.fromString(config)`
 * `RuleSet.fromFile(path)`
 * `RuleSet.render(rule)`
+* `RuleSet.render(rule, context)`
 
 `Copperlace` is the recommended load-once API for repeated renders. `Copperlace`
 and `RuleSet` implement `AutoCloseable`; callers should use try-with-resources

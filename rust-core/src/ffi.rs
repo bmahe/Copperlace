@@ -3,7 +3,7 @@ use std::os::raw::{c_char, c_int};
 use std::ptr;
 
 use crate::config::{ruleset_from_hocon_file, ruleset_from_hocon_str};
-use crate::render::RuleSet;
+use crate::render::{RenderContext, RuleSet};
 
 /// Status code for a successful C ABI call.
 pub const COPPERLACE_OK: c_int = 0;
@@ -95,6 +95,38 @@ pub extern "C" fn copperlace_ruleset_render(
     out_string: *mut *mut c_char,
     out_error: *mut *mut c_char,
 ) -> c_int {
+    copperlace_ruleset_render_with_context(
+        handle,
+        rule,
+        ptr::null(),
+        ptr::null(),
+        0,
+        out_string,
+        out_error,
+    )
+}
+
+/// Renders a named rule from a ruleset handle with initial context values.
+///
+/// `context_keys` and `context_values` are parallel arrays of UTF-8 C strings.
+/// They may be null only when `context_len` is zero. Duplicate keys are allowed;
+/// later entries replace earlier entries.
+///
+/// On success, writes an owned UTF-8 string to `out_string` and returns
+/// [`COPPERLACE_OK`]. On failure, writes null to `out_string`, writes an owned
+/// error string to `out_error` when provided, and returns a nonzero status code.
+/// Returned output and error strings must be released with
+/// `copperlace_string_free`.
+#[unsafe(no_mangle)]
+pub extern "C" fn copperlace_ruleset_render_with_context(
+    handle: *const CopperlaceRuleSet,
+    rule: *const c_char,
+    context_keys: *const *const c_char,
+    context_values: *const *const c_char,
+    context_len: usize,
+    out_string: *mut *mut c_char,
+    out_error: *mut *mut c_char,
+) -> c_int {
     clear_out_error(out_error);
     write_null_string(out_string);
 
@@ -106,9 +138,12 @@ pub extern "C" fn copperlace_ruleset_render(
     let Some(rule) = read_c_string(rule, out_error) else {
         return COPPERLACE_INVALID_ARGUMENT;
     };
+    let Some(context) = read_context(context_keys, context_values, context_len, out_error) else {
+        return COPPERLACE_INVALID_ARGUMENT;
+    };
 
     let ruleset = unsafe { &(*handle).ruleset };
-    match ruleset.render_rule(&rule) {
+    match ruleset.render_rule_with_context(&rule, context) {
         Ok(output) => {
             if write_out_string(out_string, &output) {
                 COPPERLACE_OK
@@ -122,6 +157,36 @@ pub extern "C" fn copperlace_ruleset_render(
             COPPERLACE_RENDER_ERROR
         }
     }
+}
+
+fn read_context(
+    keys: *const *const c_char,
+    values: *const *const c_char,
+    len: usize,
+    out_error: *mut *mut c_char,
+) -> Option<RenderContext> {
+    let mut context = RenderContext::new();
+    if len == 0 {
+        return Some(context);
+    }
+    if keys.is_null() {
+        write_out_string(out_error, "context keys array is null");
+        return None;
+    }
+    if values.is_null() {
+        write_out_string(out_error, "context values array is null");
+        return None;
+    }
+
+    for index in 0..len {
+        let key_ptr = unsafe { *keys.add(index) };
+        let value_ptr = unsafe { *values.add(index) };
+        let key = read_c_string(key_ptr, out_error)?;
+        let value = read_c_string(value_ptr, out_error)?;
+        context.insert(key, value);
+    }
+
+    Some(context)
 }
 
 /// Releases a ruleset handle returned by the C ABI.

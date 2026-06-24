@@ -31,7 +31,7 @@ Use this shape with Vite, Webpack, SvelteKit, Next, or similar bundlers:
 
 [source,ts]
 ----
-import { Copperlace, renderHoconString } from "./pkg/copperlace";
+import { Copperlace, renderHoconString, renderHoconStringWithContext } from "./pkg/copperlace";
 
 const config = `
 name = ["Mia", "Lina"]
@@ -41,8 +41,10 @@ origin = "Hello {name}"
 const copperlace = new Copperlace(config);
 const first = copperlace.render("origin");
 const second = copperlace.render("origin");
+const seeded = copperlace.renderWithContext("origin", { name: "Darcy" });
 
 const oneShot = renderHoconString(config, "origin");
+const seededOneShot = renderHoconStringWithContext(config, "origin", { name: "Lina" });
 ----
 
 == Direct Browser Usage
@@ -72,8 +74,15 @@ Compiles HOCON config once and returns a renderer for repeated renders.
 `Copperlace.render(rule: string): string`::
 Renders a named rule. Each call uses a fresh render context.
 
+`Copperlace.renderWithContext(rule: string, context: Record<string, string>): string`::
+Renders a named rule with initial context values for this render only.
+
 `renderHoconString(config: string, rule: string): string`::
 Compiles config, renders one rule, and releases the compiled ruleset.
+
+`renderHoconStringWithContext(config: string, rule: string, context: Record<string, string>): string`::
+Compiles config, renders one rule with initial context values, and releases the
+compiled ruleset.
 
 Parsing and rendering failures are thrown as JavaScript exceptions with the
 same messages returned by the Rust renderer.

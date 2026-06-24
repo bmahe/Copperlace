@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ctypes
+from collections.abc import Mapping
 from pathlib import Path
 from types import TracebackType
 from typing import Self
@@ -64,14 +65,16 @@ class RuleSet:
         except NativeError as error:
             raise CopperlaceError(str(error)) from error
 
-    def render(self, rule: str) -> str:
+    def render(self, rule: str, context: Mapping[str, str] | None = None) -> str:
         """Render a named rule from this ruleset.
 
         Each call uses a fresh render context, so per-render bindings are
         consistent within one output but do not carry over to later renders.
+        ``context`` provides initial string bindings for this render only.
 
         Args:
             rule: Name of the rule to render.
+            context: Optional initial render context values.
 
         Returns:
             Rendered text for the requested rule.
@@ -81,6 +84,15 @@ class RuleSet:
         """
 
         self._ensure_open()
+        if context is not None:
+            validated_context = _validate_context(context)
+            try:
+                return native().ruleset_render_with_context(
+                    self._handle, rule, validated_context
+                )
+            except NativeError as error:
+                raise CopperlaceError(str(error)) from error
+
         try:
             return native().ruleset_render(self._handle, rule)
         except NativeError as error:
@@ -164,11 +176,12 @@ class Copperlace:
 
         return cls(RuleSet.from_file(path))
 
-    def render(self, rule: str) -> str:
+    def render(self, rule: str, context: Mapping[str, str] | None = None) -> str:
         """Render a named rule from the loaded config.
 
         Args:
             rule: Name of the rule to render.
+            context: Optional initial render context values.
 
         Returns:
             Rendered text for the requested rule.
@@ -177,7 +190,7 @@ class Copperlace:
             CopperlaceError: If the renderer is closed or rendering fails.
         """
 
-        return self._ruleset.render(rule)
+        return self._ruleset.render(rule, context)
 
     def close(self) -> None:
         """Release the underlying native ruleset handle."""
@@ -203,7 +216,9 @@ class Copperlace:
             pass
 
 
-def render_hocon_str(config: str, rule: str) -> str:
+def render_hocon_str(
+    config: str, rule: str, context: Mapping[str, str] | None = None
+) -> str:
     """Render one rule from a HOCON config string.
 
     This convenience helper compiles the config, renders one rule, and releases
@@ -212,6 +227,7 @@ def render_hocon_str(config: str, rule: str) -> str:
     Args:
         config: HOCON config text containing Copperlace rules.
         rule: Name of the rule to render.
+        context: Optional initial render context values.
 
     Returns:
         Rendered text for the requested rule.
@@ -221,10 +237,12 @@ def render_hocon_str(config: str, rule: str) -> str:
     """
 
     with RuleSet.from_string(config) as ruleset:
-        return ruleset.render(rule)
+        return ruleset.render(rule, context)
 
 
-def render_hocon_file(path: str | Path, rule: str) -> str:
+def render_hocon_file(
+    path: str | Path, rule: str, context: Mapping[str, str] | None = None
+) -> str:
     """Render one rule from a HOCON config file.
 
     This convenience helper loads the file, renders one rule, and releases the
@@ -233,6 +251,7 @@ def render_hocon_file(path: str | Path, rule: str) -> str:
     Args:
         path: Path to the HOCON config file.
         rule: Name of the rule to render.
+        context: Optional initial render context values.
 
     Returns:
         Rendered text for the requested rule.
@@ -242,4 +261,15 @@ def render_hocon_file(path: str | Path, rule: str) -> str:
     """
 
     with RuleSet.from_file(path) as ruleset:
-        return ruleset.render(rule)
+        return ruleset.render(rule, context)
+
+
+def _validate_context(context: Mapping[str, str]) -> dict[str, str]:
+    validated = dict[str, str]()
+    for key, value in context.items():
+        if not isinstance(key, str):
+            raise TypeError("context keys must be strings")
+        if not isinstance(value, str):
+            raise TypeError("context values must be strings")
+        validated[key] = value
+    return validated

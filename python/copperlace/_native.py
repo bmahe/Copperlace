@@ -3,6 +3,7 @@ from __future__ import annotations
 import ctypes
 import os
 import platform
+from collections.abc import Mapping
 from pathlib import Path
 
 
@@ -60,6 +61,31 @@ class NativeLibrary:
         finally:
             self.string_free(output)
 
+    def ruleset_render_with_context(
+        self, handle: ctypes.c_void_p, rule: str, context: Mapping[str, str]
+    ) -> str:
+        encoded_keys = [key.encode("utf-8") for key in context.keys()]
+        encoded_values = [value.encode("utf-8") for value in context.values()]
+        keys = (ctypes.c_char_p * len(encoded_keys))(*encoded_keys)
+        values = (ctypes.c_char_p * len(encoded_values))(*encoded_values)
+
+        output = ctypes.c_void_p()
+        error = ctypes.c_void_p()
+        status = self._library.copperlace_ruleset_render_with_context(
+            handle,
+            rule.encode("utf-8"),
+            keys,
+            values,
+            ctypes.c_size_t(len(encoded_keys)),
+            ctypes.byref(output),
+            ctypes.byref(error),
+        )
+        self._raise_for_status(status, error)
+        try:
+            return ctypes.string_at(output).decode("utf-8")
+        finally:
+            self.string_free(output)
+
     def ruleset_free(self, handle: ctypes.c_void_p) -> None:
         self._library.copperlace_ruleset_free(handle)
 
@@ -88,6 +114,17 @@ class NativeLibrary:
             ctypes.POINTER(ctypes.c_void_p),
         ]
         self._library.copperlace_ruleset_render.restype = ctypes.c_int
+
+        self._library.copperlace_ruleset_render_with_context.argtypes = [
+            ctypes.c_void_p,
+            ctypes.c_char_p,
+            ctypes.POINTER(ctypes.c_char_p),
+            ctypes.POINTER(ctypes.c_char_p),
+            ctypes.c_size_t,
+            ctypes.POINTER(ctypes.c_void_p),
+            ctypes.POINTER(ctypes.c_void_p),
+        ]
+        self._library.copperlace_ruleset_render_with_context.restype = ctypes.c_int
 
         self._library.copperlace_ruleset_free.argtypes = [ctypes.c_void_p]
         self._library.copperlace_ruleset_free.restype = None

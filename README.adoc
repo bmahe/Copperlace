@@ -78,6 +78,13 @@ Render several outputs from one loaded config:
 cargo run --bin copperlace -- render -c ../examples/character_scene.conf --count 3
 ----
 
+Provide initial context values for a render:
+
+[source,sh]
+----
+cargo run --bin copperlace -- render -c ../examples/character_scene.conf --set hero=Mia
+----
+
 More runnable examples live in link:examples/README.adoc[examples/], covering
 story text, game item cards, gendered pronouns, JSON item data, product copy,
 release notes, and quest logs.
@@ -96,6 +103,10 @@ use copperlace::Copperlace;
 let copperlace = Copperlace::from_hocon_file("examples/character_scene.conf")?;
 let first = copperlace.render("origin")?;
 let second = copperlace.render("origin")?;
+let seeded = copperlace.render_with_context(
+    "origin",
+    [("hero".to_string(), "Mia".to_string())].into(),
+)?;
 ----
 
 One-shot helpers are also available when repeated rendering is not needed:
@@ -111,6 +122,7 @@ from copperlace import Copperlace
 with Copperlace.from_file("examples/character_scene.conf") as copperlace:
     first = copperlace.render("origin")
     second = copperlace.render("origin")
+    seeded = copperlace.render("origin", {"hero": "Mia"})
 ----
 
 Python also exposes `RuleSet`, `render_hocon_file`, and `render_hocon_str`.
@@ -121,10 +133,12 @@ Wrapper errors are raised as `CopperlaceError`.
 [source,java]
 ----
 import dev.mahe.copperlace.Copperlace;
+import java.util.Map;
 
 try (final Copperlace copperlace = Copperlace.fromFile("examples/character_scene.conf")) {
     final String first = copperlace.render("origin");
     final String second = copperlace.render("origin");
+    final String seeded = copperlace.render("origin", Map.of("hero", "Mia"));
 }
 ----
 
@@ -142,6 +156,7 @@ const response = await fetch("/config.conf");
 const config = await response.text();
 const copperlace = new Copperlace(config);
 const output = copperlace.render("origin");
+const seeded = copperlace.renderWithContext("origin", { hero: "Mia" });
 ----
 
 The JS/TS package is generated with `wasm-pack`. Bundler output can be imported

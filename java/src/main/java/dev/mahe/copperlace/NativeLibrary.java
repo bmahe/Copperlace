@@ -13,6 +13,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -29,6 +30,7 @@ final class NativeLibrary {
     private final MethodHandle rulesetFromFile;
     private final MethodHandle rulesetFromString;
     private final MethodHandle rulesetRender;
+    private final MethodHandle rulesetRenderWithContext;
     private final MethodHandle rulesetFree;
     private final MethodHandle stringFree;
 
@@ -63,6 +65,19 @@ final class NativeLibrary {
                         ValueLayout.ADDRESS,
                         ValueLayout.ADDRESS,
                         ValueLayout.ADDRESS));
+        rulesetRenderWithContext = downcall(
+                linker,
+                lookup,
+                "copperlace_ruleset_render_with_context",
+                FunctionDescriptor.of(
+                        ValueLayout.JAVA_INT,
+                        ValueLayout.ADDRESS,
+                        ValueLayout.ADDRESS,
+                        ValueLayout.ADDRESS,
+                        ValueLayout.ADDRESS,
+                        ValueLayout.JAVA_LONG,
+                        ValueLayout.ADDRESS,
+                        ValueLayout.ADDRESS));
         rulesetFree = downcall(
                 linker,
                 lookup,
@@ -90,6 +105,56 @@ final class NativeLibrary {
             throw exception;
         } catch (final Throwable throwable) {
             throw new CopperlaceException("Failed to create Copperlace ruleset", throwable);
+        }
+    }
+
+    String renderWithContext(final MemorySegment handle, final String rule, final Map<String, String> context) {
+        Validate.isTrue(!isNull(handle), "handle must not be null");
+        Validate.notBlank(rule, "rule must not be blank");
+        Objects.requireNonNull(context, "context");
+
+        try (Arena arena = Arena.ofConfined()) {
+            final MemorySegment outString = arena.allocate(ValueLayout.ADDRESS);
+            final MemorySegment outError = arena.allocate(ValueLayout.ADDRESS);
+            final MemorySegment ruleString = arena.allocateFrom(rule);
+            final long contextLength = context.size();
+            final long contextBytes = ValueLayout.ADDRESS.byteSize() * contextLength;
+            final MemorySegment contextKeys = contextLength == 0
+                    ? MemorySegment.NULL
+                    : arena.allocate(contextBytes, ValueLayout.ADDRESS.byteAlignment());
+            final MemorySegment contextValues = contextLength == 0
+                    ? MemorySegment.NULL
+                    : arena.allocate(contextBytes, ValueLayout.ADDRESS.byteAlignment());
+
+            long index = 0;
+            for (final Map.Entry<String, String> entry : context.entrySet()) {
+                final String key = Objects.requireNonNull(entry.getKey(), "context key");
+                final String value = Objects.requireNonNull(entry.getValue(), "context value");
+                contextKeys.setAtIndex(ValueLayout.ADDRESS, index, arena.allocateFrom(key));
+                contextValues.setAtIndex(ValueLayout.ADDRESS, index, arena.allocateFrom(value));
+                index++;
+            }
+
+            final int status = (int) rulesetRenderWithContext.invokeExact(
+                    handle,
+                    ruleString,
+                    contextKeys,
+                    contextValues,
+                    contextLength,
+                    outString,
+                    outError);
+            checkStatus(status, outError);
+
+            final MemorySegment nativeString = outString.get(ValueLayout.ADDRESS, 0);
+            try {
+                return readNativeString(nativeString);
+            } finally {
+                stringFree(nativeString);
+            }
+        } catch (final CopperlaceException exception) {
+            throw exception;
+        } catch (final Throwable throwable) {
+            throw new CopperlaceException("Failed to render Copperlace rule", throwable);
         }
     }
 

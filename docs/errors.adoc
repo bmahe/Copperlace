@@ -16,7 +16,7 @@ to `Copperlace::render`.
 Starts a fresh render for `rule_name` using the previously loaded config.
 
 `Copperlace::render_with_context(&self, rule_name, context)`::
-Starts a fresh render with Rust-provided initial context values.
+Starts a fresh render with initial context values.
 
 `RuleSet::from_config(config: hocon_rs::Value) -> Result<RuleSet, RenderError>`::
 Compiles a HOCON root value into named render rules and context defaults. The
@@ -27,7 +27,7 @@ Starts a fresh render for `rule_name`. Each call gets a new render context and a
 new thread-local random number generator.
 
 `RuleSet::render_rule_with_context(&self, rule_name, context)`::
-Starts a fresh render with Rust-provided initial context values.
+Starts a fresh render with initial context values.
 
 `render_config_rule(config: hocon_rs::Value, rule_name: &str) -> Result<String, RenderError>`::
 Convenience function that compiles the config and renders one rule.
@@ -50,7 +50,7 @@ The package builds a `copperlace` binary:
 ----
 copperlace render --config <path>
 copperlace render --config -
-copperlace render -c <path> -r <name> --count <n>
+copperlace render -c <path> -r <name> --count <n> --set name=Mia
 copperlace check --config -
 ----
 
@@ -66,6 +66,7 @@ The dynamic library exposes an opaque ruleset handle API:
 * `copperlace_ruleset_from_file`
 * `copperlace_ruleset_from_string`
 * `copperlace_ruleset_render`
+* `copperlace_ruleset_render_with_context`
 * `copperlace_ruleset_free`
 * `copperlace_string_free`
 
@@ -79,9 +80,11 @@ Each render has an isolated context. Bindings created by `{alias:rule}` and
 lazy values created from top-level `context` defaults live only for the current
 `render_rule` call.
 
-Rust callers may provide initial context values for a render. Initial context
-values resolve before top-level `context` defaults and named rules. They are
-scoped to one render call and do not persist on the ruleset.
+Callers may provide initial context values for a render through Rust,
+`copperlace_ruleset_render_with_context`, Python and Java render overloads,
+JS/WASM context methods, or CLI `--set key=value`. Initial context values
+resolve before top-level `context` defaults and named rules. They are scoped to
+one render call and do not persist on the ruleset.
 
 Bind-if-missing expressions are idempotent within a render. If `{alias:rule}`
 runs after `alias` already exists, it leaves the existing value unchanged and
@@ -89,8 +92,7 @@ does not render `rule`. Overwrite expressions with `{alias:=rule}` always render
 `rule` and replace the value.
 
 The renderer does not currently expose seeded randomness or deterministic
-replay. Initial context is currently exposed only through Rust APIs, not through
-the CLI, C ABI, Python, Java, or JS/WASM wrappers.
+replay.
 
 == Error Cases
 
