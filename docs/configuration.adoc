@@ -64,6 +64,18 @@ expression; all other text remains literal.
 origin = "Hello {name}"
 ----
 
+Literal braces can be escaped in template text with `\{` and `\}`. In normal
+quoted HOCON strings, escape the backslash itself as `\\{` or `\\}`. In
+triple-quoted strings, write `\{` or `\}` directly.
+
+[source,hocon]
+----
+inline = "\\{name\\}"
+json = """\{
+  "name": {name | quote}
+\}"""
+----
+
 Supported expressions:
 
 * `{rule}` resolves a bound value, context default, or named rule.

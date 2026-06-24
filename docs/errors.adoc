@@ -120,7 +120,7 @@ Returned when a registered processor rejects a rendered value.
 
 `InvalidExpression(String)`::
 Returned when a template expression is malformed, such as `{name | }` or
-`{ | uppercase}`.
+`{ | uppercase}`, or when template text contains an unmatched raw `{` or `}`.
 
 `EmptyChoice`::
 Returned when rendering an array value with no elements.
@@ -146,6 +146,5 @@ object.
 
 The current implementation does not define these as supported behavior:
 
-* Escaping literal `{` or `}` characters in templates.
 * Seeded or deterministic random output.
 * Rendering object parents directly.

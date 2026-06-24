@@ -671,6 +671,88 @@ fn template_expression_whitespace_is_trimmed() {
 }
 
 #[test]
+fn escaped_template_braces_render_as_literals() {
+    let rules = ruleset(
+        r#"
+        origin = """\{\}"""
+        "#,
+    );
+
+    assert_eq!(rules.render_rule("origin").unwrap(), "{}");
+}
+
+#[test]
+fn escaped_template_braces_work_next_to_expressions() {
+    let rules = ruleset(
+        r#"
+        name = ["Mia"]
+        origin = """\{{name}\}"""
+        "#,
+    );
+
+    assert_eq!(rules.render_rule("origin").unwrap(), "{Mia}");
+}
+
+#[test]
+fn normal_hocon_strings_can_escape_template_braces() {
+    let rules = ruleset(
+        r#"
+        origin = "\\{name\\}"
+        "#,
+    );
+
+    assert_eq!(rules.render_rule("origin").unwrap(), "{name}");
+}
+
+#[test]
+fn template_backslashes_remain_literal_when_not_escaping_braces() {
+    let rules = ruleset(
+        r#"
+        origin = """path\name"""
+        "#,
+    );
+
+    assert_eq!(rules.render_rule("origin").unwrap(), r"path\name");
+}
+
+#[test]
+fn unmatched_opening_template_brace_is_invalid() {
+    assert!(matches!(
+        ruleset_result(
+            r#"
+            origin = """{"""
+            "#
+        ),
+        Err(RenderError::InvalidExpression(_))
+    ));
+}
+
+#[test]
+fn unmatched_closing_template_brace_is_invalid() {
+    assert!(matches!(
+        ruleset_result(
+            r#"
+            origin = """}"""
+            "#
+        ),
+        Err(RenderError::InvalidExpression(_))
+    ));
+}
+
+#[test]
+fn item_json_example_renders_valid_json_with_escaped_braces() {
+    let copperlace =
+        Copperlace::from_hocon_str(include_str!("../../examples/item_json.conf")).unwrap();
+    let rendered = copperlace.render("origin").unwrap();
+    let json: serde_json::Value = serde_json::from_str(&rendered).unwrap();
+
+    assert!(
+        json.get("properties")
+            .is_some_and(|value| value.is_object())
+    );
+}
+
+#[test]
 fn overwrite_binding_whitespace_is_trimmed() {
     let rules = ruleset(
         r#"

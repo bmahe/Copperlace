@@ -5,7 +5,6 @@ use std::sync::Arc;
 use rand::distr::Distribution;
 use rand::distr::weighted::WeightedIndex;
 use rand::seq::IndexedRandom;
-use regex::Regex;
 
 use crate::processors::builtin_processors;
 
@@ -666,29 +665,53 @@ fn template_to_node(
     template: &str,
     processors: &ProcessorRegistry,
 ) -> Result<Box<dyn Node>, RenderError> {
-    let re = Regex::new(r"\{\s*(?<expression>[^\}]*)\s*\}").unwrap();
     let mut nodes: Vec<Box<dyn Node>> = Vec::new();
-    let mut cursor = 0;
+    let mut literal = String::new();
+    let mut chars = template.char_indices().peekable();
 
-    for captures in re.captures_iter(template) {
-        let Some(full_match) = captures.get(0) else {
-            continue;
-        };
+    while let Some((index, character)) = chars.next() {
+        match character {
+            '\\' => match chars.peek() {
+                Some((_, next_character)) if matches!(next_character, '{' | '}') => {
+                    literal.push(*next_character);
+                    chars.next();
+                }
+                _ => literal.push(character),
+            },
+            '{' => {
+                if !literal.is_empty() {
+                    nodes.push(Box::new(std::mem::take(&mut literal)));
+                }
 
-        if full_match.start() > cursor {
-            nodes.push(Box::new(template[cursor..full_match.start()].to_string()));
+                let expression_start = index + character.len_utf8();
+                let mut expression_end = None;
+                for (expression_index, expression_character) in chars.by_ref() {
+                    if expression_character == '}' {
+                        expression_end = Some(expression_index);
+                        break;
+                    }
+                }
+
+                let Some(expression_end) = expression_end else {
+                    return Err(RenderError::InvalidExpression(
+                        "unmatched opening brace in template".to_string(),
+                    ));
+                };
+
+                let expression = template[expression_start..expression_end].trim();
+                nodes.push(expression_to_node(expression, processors)?);
+            }
+            '}' => {
+                return Err(RenderError::InvalidExpression(
+                    "unmatched closing brace in template".to_string(),
+                ));
+            }
+            _ => literal.push(character),
         }
-
-        let expression = captures
-            .name("expression")
-            .map(|value| value.as_str().trim())
-            .unwrap_or_default();
-        nodes.push(expression_to_node(expression, processors)?);
-        cursor = full_match.end();
     }
 
-    if cursor < template.len() {
-        nodes.push(Box::new(template[cursor..].to_string()));
+    if !literal.is_empty() {
+        nodes.push(Box::new(literal));
     }
 
     Ok(Box::new(VecNode::new(nodes)))
