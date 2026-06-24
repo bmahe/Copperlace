@@ -332,6 +332,50 @@ fn checks_config_file_with_short_flag() {
 }
 
 #[test]
+fn checks_config_from_stdin() {
+    let mut child = Command::new(env!("CARGO_BIN_EXE_copperlace"))
+        .args(["check", "--config", "-"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .unwrap();
+
+    child
+        .stdin
+        .as_mut()
+        .unwrap()
+        .write_all(br#"origin = "Mia""#)
+        .unwrap();
+
+    let output = child.wait_with_output().unwrap();
+
+    assert!(output.status.success());
+    assert_eq!(String::from_utf8_lossy(&output.stdout), "OK\n");
+}
+
+#[test]
+fn checks_config_from_stdin_with_short_flag() {
+    let mut child = Command::new(env!("CARGO_BIN_EXE_copperlace"))
+        .args(["check", "-c", "-"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .unwrap();
+
+    child
+        .stdin
+        .as_mut()
+        .unwrap()
+        .write_all(br#"origin = "Mia""#)
+        .unwrap();
+
+    let output = child.wait_with_output().unwrap();
+
+    assert!(output.status.success());
+    assert_eq!(String::from_utf8_lossy(&output.stdout), "OK\n");
+}
+
+#[test]
 fn checks_config_string() {
     let output = Command::new(env!("CARGO_BIN_EXE_copperlace"))
         .args(["check", "--string", r#"origin = "Mia""#])
@@ -354,6 +398,28 @@ fn check_rejects_invalid_hocon_string() {
 }
 
 #[test]
+fn check_rejects_invalid_hocon_from_stdin() {
+    let mut child = Command::new(env!("CARGO_BIN_EXE_copperlace"))
+        .args(["check", "--config", "-"])
+        .stdin(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+
+    child
+        .stdin
+        .as_mut()
+        .unwrap()
+        .write_all(br#"["Mia"]"#)
+        .unwrap();
+
+    let output = child.wait_with_output().unwrap();
+
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("failed to parse config"));
+}
+
+#[test]
 fn check_rejects_invalid_copperlace_config() {
     let output = Command::new(env!("CARGO_BIN_EXE_copperlace"))
         .args([
@@ -366,6 +432,20 @@ fn check_rejects_invalid_copperlace_config() {
 
     assert!(!output.status.success());
     assert!(String::from_utf8_lossy(&output.stderr).contains("unknown processor"));
+}
+
+#[test]
+fn check_rejects_stdin_config_with_string_input() {
+    let output = Command::new(env!("CARGO_BIN_EXE_copperlace"))
+        .args(["check", "--config", "-", "--string", r#"origin = "Darcy""#])
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success());
+    assert!(
+        String::from_utf8_lossy(&output.stderr)
+            .contains("only one of --config or --string may be provided")
+    );
 }
 
 #[test]

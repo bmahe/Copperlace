@@ -97,14 +97,19 @@ fn render(args: &[String], start_index: usize) -> Result<Option<String>, String>
 
 fn copperlace_from_render_config(config: &str) -> Result<Copperlace, String> {
     if config == "-" {
-        let mut input = String::new();
-        io::stdin()
-            .read_to_string(&mut input)
-            .map_err(|error| format!("failed to read config from stdin: {error}"))?;
+        let input = read_stdin_config()?;
         Copperlace::from_hocon_str(&input).map_err(|error| error.to_string())
     } else {
         Copperlace::from_hocon_file(config).map_err(|error| error.to_string())
     }
+}
+
+fn read_stdin_config() -> Result<String, String> {
+    let mut input = String::new();
+    io::stdin()
+        .read_to_string(&mut input)
+        .map_err(|error| format!("failed to read config from stdin: {error}"))?;
+    Ok(input)
 }
 
 fn check(args: &[String], start_index: usize) -> Result<Option<String>, String> {
@@ -116,7 +121,7 @@ fn check(args: &[String], start_index: usize) -> Result<Option<String>, String> 
         match args[index].as_str() {
             "--config" | "-c" => {
                 index += 1;
-                config = Some(required_value(args, index, "--config", check_help)?);
+                config = Some(required_config_value(args, index, "--config", check_help)?);
             }
             "--string" | "-s" => {
                 index += 1;
@@ -130,7 +135,7 @@ fn check(args: &[String], start_index: usize) -> Result<Option<String>, String> 
 
     match (config, config_string) {
         (Some(path), None) => {
-            ruleset_from_hocon_file(path).map_err(|error| error.to_string())?;
+            check_config(&path)?;
         }
         (None, Some(config)) => {
             ruleset_from_hocon_str(&config).map_err(|error| error.to_string())?;
@@ -150,6 +155,19 @@ fn check(args: &[String], start_index: usize) -> Result<Option<String>, String> 
     }
 
     Ok(Some("OK\n".to_string()))
+}
+
+fn check_config(config: &str) -> Result<(), String> {
+    if config == "-" {
+        let input = read_stdin_config()?;
+        ruleset_from_hocon_str(&input)
+            .map(|_| ())
+            .map_err(|error| error.to_string())
+    } else {
+        ruleset_from_hocon_file(config)
+            .map(|_| ())
+            .map_err(|error| error.to_string())
+    }
 }
 
 fn required_value(
@@ -204,6 +222,7 @@ fn top_level_help() -> String {
     "Usage:
   copperlace [render] --config <path> [--rule <name>] [--count <n>]
   copperlace check --config <path>
+  copperlace check --config -
   copperlace check --string <hocon>
   copperlace --help
   copperlace --version
@@ -245,7 +264,7 @@ fn check_help() -> String {
   copperlace check -s <hocon>
 
 Check options:
-  -c, --config <path>    HOCON config file to parse and compile
+  -c, --config <path>    HOCON config file to parse and compile, or - to read stdin
   -s, --string <hocon>   HOCON config string to parse and compile
   -h, --help             Show check help"
         .to_string()
