@@ -38,6 +38,10 @@ JSON item data. Demonstrates JSON-safe quoted strings, bindings, scalar values,
 Product or marketing microcopy. Demonstrates multiple render rules plus
 `titlecase`, `sentence`, `article`, `quote`, `pluralize`, and `slug`.
 
+`proverbs.conf`::
+Short proverb-style sayings. Demonstrates weighted templates, bindings,
+context defaults, `sentence`, and `article`.
+
 `release_note.conf`::
 Changelog-style output. Demonstrates `past_tense`, `article`, `ordinal`,
 `pluralize`, `possessive`, and binding reuse.
@@ -53,6 +57,8 @@ Try alternate rules where available:
 cargo run --bin copperlace -- render --config ../examples/product_blurb.conf --rule headline
 cargo run --bin copperlace -- render --config ../examples/product_blurb.conf --rule tagline
 cargo run --bin copperlace -- render --config ../examples/product_blurb.conf --rule slug
+cargo run --bin copperlace -- render --config ../examples/proverbs.conf --rule origin
+cargo run --bin copperlace -- render --config ../examples/proverbs.conf --rule short
 cargo run --bin copperlace -- render --config ../examples/gendered_pronouns.conf --rule origin
 cargo run --bin copperlace -- render --config ../examples/gendered_pronouns.conf --rule profile
 cargo run --bin copperlace -- render --config ../examples/item_json.conf --rule origin
