@@ -1,5 +1,4 @@
 :root {
-  color-scheme: light;
   --bg: #fbfaf7;
   --panel: #ffffff;
   --text: #1f2528;
@@ -8,6 +7,37 @@
   --accent: #21695d;
   --accent-dark: #174a42;
   --code-bg: #f1f4f2;
+  --error: #8f2f2f;
+  --error-line: #b45353;
+  color-scheme: light;
+}
+
+html[data-theme="light"] {
+  --bg: #fbfaf7;
+  --panel: #ffffff;
+  --text: #1f2528;
+  --muted: #5c686f;
+  --line: #d9dedc;
+  --accent: #21695d;
+  --accent-dark: #174a42;
+  --code-bg: #f1f4f2;
+  --error: #8f2f2f;
+  --error-line: #b45353;
+  color-scheme: light;
+}
+
+html[data-theme="dark"] {
+  --bg: #111715;
+  --panel: #18211e;
+  --text: #e8efeb;
+  --muted: #aab8b2;
+  --line: #31413b;
+  --accent: #6ed2bc;
+  --accent-dark: #9ae3d2;
+  --code-bg: #0d1412;
+  --error: #ffb4b4;
+  --error-line: #d67676;
+  color-scheme: dark;
 }
 
 * {
@@ -51,6 +81,14 @@ a:hover {
   text-decoration: none;
 }
 
+.header-controls {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  justify-content: flex-end;
+}
+
 .top-nav {
   display: flex;
   flex-wrap: wrap;
@@ -60,6 +98,28 @@ a:hover {
 
 .top-nav a {
   text-decoration: none;
+}
+
+.theme-control {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.theme-control select {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  letter-spacing: 0;
+  padding: 6px 8px;
+  text-transform: none;
 }
 
 .site-shell {
@@ -122,7 +182,7 @@ a:hover {
 }
 
 .content code {
-  color: #223432;
+  color: var(--text);
 }
 
 .copperlace-demo {
@@ -188,7 +248,7 @@ a:hover {
   border: 1px solid var(--accent);
   border-radius: 8px;
   background: var(--accent);
-  color: #ffffff;
+  color: var(--panel);
   font: inherit;
   font-weight: 700;
   cursor: pointer;
@@ -212,8 +272,8 @@ a:hover {
 }
 
 .demo-output.is-error {
-  border-color: #b45353;
-  color: #8f2f2f;
+  border-color: var(--error-line);
+  color: var(--error);
 }
 
 .examples-demo-links {
@@ -279,6 +339,14 @@ a:hover {
 
   .site-shell {
     display: block;
+  }
+
+  .site-header-inner {
+    align-items: flex-start;
+  }
+
+  .header-controls {
+    justify-content: flex-start;
   }
 
   .side-nav {

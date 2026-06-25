@@ -130,21 +130,33 @@ def write_page(output: Path, title: str, body: str, section: str, scripts: str =
         f'<a href="{relative_root}{href.lstrip("/")}">{html.escape(label)}</a>'
         for label, href in NAV
     )
+    page_scripts = "\n".join(script for script in [theme_script(), scripts] if script)
     html_text = f"""<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{html.escape(title)} | Copperlace</title>
+  {theme_head_script()}
   <link rel="stylesheet" href="{relative_root}site.css">
 </head>
 <body>
   <header class="site-header">
     <div class="site-header-inner">
       <a class="brand" href="{relative_root}index.html">Copperlace</a>
-      <nav class="top-nav" aria-label="Primary navigation">
-        {nav}
-      </nav>
+      <div class="header-controls">
+        <nav class="top-nav" aria-label="Primary navigation">
+          {nav}
+        </nav>
+        <label class="theme-control">
+          <span>Theme</span>
+          <select data-theme-select aria-label="Theme">
+            <option value="system">System</option>
+            <option value="light">Light</option>
+            <option value="dark">Dark</option>
+          </select>
+        </label>
+      </div>
     </div>
   </header>
   <div class="site-shell">
@@ -160,11 +172,78 @@ def write_page(output: Path, title: str, body: str, section: str, scripts: str =
   <footer class="site-footer">
     Generated from repository documentation and native API docs.
   </footer>
-{scripts}
+{page_scripts}
 </body>
 </html>
 """
     output.write_text(html_text, encoding="utf-8")
+
+
+def theme_head_script() -> str:
+    return """<script>
+    (() => {
+      const key = "copperlace-theme";
+      let stored = null;
+      try {
+        stored = localStorage.getItem(key);
+      } catch {
+        stored = null;
+      }
+      const choice = ["light", "dark", "system"].includes(stored) ? stored : "system";
+      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
+      document.documentElement.dataset.theme = choice === "system" && prefersDark ? "dark" : choice === "dark" ? "dark" : "light";
+    })();
+  </script>"""
+
+
+def theme_script() -> str:
+    return """  <script>
+    (() => {
+      const key = "copperlace-theme";
+      const values = ["light", "dark", "system"];
+      const media = window.matchMedia("(prefers-color-scheme: dark)");
+      const select = document.querySelector("[data-theme-select]");
+
+      function storedChoice() {
+        let stored = null;
+        try {
+          stored = localStorage.getItem(key);
+        } catch {
+          stored = null;
+        }
+        return values.includes(stored) ? stored : "system";
+      }
+
+      function applyTheme(choice) {
+        const selected = values.includes(choice) ? choice : "system";
+        const effective = selected === "system" ? (media.matches ? "dark" : "light") : selected;
+        document.documentElement.dataset.theme = effective;
+        if (select) {
+          select.value = selected;
+        }
+      }
+
+      if (select) {
+        select.addEventListener("change", () => {
+          try {
+            localStorage.setItem(key, select.value);
+          } catch {
+            // Theme still applies for this page even when storage is unavailable.
+          }
+          applyTheme(select.value);
+        });
+      }
+
+      media.addEventListener("change", () => {
+        if (storedChoice() === "system") {
+          applyTheme("system");
+        }
+      });
+
+      applyTheme(storedChoice());
+    })();
+  </script>
+"""
 
 
 def homepage_scripts() -> str:
