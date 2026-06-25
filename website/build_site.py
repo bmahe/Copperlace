@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import html
+import json
 import os
 import shutil
 import subprocess
@@ -91,7 +92,7 @@ def build_main_site() -> None:
         if source == ROOT / "examples" / "README.adoc":
             body += examples_section()
         body = rewrite_links(body)
-        scripts = homepage_scripts() if output == SITE / "index.html" else ""
+        scripts = page_scripts(output)
         write_page(output, page_title(source), body, section, scripts)
 
     build_example_sources()
@@ -198,6 +199,76 @@ def homepage_scripts() -> str:
 """
 
 
+def examples_scripts() -> str:
+    examples_json = json.dumps(examples_data(), ensure_ascii=False).replace("</", "<\\/")
+    return f"""  <script type="module">
+    import init, {{ Copperlace }} from "../js/pkg/copperlace.js";
+
+    const examples = {examples_json};
+    const exampleSelect = document.querySelector("[data-example-select]");
+    const renderButton = document.querySelector("[data-example-render]");
+    const output = document.querySelector("[data-example-output]");
+    const source = document.querySelector("[data-example-config-source]");
+    const sourceLink = document.querySelector("[data-example-source]");
+    const downloadLink = document.querySelector("[data-example-download]");
+
+    const ready = init();
+
+    function selectedExample() {{
+      return examples.find((example) => example.file === exampleSelect.value) || examples[0];
+    }}
+
+    function syncSelectedExample() {{
+      const example = selectedExample();
+      sourceLink.href = example.sourceUrl;
+      downloadLink.href = example.downloadUrl;
+      source.textContent = example.config;
+      output.classList.remove("is-error");
+      output.textContent = `Ready to render ${{example.name}}.`;
+    }}
+
+    async function renderExample() {{
+      const example = selectedExample();
+      output.textContent = "Rendering...";
+      output.classList.remove("is-error");
+
+      try {{
+        await ready;
+        const copperlace = new Copperlace(example.config);
+        output.textContent = copperlace.render("origin");
+      }} catch (error) {{
+        output.textContent = error instanceof Error ? error.message : String(error);
+        output.classList.add("is-error");
+      }}
+    }}
+
+    for (const example of examples) {{
+      const option = document.createElement("option");
+      option.value = example.file;
+      option.textContent = example.name;
+      exampleSelect.append(option);
+    }}
+
+    exampleSelect.addEventListener("change", () => {{
+      syncSelectedExample();
+      renderExample();
+    }});
+    renderButton.addEventListener("click", renderExample);
+
+    syncSelectedExample();
+    renderExample();
+  </script>
+"""
+
+
+def page_scripts(output: Path) -> str:
+    if output == SITE / "index.html":
+        return homepage_scripts()
+    if output == SITE / "examples" / "index.html":
+        return examples_scripts()
+    return ""
+
+
 def relative_prefix(output: Path) -> str:
     parent = output.parent
     relative = os.path.relpath(SITE, parent).replace(os.sep, "/")
@@ -226,21 +297,55 @@ def rewrite_links(body: str) -> str:
 
 def examples_section() -> str:
     cards = []
-    for config in sorted((ROOT / "examples").glob("*.conf")):
-        stem = config.stem.replace("_", " ").title()
+    for example in examples_data():
         cards.append(
             f"""<div class="example-card">
-  <strong>{html.escape(stem)}</strong>
-  <a href="conf/{config.name}.html">View source</a><br>
-  <a href="conf/{config.name}">Download .conf</a>
+  <strong>{html.escape(example["name"])}</strong>
+  <a href="{html.escape(example["sourceUrl"])}">View source</a><br>
+  <a href="{html.escape(example["downloadUrl"])}">Download .conf</a>
 </div>"""
         )
     return f"""
+<h2 id="interactive-examples">Interactive Examples</h2>
+<section class="copperlace-demo examples-demo" aria-label="Interactive Copperlace examples">
+  <div class="demo-controls">
+    <label class="demo-rule">
+      <span>Example</span>
+      <select data-example-select></select>
+    </label>
+    <button data-example-render type="button">Render</button>
+  </div>
+  <output class="demo-output" data-example-output>Loading Copperlace...</output>
+  <details class="examples-demo-source" open>
+    <summary>Source config</summary>
+    <pre><code data-example-config-source></code></pre>
+  </details>
+  <p class="examples-demo-links">
+    <a data-example-source href="#">View source</a>
+    <a data-example-download href="#">Download .conf</a>
+  </p>
+</section>
+
 <h2 id="runnable-config-sources">Runnable Config Sources</h2>
 <div class="example-grid">
 {''.join(cards)}
 </div>
 """
+
+
+def examples_data() -> list[dict[str, str]]:
+    examples = []
+    for config in sorted((ROOT / "examples").glob("*.conf")):
+        examples.append(
+            {
+                "file": config.name,
+                "name": config.stem.replace("_", " ").title(),
+                "config": config.read_text(encoding="utf-8"),
+                "sourceUrl": f"conf/{config.name}.html",
+                "downloadUrl": f"conf/{config.name}",
+            }
+        )
+    return examples
 
 
 def build_example_sources() -> None:

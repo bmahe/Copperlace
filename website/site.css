@@ -128,6 +128,7 @@ a:hover {
 .copperlace-demo {
   display: grid;
   gap: 14px;
+  min-width: 0;
   margin: 22px 0 30px;
   padding: 16px;
   border: 1px solid var(--line);
@@ -139,6 +140,7 @@ a:hover {
 .demo-rule {
   display: grid;
   gap: 6px;
+  min-width: 0;
 }
 
 .demo-field span,
@@ -151,7 +153,8 @@ a:hover {
 }
 
 .demo-field textarea,
-.demo-rule input {
+.demo-rule input,
+.demo-rule select {
   width: 100%;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -166,7 +169,8 @@ a:hover {
   resize: vertical;
 }
 
-.demo-rule input {
+.demo-rule input,
+.demo-rule select {
   padding: 9px 10px;
 }
 
@@ -175,6 +179,7 @@ a:hover {
   grid-template-columns: minmax(160px, 1fr) auto;
   gap: 12px;
   align-items: end;
+  min-width: 0;
 }
 
 .demo-controls button {
@@ -196,6 +201,7 @@ a:hover {
 
 .demo-output {
   display: block;
+  min-width: 0;
   min-height: 52px;
   padding: 14px;
   border: 1px solid var(--line);
@@ -208,6 +214,32 @@ a:hover {
 .demo-output.is-error {
   border-color: #b45353;
   color: #8f2f2f;
+}
+
+.examples-demo-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 0;
+}
+
+.examples-demo-source summary {
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.examples-demo-source {
+  min-width: 0;
+}
+
+.examples-demo-source pre {
+  width: 100%;
+  max-height: 360px;
+  margin: 8px 0 0;
 }
 
 .example-grid {
