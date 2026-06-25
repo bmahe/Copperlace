@@ -1,10 +1,11 @@
 = Copperlace
-:description: A rule-driven text rendering engine for reusable procedural text.
+:description: A procedural text generator for Rust, Python, Java, and JS/TS WebAssembly.
 
-Copperlace compiles readable generation rules into a reusable renderer for
-game content, product copy, structured snippets, browser-side experiments, and
-other text that needs controlled variation. It keeps random choices consistent
-within one render through per-render bindings and context defaults.
+Copperlace is a tool for procedural text generation with support for Rust, Python, Java, and JS/TS WebAssembly.
+
+It can be used for generating game content, product copy, structured snippets, browser-side experiments, and other text that needs controlled variation. You can use it directly from the command line, or embed it in your application code.
+
+It is inspired by link:https://tracery.io/[Tracery].
 
 == Try It
 
