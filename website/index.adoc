@@ -6,14 +6,30 @@ game content, product copy, structured snippets, browser-side experiments, and
 other text that needs controlled variation. It keeps random choices consistent
 within one render through per-render bindings and context defaults.
 
-[source]
-----
-name = ["Arjun", "Mia", "Lina"]
-animal = [unicorn, raven, owl]
+== Try It
 
-story = "{hero} traveled with {heroPet | article}."
-origin = "{hero:name}{heroPet:animal}{story}"
-----
+++++
+<section class="copperlace-demo" aria-label="Copperlace browser demo">
+  <label class="demo-field">
+    <span>Config</span>
+    <textarea data-copperlace-config rows="8" spellcheck="false">name = [célia, bob, myrine, idric]
+flavor = [chocolate, strawberry, apple, lime]
+treat = [moon cookie, "{flavor} tart", "{flavor} cake", quemeau tart]
+emotion = ["sunshine", "a tiny holiday", "good luck"]
+
+note = "{name | capitalize} baked {snack | article}. The {snack} tastes like {emotion}."
+origin = "{snack:treat}{note}"</textarea>
+  </label>
+  <div class="demo-controls">
+    <label class="demo-rule">
+      <span>Rule</span>
+      <input data-copperlace-rule type="text" value="origin">
+    </label>
+    <button data-copperlace-render type="button">Render</button>
+  </div>
+  <output class="demo-output" data-copperlace-output>Loading Copperlace...</output>
+</section>
+++++
 
 == Why Copperlace
 

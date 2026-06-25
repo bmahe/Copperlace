@@ -52,7 +52,7 @@ def main() -> int:
         shutil.rmtree(SITE)
 
     SITE.mkdir(parents=True, exist_ok=True)
-    copy_assets()
+    copy_assets(include_js=build_main)
 
     if build_main:
         build_main_site()
@@ -62,8 +62,27 @@ def main() -> int:
     return 0
 
 
-def copy_assets() -> None:
+def copy_assets(include_js: bool) -> None:
     shutil.copy2(ROOT / "website" / "site.css", SITE / "site.css")
+    if include_js:
+        copy_js_package()
+
+
+def copy_js_package() -> None:
+    source = ROOT / "js" / "pkg"
+    required_files = [
+        source / "copperlace.js",
+        source / "copperlace_bg.wasm",
+    ]
+    missing = [path for path in required_files if not path.exists()]
+    if missing:
+        missing_names = ", ".join(str(path.relative_to(ROOT)) for path in missing)
+        raise SystemExit(
+            f"Missing JS web package files: {missing_names}. Run make js-web before "
+            "building the main site."
+        )
+
+    copy_tree(source, SITE / "js" / "pkg")
 
 
 def build_main_site() -> None:
@@ -72,7 +91,8 @@ def build_main_site() -> None:
         if source == ROOT / "examples" / "README.adoc":
             body += examples_section()
         body = rewrite_links(body)
-        write_page(output, page_title(source), body, section)
+        scripts = homepage_scripts() if output == SITE / "index.html" else ""
+        write_page(output, page_title(source), body, section, scripts)
 
     build_example_sources()
 
@@ -102,7 +122,7 @@ def page_title(source: Path) -> str:
     return "Copperlace"
 
 
-def write_page(output: Path, title: str, body: str, section: str) -> None:
+def write_page(output: Path, title: str, body: str, section: str, scripts: str = "") -> None:
     output.parent.mkdir(parents=True, exist_ok=True)
     relative_root = relative_prefix(output)
     nav = "\n".join(
@@ -139,10 +159,43 @@ def write_page(output: Path, title: str, body: str, section: str) -> None:
   <footer class="site-footer">
     Generated from repository documentation and native API docs.
   </footer>
+{scripts}
 </body>
 </html>
 """
     output.write_text(html_text, encoding="utf-8")
+
+
+def homepage_scripts() -> str:
+    return """  <script type="module">
+    import init, { Copperlace } from "./js/pkg/copperlace.js";
+
+    const configInput = document.querySelector("[data-copperlace-config]");
+    const ruleInput = document.querySelector("[data-copperlace-rule]");
+    const renderButton = document.querySelector("[data-copperlace-render]");
+    const output = document.querySelector("[data-copperlace-output]");
+
+    const ready = init();
+
+    async function renderDemo() {
+      output.textContent = "Rendering...";
+      output.classList.remove("is-error");
+
+      try {
+        await ready;
+        const rule = ruleInput.value.trim() || "origin";
+        const copperlace = new Copperlace(configInput.value);
+        output.textContent = copperlace.render(rule);
+      } catch (error) {
+        output.textContent = error instanceof Error ? error.message : String(error);
+        output.classList.add("is-error");
+      }
+    }
+
+    renderButton.addEventListener("click", renderDemo);
+    renderDemo();
+  </script>
+"""
 
 
 def relative_prefix(output: Path) -> str:

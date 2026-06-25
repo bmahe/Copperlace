@@ -1,37 +1,46 @@
 = Copperlace
 
-Copperlace is a rule-driven text rendering engine. It expands named rules,
-template references, random choices, processors, context defaults, and
-per-render bindings into generated text.
+Copperlace turns generative grammars into varied text.
 
-The core renderer is written in Rust and is exposed through:
+Write the pieces once, then ask Copperlace to render a named rule. It can pick
+random options, remember a picked value for the rest of one result, fill in
+default values, and clean up text with processors such as `article`,
+`possessive`, `pluralize`, and `sentence`.
 
-* a Rust library;
-* a `copperlace` CLI;
-* a C ABI dynamic library;
-* Python bindings backed by `ctypes`;
-* Java bindings backed by the Java FFM API;
-* JS/TS WebAssembly bindings for browser use.
+Use it for story snippets, game item descriptions, product blurbs, release
+notes, quest logs, or any place where hand-written text needs controlled
+variation.
 
 == What It Does
 
-Copperlace renders one named rule at a time. Each render gets its own binding
-context, so a random choice can be selected once and reused consistently across
-the generated output.
+Here is a tiny Copperlace configuration:
 
 [source]
 ----
-name = ["Arjun", "Mia", "Lina"]
-animal = [unicorn, raven, owl]
-mood = [vexed, wistful, astute]
+name = ["Mia", "Lina"]
+animal = ["owl", "raven"]
+mood = ["quiet", "restless"]
 
-story = "{hero} traveled with {heroPet | article}. {hero} stayed {mood}, even when the {heroPet} got loud."
-origin = "{hero:name}{heroPet:animal}{story}"
+story = "{hero} traveled with {pet | article}. {hero} stayed {mood}."
+origin = "{hero:name}{pet:animal}{story}"
 ----
 
-Rendering `origin` first binds `hero` from `name` and `heroPet` from `animal`.
-Later `{hero}` and `{heroPet}` references reuse those values for the rest of
-that render.
+Rendering `origin` might produce:
+
+[source,text]
+----
+Mia traveled with an owl. Mia stayed quiet.
+----
+
+Another render might produce:
+
+[source,text]
+----
+Lina traveled with a raven. Lina stayed restless.
+----
+
+The important detail is consistency inside one result: `{hero:name}` chooses a
+name once, and later `{hero}` references reuse that same name.
 
 Template expressions also support processor pipelines:
 
@@ -42,57 +51,106 @@ slug = "{item | slug}"
 description = "You found {item | article}."
 ----
 
-Builtin processors include `uppercase`, `lowercase`, `trim`, `capitalize`,
-`titlecase`, `article`, `past_tense`, `pluralize`, `singularize`,
-`possessive`, `present_participle`, `ordinal`, `sentence`, `quote`, and `slug`.
+This can render text like:
+
+[source,text]
+----
+You found an ancient key.
+----
+
+The `article` processor chooses `a` or `an`, and `slug` turns text into a
+URL-friendly value such as `ancient-key`.
 
 == Quick Start
 
-Run the full development check:
-
-[source,sh]
-----
-make check
-----
-
-Run the CLI against a bundled example:
+Run the bundled example from the Rust project:
 
 [source,sh]
 ----
 cd rust-core
-cargo run --bin copperlace -- render --config ../examples/character_scene.conf
+cargo run --bin copperlace -- render -c ../examples/character_scene.conf
 ----
 
-Use `-` as the config path to read configuration from standard input:
+Example output:
+
+[source,text]
+----
+Darcy's scholar found a brass compass in a moonlit bridge while running. The quiet discovery changed everything.
+----
+
+Your exact result may differ because the example contains random choices.
+
+Render three results from the same loaded configuration:
 
 [source,sh]
 ----
-cat ../examples/character_scene.conf | cargo run --bin copperlace -- render --config -
-cat ../examples/character_scene.conf | cargo run --bin copperlace -- check --config -
+cargo run --bin copperlace -- render -c ../examples/character_scene.conf -n 3
 ----
 
-Render several outputs from one loaded config:
+Example output:
 
-[source,sh]
+[source,text]
 ----
-cargo run --bin copperlace -- render -c ../examples/character_scene.conf --count 3
+Mia's ranger found an hourglass in a forgotten observatory while searching. The quiet discovery changed everything.
+Azra's ranger found a brass compass in a moonlit bridge while searching. The restless discovery changed everything.
+Lina's scholar found an owl feather in a moonlit bridge while watching. The restless discovery changed everything.
 ----
 
-Provide initial context values for a render:
+Provide a starting value with `--set`. Here the hero is fixed to `Mia`, while
+the other values can still vary:
 
 [source,sh]
 ----
 cargo run --bin copperlace -- render -c ../examples/character_scene.conf --set hero=Mia
 ----
 
+Example output:
+
+[source,text]
+----
+Mia's pilot found a brass compass in a forgotten observatory while running. The quiet discovery changed everything.
+----
+
+Check a configuration without rendering it:
+
+[source,sh]
+----
+cargo run --bin copperlace -- check -c ../examples/character_scene.conf
+----
+
+Output:
+
+[source,text]
+----
+OK
+----
+
+Use `-` as the config path to read configuration from standard input:
+
+[source,sh]
+----
+cat ../examples/character_scene.conf | cargo run --bin copperlace -- render -c -
+cat ../examples/character_scene.conf | cargo run --bin copperlace -- check -c -
+----
+
 More runnable examples live in link:examples/README.adoc[examples/], covering
 story text, game item cards, gendered pronouns, JSON item data, product copy,
 release notes, and quest logs.
+
+For development checks, run:
+
+[source,sh]
+----
+make check
+----
 
 == Load Once, Render Many Times
 
 For repeated renders, load the configuration once and call `render` multiple
 times. This avoids recompiling the rule set for each render.
+
+Copperlace is available as a command-line tool and as libraries for Rust,
+Python, Java, and browser JavaScript/WebAssembly.
 
 === Rust
 
