@@ -2,14 +2,17 @@ use crate::render::{ProcessorRegistry, processor};
 
 pub(crate) fn builtin_processors() -> ProcessorRegistry {
     let mut processors = ProcessorRegistry::new();
+    // Converts the whole rendered value to uppercase, e.g. "Mia" -> "MIA".
     processors.insert(
         "uppercase".to_string(),
         processor(|value: &str| Ok(value.to_uppercase())),
     );
+    // Converts the whole rendered value to lowercase, e.g. "Mia" -> "mia".
     processors.insert(
         "lowercase".to_string(),
         processor(|value: &str| Ok(value.to_lowercase())),
     );
+    // Removes leading and trailing whitespace, e.g. "  old  key  " -> "old  key".
     processors.insert(
         "trim".to_string(),
         processor(|value: &str| Ok(value.trim().to_string())),
@@ -32,6 +35,7 @@ pub(crate) fn builtin_processors() -> ProcessorRegistry {
     processors
 }
 
+/// Uppercases the first character and lowercases the rest, e.g. "mIA" -> "Mia".
 fn capitalize(value: &str) -> Result<String, String> {
     let mut chars = value.chars();
     let Some(first) = chars.next() else {
@@ -44,6 +48,7 @@ fn capitalize(value: &str) -> Result<String, String> {
     Ok(output)
 }
 
+/// Capitalizes whitespace-separated words, e.g. "old BRASS key" -> "Old Brass Key".
 fn titlecase(value: &str) -> Result<String, String> {
     let mut output = String::new();
     let mut start_of_word = true;
@@ -63,6 +68,7 @@ fn titlecase(value: &str) -> Result<String, String> {
     Ok(output)
 }
 
+/// Capitalizes the first alphabetic character only, e.g. "...mia waits" -> "...Mia waits".
 fn sentence(value: &str) -> Result<String, String> {
     for (index, character) in value.char_indices() {
         if character.is_alphabetic() {
@@ -77,6 +83,7 @@ fn sentence(value: &str) -> Result<String, String> {
     Ok(value.to_string())
 }
 
+/// Wraps text in ASCII quotes and escapes quote/backslash characters, e.g. `Mia said "hi"` -> `"Mia said \"hi\""`.
 fn quote(value: &str) -> Result<String, String> {
     let mut output = String::from("\"");
     for character in value.chars() {
@@ -90,6 +97,7 @@ fn quote(value: &str) -> Result<String, String> {
     Ok(output)
 }
 
+/// Normalizes text into a lowercase hyphen-separated identifier, e.g. "Mia's Story" -> "mias-story".
 fn slug(value: &str) -> Result<String, String> {
     let mut output = String::new();
     let mut pending_separator = false;
@@ -111,6 +119,7 @@ fn slug(value: &str) -> Result<String, String> {
     Ok(output)
 }
 
+/// Prefixes text with an English indefinite article, e.g. "hourglass" -> "an hourglass".
 fn article(value: &str) -> Result<String, String> {
     let article = if uses_an(value) { "an" } else { "a" };
     Ok(format!("{article} {value}"))
@@ -196,6 +205,7 @@ fn starts_with_vowel_sound_initial(value: &str) -> bool {
     )
 }
 
+/// Converts one verb token to past tense, e.g. "run" -> "ran" and "try" -> "tried".
 fn past_tense(value: &str) -> Result<String, String> {
     let (leading, token, trailing) = single_token_parts(value, "verb")?;
     let tense = apply_case_style(token, &past_tense_lowercase(&token.to_lowercase()));
@@ -203,6 +213,7 @@ fn past_tense(value: &str) -> Result<String, String> {
     Ok(format!("{leading}{tense}{trailing}"))
 }
 
+/// Converts one noun token to plural form, e.g. "city" -> "cities" and "person" -> "people".
 fn pluralize(value: &str) -> Result<String, String> {
     let (leading, token, trailing) = single_token_parts(value, "noun")?;
     let plural = apply_case_style(token, &pluralize_lowercase(&token.to_lowercase()));
@@ -260,6 +271,7 @@ fn irregular_plural(value: &str) -> Option<&'static str> {
     }
 }
 
+/// Converts one plural noun token to singular form, e.g. "cities" -> "city" and "people" -> "person".
 fn singularize(value: &str) -> Result<String, String> {
     let (leading, token, trailing) = single_token_parts(value, "noun")?;
     let singular = apply_case_style(token, &singularize_lowercase(&token.to_lowercase()));
@@ -316,6 +328,7 @@ fn irregular_singular(value: &str) -> Option<&'static str> {
     }
 }
 
+/// Adds an English possessive suffix to one token, e.g. "Mia" -> "Mia's" and "James" -> "James'".
 fn possessive(value: &str) -> Result<String, String> {
     let (leading, token, trailing) = single_token_parts(value, "name")?;
     let suffix = if token.ends_with('s') { "'" } else { "'s" };
@@ -323,6 +336,7 @@ fn possessive(value: &str) -> Result<String, String> {
     Ok(format!("{leading}{token}{suffix}{trailing}"))
 }
 
+/// Converts one verb token to present participle form, e.g. "run" -> "running" and "lie" -> "lying".
 fn present_participle(value: &str) -> Result<String, String> {
     let (leading, token, trailing) = single_token_parts(value, "verb")?;
     let participle = apply_case_style(token, &present_participle_lowercase(&token.to_lowercase()));
@@ -354,6 +368,7 @@ fn present_participle_lowercase(value: &str) -> String {
     format!("{value}ing")
 }
 
+/// Adds an English ordinal suffix to one integer token, e.g. "1" -> "1st" and "11" -> "11th".
 fn ordinal(value: &str) -> Result<String, String> {
     let (leading, token, trailing) = single_token_parts(value, "integer")?;
     let digits = token.strip_prefix('-').unwrap_or(token);
