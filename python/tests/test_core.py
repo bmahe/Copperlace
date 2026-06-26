@@ -151,7 +151,7 @@ class CopperlaceTests(unittest.TestCase):
 
     def test_ruleset_renders_with_context(self) -> None:
         with RuleSet.from_string(
-            'context { name = "Mia" }\nnext = "Darcy"\norigin = "{name}{name:=next}"'
+            'context { name = "Mia" }\nnext = "Darcy"\norigin = "{name}{% name:=next %}"'
         ) as ruleset:
             self.assertEqual(ruleset.render("origin", {"name": "Lina"}), "Lina")
             self.assertEqual(ruleset.render("origin", {"name": "Lina"}), "Lina")

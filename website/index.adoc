@@ -19,7 +19,7 @@ treat = [moon cookie, "{flavor} tart", "{flavor} cake", quemeau tart]
 emotion = ["sunshine", "a tiny holiday", "good luck"]
 
 note = "{name | capitalize} baked {snack | article}. The {snack} tastes like {emotion}."
-origin = "{snack:treat}{note}"</textarea>
+origin = "{% snack:treat %}{note}"</textarea>
   </label>
   <div class="demo-controls">
     <label class="demo-rule">

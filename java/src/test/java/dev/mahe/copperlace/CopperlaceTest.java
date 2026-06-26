@@ -287,7 +287,7 @@ final class CopperlaceTest {
                     name = "Mia"
                 }
                 next = "Darcy"
-                origin = "{name}{name:=next}"
+                origin = "{name}{% name:=next %}"
                 """)) {
             assertEquals("Lina", rules.render("origin", Map.of("name", "Lina")));
             assertEquals("Lina", rules.render("origin", Map.of("name", "Lina")));

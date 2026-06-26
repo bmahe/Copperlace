@@ -21,7 +21,7 @@ fn renders_from_multiple_named_rules() {
         name = ["Mia"]
         animal = ["owl"]
         story = ["{hero} and {heroPet}"]
-        origin = "{hero:name}{heroPet:animal}{story}"
+        origin = "{% hero:name %}{% heroPet:animal %}{story}"
         context = {
             hero = "{name}"
             heroPet = "{animal}"
@@ -131,7 +131,7 @@ fn bind_if_missing_preserves_initial_context() {
     let rules = ruleset(
         r#"
         fallback = ["Darcy"]
-        origin = "{hero:fallback}{hero}"
+        origin = "{% hero:fallback %}{hero}"
         "#,
     );
     let mut context = RenderContext::new();
@@ -148,7 +148,7 @@ fn overwrite_binding_replaces_initial_context() {
     let rules = ruleset(
         r#"
         fallback = ["Darcy"]
-        origin = "{hero:=fallback}{hero}"
+        origin = "{% hero:=fallback %}{hero}"
         "#,
     );
     let mut context = RenderContext::new();
@@ -267,7 +267,7 @@ fn binding_reuses_the_same_generated_value() {
     let rules = ruleset(
         r#"
         name = ["Mia"]
-        origin = "{hero:name}{hero}/{hero}"
+        origin = "{% hero:name %}{hero}/{hero}"
         "#,
     );
 
@@ -280,7 +280,7 @@ fn binding_does_not_overwrite_existing_value() {
         r#"
         first = ["Mia"]
         second = ["Darcy"]
-        origin = "{hero:first}{hero:second}{hero}"
+        origin = "{% hero:first %}{% hero:second %}{hero}"
         "#,
     );
 
@@ -293,7 +293,7 @@ fn binding_does_not_overwrite_context_default_value() {
         r#"
         name = ["Mia"]
         other = ["Darcy"]
-        origin = "{hero}{hero:other}/{hero}"
+        origin = "{hero}{% hero:other %}/{hero}"
         context = {
             hero = "{name}"
         }
@@ -309,7 +309,7 @@ fn overwrite_binding_replaces_existing_value() {
         r#"
         first = ["Mia"]
         second = ["Darcy"]
-        origin = "{hero:first}{hero:=second}{hero}"
+        origin = "{% hero:first %}{% hero:=second %}{hero}"
         "#,
     );
 
@@ -322,7 +322,7 @@ fn overwrite_binding_replaces_context_default_value() {
         r#"
         name = ["Mia"]
         other = ["Darcy"]
-        origin = "{hero}{hero:=other}/{hero}"
+        origin = "{hero}{% hero:=other %}/{hero}"
         context = {
             hero = "{name}"
         }
@@ -426,7 +426,7 @@ fn dotted_context_default_renders_and_caches_value() {
         r#"
         first = ["Mia"]
         second = ["Darcy"]
-        origin = "{hero.name}{hero.name:=second}/{hero.name}"
+        origin = "{hero.name}{% hero.name:=second %}/{hero.name}"
         context.hero.name = "{first}"
         "#,
     );
@@ -705,6 +705,17 @@ fn normal_config_strings_can_escape_template_braces() {
 }
 
 #[test]
+fn escaped_template_statement_delimiters_render_as_literals() {
+    let rules = ruleset(
+        r#"
+        origin = """\{% name %\}"""
+        "#,
+    );
+
+    assert_eq!(rules.render_rule("origin").unwrap(), "{% name %}");
+}
+
+#[test]
 fn template_backslashes_remain_literal_when_not_escaping_braces() {
     let rules = ruleset(
         r#"
@@ -740,6 +751,30 @@ fn unmatched_closing_template_brace_is_invalid() {
 }
 
 #[test]
+fn unmatched_opening_template_statement_delimiter_is_invalid() {
+    assert!(matches!(
+        ruleset_result(
+            r#"
+            origin = """{% name"""
+            "#
+        ),
+        Err(RenderError::InvalidExpression(_))
+    ));
+}
+
+#[test]
+fn unmatched_closing_template_statement_delimiter_is_invalid() {
+    assert!(matches!(
+        ruleset_result(
+            r#"
+            origin = """name %}"""
+            "#
+        ),
+        Err(RenderError::InvalidExpression(_))
+    ));
+}
+
+#[test]
 fn item_json_example_renders_valid_json_with_escaped_braces() {
     let copperlace = Copperlace::from_str(include_str!("../../examples/item_json.conf")).unwrap();
     let rendered = copperlace.render("origin").unwrap();
@@ -757,11 +792,87 @@ fn overwrite_binding_whitespace_is_trimmed() {
         r#"
         first = ["Mia"]
         second = ["Darcy"]
-        origin = "{ hero:first }{ hero := second }{hero}"
+        origin = "{% hero:first %}{% hero:=second %}{hero}"
         "#,
     );
 
     assert_eq!(rules.render_rule("origin").unwrap(), "Darcy");
+}
+
+#[test]
+fn expression_binding_syntax_is_invalid() {
+    assert!(matches!(
+        ruleset_result(
+            r#"
+            name = ["Mia"]
+            origin = "{hero:name}"
+            "#
+        ),
+        Err(RenderError::InvalidExpression(expression)) if expression == "hero:name"
+    ));
+}
+
+#[test]
+fn expression_overwrite_binding_syntax_is_invalid() {
+    assert!(matches!(
+        ruleset_result(
+            r#"
+            name = ["Mia"]
+            origin = "{hero:=name}"
+            "#
+        ),
+        Err(RenderError::InvalidExpression(expression)) if expression == "hero:=name"
+    ));
+}
+
+#[test]
+fn statement_without_side_effect_is_invalid() {
+    assert!(matches!(
+        ruleset_result(
+            r#"
+            name = ["Mia"]
+            origin = "{% name %}"
+            "#
+        ),
+        Err(RenderError::InvalidExpression(expression)) if expression == "name"
+    ));
+}
+
+#[test]
+fn statement_without_source_is_invalid() {
+    assert!(matches!(
+        ruleset_result(
+            r#"
+            origin = "{% hero: %}"
+            "#
+        ),
+        Err(RenderError::InvalidExpression(expression)) if expression == "hero:"
+    ));
+}
+
+#[test]
+fn statement_without_target_is_invalid() {
+    assert!(matches!(
+        ruleset_result(
+            r#"
+            origin = "{% :name %}"
+            "#
+        ),
+        Err(RenderError::InvalidExpression(expression)) if expression == ":name"
+    ));
+}
+
+#[test]
+fn statement_with_empty_processor_is_invalid() {
+    assert!(matches!(
+        ruleset_result(
+            r#"
+            name = ["Mia"]
+            origin = "{% hero:name | %}"
+            "#
+        ),
+        Err(RenderError::InvalidExpression(expression)) if expression == "hero:name |"
+    ));
 }
 
 #[test]
@@ -1503,7 +1614,7 @@ fn bind_if_missing_stores_processed_value() {
         r#"
         name = ["mia"]
         other = ["darcy"]
-        origin = "{hero:name | uppercase}{hero:other | lowercase}{hero}"
+        origin = "{% hero:name | uppercase %}{% hero:other | lowercase %}{hero}"
         "#,
     );
 
@@ -1516,7 +1627,7 @@ fn overwrite_binding_stores_processed_value() {
         r#"
         name = ["mia"]
         other = ["darcy"]
-        origin = "{hero:name | uppercase}{hero:=other | titlecase}{hero}"
+        origin = "{% hero:name | uppercase %}{% hero:=other | titlecase %}{hero}"
         "#,
     );
 

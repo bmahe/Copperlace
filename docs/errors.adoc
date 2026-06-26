@@ -88,7 +88,7 @@ the ruleset handle is freed.
 
 == Render Context
 
-Each render has an isolated context. Bindings created by `{alias:rule}` and
+Each render has an isolated context. Bindings created by `{% alias:rule %}` and
 lazy values created from top-level `context` defaults live only for the current
 `render_rule` call.
 
@@ -98,9 +98,9 @@ JS/WASM context methods, or CLI `--set key=value`. Initial context values
 resolve before top-level `context` defaults and named rules. They are scoped to
 one render call and do not persist on the ruleset.
 
-Bind-if-missing expressions are idempotent within a render. If `{alias:rule}`
+Bind-if-missing statements are idempotent within a render. If `{% alias:rule %}`
 runs after `alias` already exists, it leaves the existing value unchanged and
-does not render `rule`. Overwrite expressions with `{alias:=rule}` always render
+does not render `rule`. Overwrite statements with `{% alias:=rule %}` always render
 `rule` and replace the value.
 
 The renderer does not currently expose seeded randomness or deterministic
@@ -119,8 +119,9 @@ Returned when a template pipeline references a processor that is not registered.
 Returned when a registered processor rejects a rendered value.
 
 `InvalidExpression(String)`::
-Returned when a template expression is malformed, such as `{name | }` or
-`{ | uppercase}`, or when template text contains an unmatched raw `{` or `}`.
+Returned when a template expression or statement is malformed, such as
+`{name | }`, `{ | uppercase}`, or `{% name %}`, or when template text contains
+an unmatched raw `{`, `}`, `{%`, or `%}`.
 
 `EmptyChoice`::
 Returned when rendering an array value with no elements.

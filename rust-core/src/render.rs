@@ -136,9 +136,9 @@ impl<'a> RenderState<'a> {
 
 /// A renderable piece of a compiled rule.
 ///
-/// Nodes are produced from config values and template expressions. Rendering is
-/// driven by `RenderState`, which carries the rule table, bound variables, RNG,
-/// and rule call stack for cycle detection.
+/// Nodes are produced from config values, template expressions, and template
+/// statements. Rendering is driven by `RenderState`, which carries the rule
+/// table, bound variables, RNG, and rule call stack for cycle detection.
 pub trait Node {
     /// Renders this node using the supplied render state.
     fn render(&self, state: &mut RenderState) -> Result<String, RenderError>;
@@ -397,11 +397,11 @@ pub enum BindMode {
 
 /// Binds the output of a child node into the render context without emitting it.
 ///
-/// This is the node generated for `{alias:rule}` expressions. If `alias` is not
-/// already bound, it renders `rule` and stores the result under `alias`. It
-/// also supports `{alias:=rule}` expressions, which always render `rule` and
-/// overwrite `alias`. Binding expressions always return an empty string so
-/// later `{alias}` references reuse the generated value.
+/// This is the node generated for `{% alias:rule %}` statements. If `alias` is
+/// not already bound, it renders `rule` and stores the result under `alias`. It
+/// also supports `{% alias:=rule %}` statements, which always render `rule` and
+/// overwrite `alias`. Binding statements always return an empty string so later
+/// `{alias}` references reuse the generated value.
 pub struct BindNode {
     name: String,
     node: Box<dyn Node>,
@@ -508,9 +508,10 @@ impl Node for WeightedChoiceNode {
 
 /// Renders a sequence of child nodes and concatenates their output.
 ///
-/// This is produced from string templates after splitting literal text and
-/// `{...}` expressions. For example, `"Hello {name}"` becomes a `VecNode`
-/// containing a literal `"Hello "` and a `RuleCallNode` for `name`.
+/// This is produced from string templates after splitting literal text,
+/// `{...}` expressions, and `{% ... %}` statements. For example,
+/// `"Hello {name}"` becomes a `VecNode` containing a literal `"Hello "` and a
+/// `RuleCallNode` for `name`.
 pub struct VecNode {
     nodes: Vec<Box<dyn Node>>,
 }
@@ -683,23 +684,61 @@ fn template_to_node(
                     nodes.push(Box::new(std::mem::take(&mut literal)));
                 }
 
-                let expression_start = index + character.len_utf8();
-                let mut expression_end = None;
-                for (expression_index, expression_character) in chars.by_ref() {
-                    if expression_character == '}' {
-                        expression_end = Some(expression_index);
-                        break;
+                if let Some((_, '%')) = chars.peek() {
+                    chars.next();
+                    let statement_start = index + character.len_utf8() + '%'.len_utf8();
+                    let mut statement_end = None;
+                    let mut previous_percent_index = None;
+                    for (statement_index, statement_character) in chars.by_ref() {
+                        if statement_character == '}'
+                            && let Some(percent_index) = previous_percent_index
+                        {
+                            statement_end = Some(percent_index);
+                            break;
+                        }
+                        previous_percent_index = if statement_character == '%' {
+                            Some(statement_index)
+                        } else {
+                            None
+                        };
                     }
+
+                    let Some(statement_end) = statement_end else {
+                        return Err(RenderError::InvalidExpression(
+                            "unmatched opening statement delimiter in template".to_string(),
+                        ));
+                    };
+
+                    let statement = template[statement_start..statement_end].trim();
+                    nodes.push(statement_to_node(statement, processors)?);
+                } else {
+                    let expression_start = index + character.len_utf8();
+                    let mut expression_end = None;
+                    for (expression_index, expression_character) in chars.by_ref() {
+                        if expression_character == '}' {
+                            expression_end = Some(expression_index);
+                            break;
+                        }
+                    }
+
+                    let Some(expression_end) = expression_end else {
+                        return Err(RenderError::InvalidExpression(
+                            "unmatched opening brace in template".to_string(),
+                        ));
+                    };
+
+                    let expression = template[expression_start..expression_end].trim();
+                    nodes.push(expression_to_node(expression, processors)?);
                 }
-
-                let Some(expression_end) = expression_end else {
+            }
+            '%' => {
+                if let Some((_, '}')) = chars.peek() {
                     return Err(RenderError::InvalidExpression(
-                        "unmatched opening brace in template".to_string(),
+                        "unmatched closing statement delimiter in template".to_string(),
                     ));
-                };
-
-                let expression = template[expression_start..expression_end].trim();
-                nodes.push(expression_to_node(expression, processors)?);
+                } else {
+                    literal.push(character);
+                }
             }
             '}' => {
                 return Err(RenderError::InvalidExpression(
@@ -717,10 +756,59 @@ fn template_to_node(
     Ok(Box::new(VecNode::new(nodes)))
 }
 
+fn statement_to_node(
+    statement: &str,
+    processors: &ProcessorRegistry,
+) -> Result<Box<dyn Node>, RenderError> {
+    let (base_expression, processor_names) = parse_pipeline(statement, processors)?;
+
+    if let Some((name, source)) = base_expression.split_once(":=") {
+        return bind_node(
+            statement,
+            name,
+            source,
+            processor_names,
+            BindMode::Overwrite,
+        );
+    }
+
+    if let Some((name, source)) = base_expression.split_once(':') {
+        return bind_node(
+            statement,
+            name,
+            source,
+            processor_names,
+            BindMode::IfMissing,
+        );
+    }
+
+    Err(RenderError::InvalidExpression(statement.to_string()))
+}
+
 fn expression_to_node(
     expression: &str,
     processors: &ProcessorRegistry,
 ) -> Result<Box<dyn Node>, RenderError> {
+    let (base_expression, processor_names) = parse_pipeline(expression, processors)?;
+
+    if base_expression.contains(':') {
+        return Err(RenderError::InvalidExpression(expression.to_string()));
+    }
+
+    let name = base_expression.trim();
+    if name.is_empty() {
+        return Err(RenderError::InvalidExpression(expression.to_string()));
+    }
+    Ok(pipeline_node(
+        Box::new(RuleCallNode::new(name.to_string())),
+        processor_names,
+    ))
+}
+
+fn parse_pipeline<'a>(
+    expression: &'a str,
+    processors: &ProcessorRegistry,
+) -> Result<(&'a str, Vec<String>), RenderError> {
     let mut parts = expression.split('|').map(str::trim);
     let base_expression = parts
         .next()
@@ -738,48 +826,26 @@ fn expression_to_node(
         })
         .collect::<Result<Vec<_>, _>>()?;
 
-    if let Some((name, source)) = base_expression.split_once(":=") {
-        let name = name.trim();
-        let source = source.trim();
-        if name.is_empty() || source.is_empty() {
-            return Err(RenderError::InvalidExpression(expression.to_string()));
-        }
-        let node = pipeline_node(
-            Box::new(RuleCallNode::new(source.to_string())),
-            processor_names,
-        );
-        return Ok(Box::new(BindNode::new(
-            name.trim().to_string(),
-            node,
-            BindMode::Overwrite,
-        )));
-    }
+    Ok((base_expression, processor_names))
+}
 
-    if let Some((name, source)) = base_expression.split_once(':') {
-        let name = name.trim();
-        let source = source.trim();
-        if name.is_empty() || source.is_empty() {
-            return Err(RenderError::InvalidExpression(expression.to_string()));
-        }
-        let node = pipeline_node(
-            Box::new(RuleCallNode::new(source.to_string())),
-            processor_names,
-        );
-        return Ok(Box::new(BindNode::new(
-            name.trim().to_string(),
-            node,
-            BindMode::IfMissing,
-        )));
-    }
-
-    let name = base_expression.trim();
-    if name.is_empty() {
+fn bind_node(
+    expression: &str,
+    name: &str,
+    source: &str,
+    processor_names: Vec<String>,
+    mode: BindMode,
+) -> Result<Box<dyn Node>, RenderError> {
+    let name = name.trim();
+    let source = source.trim();
+    if name.is_empty() || source.is_empty() {
         return Err(RenderError::InvalidExpression(expression.to_string()));
     }
-    Ok(pipeline_node(
-        Box::new(RuleCallNode::new(name.to_string())),
+    let node = pipeline_node(
+        Box::new(RuleCallNode::new(source.to_string())),
         processor_names,
-    ))
+    );
+    Ok(Box::new(BindNode::new(name.to_string(), node, mode)))
 }
 
 fn pipeline_node(node: Box<dyn Node>, processors: Vec<String>) -> Box<dyn Node> {

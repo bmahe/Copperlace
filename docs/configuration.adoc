@@ -11,7 +11,7 @@ with `InvalidConfigRoot`.
 
 [source]
 ----
-origin = "{hero:name}{story}"
+origin = "{% hero:name %}{story}"
 name = ["Mia"]
 story = "{hero} walked home."
 ----
@@ -58,16 +58,19 @@ render finishes.
 == String Values
 
 Strings are parsed as templates. Each `{...}` section becomes a render-time
-expression; all other text remains literal.
+expression that appends text to the output. Each `{% ... %}` section becomes a
+render-time statement that may update render state but appends no text. All
+other text remains literal.
 
 [source]
 ----
 origin = "Hello {name}"
 ----
 
-Literal braces can be escaped in template text with `\{` and `\}`. In normal
-quoted strings, escape the backslash itself as `\\{` or `\\}`. In triple-quoted
-strings, write `\{` or `\}` directly.
+Literal expression braces can be escaped in template text with `\{` and `\}`.
+Literal statement delimiters can be escaped with `\{%` and `%\}`. In normal
+quoted strings, escape the backslash itself as `\\{`, `\\}`, `\\{%`, or
+`%\\}`. In triple-quoted strings, write `\{`, `\}`, `\{%`, or `%\}` directly.
 
 [source]
 ----
@@ -75,6 +78,7 @@ inline = "\\{name\\}"
 json = """\{
   "name": {name | quote}
 \}"""
+statement = """\{% hero:name %\}"""
 ----
 
 Supported expressions:
@@ -82,17 +86,20 @@ Supported expressions:
 * `{rule}` resolves a bound value, context default, or named rule.
 * `{rule | processor}` renders `rule` and passes the result through one or more
   processors from left to right.
-* `{alias:rule}` binds the rendered `rule` value to `alias` if `alias` is not
-  already bound for this render, and emits an empty string.
-* `{alias:=rule}` always renders `rule`, stores the result under `alias`, and
-  emits an empty string.
 
-Binding expressions can also use processors. `{alias:rule | uppercase}` stores
-the processed result under `alias`; `{alias:=rule | uppercase}` overwrites
+Supported statements:
+
+* `{% alias:rule %}` binds the rendered `rule` value to `alias` if `alias` is not
+  already bound for this render.
+* `{% alias:=rule %}` always renders `rule`, stores the result under `alias`, and
+  replaces any existing value.
+
+Binding statements can also use processors. `{% alias:rule | uppercase %}` stores
+the processed result under `alias`; `{% alias:=rule | uppercase %}` overwrites
 `alias` with the processed result.
 
-Overwrite bindings are parsed before bind-if-missing bindings, so `{alias:=rule}`
-is distinct from `{alias:rule}`.
+Overwrite bindings are parsed before bind-if-missing bindings, so `{% alias:=rule %}`
+is distinct from `{% alias:rule %}`.
 
 Supported builtin processors are:
 
@@ -297,7 +304,7 @@ story = [
   "{hero} traveled with her pet {heroPet}. {hero} was never {mood}, for the {heroPet} was always too {mood}."
 ]
 
-origin = "{hero:name}{heroPet:animal}{story}"
+origin = "{% hero:name %}{% heroPet:animal %}{story}"
 
 context = {
   hero = "{name}"

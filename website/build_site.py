@@ -53,12 +53,12 @@ def main() -> int:
         shutil.rmtree(SITE)
 
     SITE.mkdir(parents=True, exist_ok=True)
-    copy_assets(include_js=build_main)
 
-    if build_main:
-        build_main_site()
     if build_api:
         build_api_docs()
+    copy_assets(include_js=build_main)
+    if build_main:
+        build_main_site()
 
     return 0
 

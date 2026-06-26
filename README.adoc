@@ -22,7 +22,7 @@ animal = ["owl", "raven"]
 mood = ["quiet", "restless"]
 
 story = "{hero} traveled with {pet | article}. {hero} stayed {mood}."
-origin = "{hero:name}{pet:animal}{story}"
+origin = "{% hero:name %}{% pet:animal %}{story}"
 ----
 
 Rendering `origin` might produce:
@@ -39,7 +39,7 @@ Another render might produce:
 Lina traveled with a raven. Lina stayed restless.
 ----
 
-The important detail is consistency inside one result: `{hero:name}` chooses a
+The important detail is consistency inside one result: `{% hero:name %}` chooses a
 name once, and later `{hero}` references reuse that same name.
 
 Template expressions also support processor pipelines:

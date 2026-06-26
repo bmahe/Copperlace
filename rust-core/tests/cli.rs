@@ -261,7 +261,7 @@ fn render_count_reuses_initial_context_without_persisting_overwrites() {
     let config_path = write_temp_config(
         r#"
         next = "Darcy"
-        origin = "{name}{name:=next}"
+        origin = "{name}{% name:=next %}"
         "#,
     );
     let output = Command::new(env!("CARGO_BIN_EXE_copperlace"))

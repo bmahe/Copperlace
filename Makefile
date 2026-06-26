@@ -77,7 +77,7 @@ site:
 	$(PYTHON) website/build_site.py --clean
 
 .PHONY: site-main
-site-main:
+site-main: js-web
 	$(PYTHON) website/build_site.py --clean --main
 
 .PHONY: site-api

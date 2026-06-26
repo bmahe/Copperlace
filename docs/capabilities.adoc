@@ -23,7 +23,9 @@ Rendering `name` directly is also valid.
 == Templates
 
 String values are parsed as templates. Literal text is copied into the output.
-Expressions inside braces are resolved at render time.
+Expressions inside braces are resolved at render time and append text to the
+output. Statements inside `{% ... %}` are resolved at render time but never
+append text directly.
 
 [source]
 ----
@@ -96,18 +98,18 @@ Copperlace supports two binding forms. Both forms emit no text directly.
 
 === Bind If Missing
 
-An expression of the form `{alias:rule}` ensures `alias` has a value for the
+A statement of the form `{% alias:rule %}` ensures `alias` has a value for the
 current render and emits no text directly. If `alias` is missing, Copperlace
 renders `rule` and stores the result under `alias`. If `alias` already exists,
-the expression leaves the existing value unchanged and does not render `rule`.
+the statement leaves the existing value unchanged and does not render `rule`.
 
 [source]
 ----
 name = ["Mia"]
-origin = "{hero:name}{hero}/{hero}"
+origin = "{% hero:name %}{hero}/{hero}"
 ----
 
-Rendering `origin` produces `Mia/Mia`. The first expression binds `hero`; later
+Rendering `origin` produces `Mia/Mia`. The first statement binds `hero`; later
 `{hero}` references reuse the same value.
 
 Bindings do not overwrite an existing value:
@@ -116,32 +118,32 @@ Bindings do not overwrite an existing value:
 ----
 first = ["Mia"]
 second = ["Darcy"]
-origin = "{hero:first}{hero:second}{hero}"
+origin = "{% hero:first %}{% hero:second %}{hero}"
 ----
 
-Rendering `origin` produces `Mia`. The second binding expression is a no-op
+Rendering `origin` produces `Mia`. The second binding statement is a no-op
 because `hero` already exists.
 
-Binding expressions store processed values when a pipeline is present:
+Binding statements store processed values when a pipeline is present:
 
 [source]
 ----
 name = ["mia"]
-origin = "{hero:name | uppercase}{hero}"
+origin = "{% hero:name | uppercase %}{hero}"
 ----
 
 Rendering `origin` produces `MIA`.
 
 === Overwrite Binding
 
-An expression of the form `{alias:=rule}` always renders `rule`, stores the
+A statement of the form `{% alias:=rule %}` always renders `rule`, stores the
 result under `alias`, and replaces any existing value for `alias`.
 
 [source]
 ----
 first = ["Mia"]
 second = ["Darcy"]
-origin = "{hero:first}{hero:=second}{hero}"
+origin = "{% hero:first %}{% hero:=second %}{hero}"
 ----
 
 Rendering `origin` produces `Darcy`. The overwrite binding replaces the
