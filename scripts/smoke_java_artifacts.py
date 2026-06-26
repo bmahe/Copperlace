@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import platform
+import shutil
 import subprocess
 import tempfile
 from pathlib import Path
@@ -25,7 +26,7 @@ def main() -> int:
         commons = temp_dir / f"commons-lang3-{COMMONS_LANG3_VERSION}.jar"
         subprocess.run(
             [
-                "mvn",
+                command("mvn"),
                 "-q",
                 "dependency:copy",
                 f"-Dartifact=org.apache.commons:commons-lang3:{COMMONS_LANG3_VERSION}",
@@ -50,9 +51,15 @@ public final class Smoke {
             encoding="utf-8",
         )
         classpath = classpath_for([base_jar, native_jar, commons])
-        subprocess.run(["javac", "--release", "25", "-cp", classpath, str(source)], cwd=temp_dir, check=True)
+        subprocess.run([command("javac"), "--release", "25", "-cp", classpath, str(source)], cwd=temp_dir, check=True)
         subprocess.run(
-            ["java", "--enable-native-access=ALL-UNNAMED", "-cp", classpath_for([temp_dir, base_jar, native_jar, commons]), "Smoke"],
+            [
+                command("java"),
+                "--enable-native-access=ALL-UNNAMED",
+                "-cp",
+                classpath_for([temp_dir, base_jar, native_jar, commons]),
+                "Smoke",
+            ],
             cwd=temp_dir,
             check=True,
         )
@@ -62,6 +69,13 @@ public final class Smoke {
 
 def classpath_for(paths: list[Path]) -> str:
     return (";" if platform.system() == "Windows" else ":").join(str(path) for path in paths)
+
+
+def command(name: str) -> str:
+    tool = shutil.which(name)
+    if tool is None:
+        raise RuntimeError(f"Could not find {name} on PATH")
+    return tool
 
 
 if __name__ == "__main__":
