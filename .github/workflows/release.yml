@@ -1,0 +1,181 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  versions:
+    name: Version metadata
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: python scripts/check_versions.py --tag "${GITHUB_REF_NAME}"
+
+  python-wheel:
+    name: Python wheel (${{ matrix.target }})
+    needs: versions
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: linux-x86_64
+            runner: ubuntu-24.04
+          - target: linux-aarch64
+            runner: ubuntu-24.04-arm
+          - target: macos-x86_64
+            runner: macos-15-intel
+          - target: macos-aarch64
+            runner: macos-15
+          - target: windows-x86_64
+            runner: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: dtolnay/rust-toolchain@stable
+      - run: python -m build --wheel
+        working-directory: python
+      - shell: bash
+        run: python scripts/smoke_python_wheel.py python/dist/*.whl
+      - uses: actions/upload-artifact@v4
+        with:
+          name: python-wheel-${{ matrix.target }}
+          path: python/dist/*.whl
+
+  java-package:
+    name: Java package (${{ matrix.target }})
+    needs: versions
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: linux-x86_64
+            runner: ubuntu-24.04
+            classifier: linux-x86_64
+          - target: linux-aarch64
+            runner: ubuntu-24.04-arm
+            classifier: linux-aarch64
+          - target: macos-x86_64
+            runner: macos-15-intel
+            classifier: macos-x86_64
+          - target: macos-aarch64
+            runner: macos-15
+            classifier: macos-aarch64
+          - target: windows-x86_64
+            runner: windows-2022
+            classifier: windows-x86_64
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+      - uses: dtolnay/rust-toolchain@stable
+      - run: mvn -q package
+        working-directory: java
+      - shell: bash
+        run: |
+          VERSION=$(python scripts/check_versions.py)
+          BASE_JAR="java/target/copperlace-${VERSION}.jar"
+          NATIVE_JAR="java/target/copperlace-${VERSION}-${{ matrix.classifier }}.jar"
+          python scripts/smoke_java_artifacts.py --base-jar "$BASE_JAR" --native-jar "$NATIVE_JAR"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: java-jars-${{ matrix.target }}
+          path: java/target/*.jar
+
+  cli-archive:
+    name: CLI archive (${{ matrix.target }})
+    needs: versions
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: linux-x86_64
+            runner: ubuntu-24.04
+          - target: linux-aarch64
+            runner: ubuntu-24.04-arm
+          - target: macos-x86_64
+            runner: macos-15-intel
+          - target: macos-aarch64
+            runner: macos-15
+          - target: windows-x86_64
+            runner: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo build --release --manifest-path rust-core/Cargo.toml
+      - run: python scripts/package_cli.py --output-dir dist
+      - shell: bash
+        run: python scripts/smoke_cli_archive.py dist/*
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cli-archive-${{ matrix.target }}
+          path: dist/*
+
+  js-package:
+    name: JS/WASM package
+    needs: versions
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - run: cargo install wasm-pack --locked
+      - run: make js-package
+      - run: |
+          mkdir -p dist
+          cp LICENSE js/pkg/LICENSE
+          npm pack ./js/pkg --pack-destination dist
+      - run: python scripts/smoke_js_package.py dist/*.tgz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: js-package
+          path: dist/*.tgz
+
+  publish:
+    name: Publish GitHub Release
+    needs:
+      - python-wheel
+      - java-package
+      - cli-archive
+      - js-package
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+          merge-multiple: true
+      - name: Generate checksums
+        run: python scripts/checksums.py release-artifacts
+      - name: Publish release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
+            gh release upload "${GITHUB_REF_NAME}" release-artifacts/* --clobber
+          else
+            gh release create "${GITHUB_REF_NAME}" release-artifacts/* \
+              --title "${GITHUB_REF_NAME}" \
+              --notes "Copperlace ${GITHUB_REF_NAME} release artifacts."
+          fi

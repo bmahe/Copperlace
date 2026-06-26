@@ -17,6 +17,7 @@ help:
 	@printf '%s\n' '  make rust-build     Build Rust library, native library, and CLI'
 	@printf '%s\n' '  make rust-test      Run Rust tests'
 	@printf '%s\n' '  make rust-cli       Run the sample CLI render command'
+	@printf '%s\n' '  make cli-archive    Build a CLI and native-library release archive'
 	@printf '%s\n' '  make python-test    Run Python wrapper tests'
 	@printf '%s\n' '  make python-wheel   Build the Python wheel'
 	@printf '%s\n' '  make js-package     Build JS/TS WebAssembly package for bundlers'
@@ -29,6 +30,7 @@ help:
 	@printf '%s\n' '  make site-serve     Serve generated website locally'
 	@printf '%s\n' '  make test           Run Rust, Python, and Java tests'
 	@printf '%s\n' '  make package        Build Python, JS/TS, and Java distributable artifacts'
+	@printf '%s\n' '  make release-check  Check package version metadata consistency'
 	@printf '%s\n' '  make check          Run formatting checks and tests'
 	@printf '%s\n' '  make clean          Remove build outputs'
 
@@ -47,6 +49,10 @@ rust-test:
 .PHONY: rust-cli
 rust-cli:
 	cd $(RUST_DIR) && $(CARGO) run --bin copperlace -- render --config example.conf --rule origin
+
+.PHONY: cli-archive
+cli-archive: rust-build
+	$(PYTHON) scripts/package_cli.py --output-dir target/release-artifacts
 
 .PHONY: python-test
 python-test: rust-build
@@ -92,7 +98,11 @@ site-serve: site-main
 test: rust-test python-test java-test
 
 .PHONY: package
-package: python-wheel js-package java-package
+package: cli-archive python-wheel js-package java-package
+
+.PHONY: release-check
+release-check:
+	$(PYTHON) scripts/check_versions.py
 
 .PHONY: check
 check: rust-fmt test
@@ -100,6 +110,7 @@ check: rust-fmt test
 .PHONY: clean
 clean:
 	cd $(RUST_DIR) && $(CARGO) clean
+	rm -rf target/release-artifacts
 	rm -rf $(PYTHON_DIR)/build $(PYTHON_DIR)/dist $(PYTHON_DIR)/*.egg-info
 	rm -rf $(JS_DIR)/pkg
 	find $(PYTHON_DIR) -type d -name __pycache__ -prune -exec rm -rf {} +

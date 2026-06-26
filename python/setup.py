@@ -75,6 +75,10 @@ try:
             super().finalize_options()
             self.root_is_pure = False
 
+        def get_tag(self) -> tuple[str, str, str]:
+            _python, _abi, platform_tag = super().get_tag()
+            return "py3", "none", platform_tag
+
     cmdclass = {
         "build_py": build_py_with_rust,
         "bdist_wheel": bdist_wheel_platform,

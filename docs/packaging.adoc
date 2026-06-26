@@ -15,8 +15,40 @@ make clean
 ----
 
 `make check` runs Rust formatting checks plus Rust, Python, and Java tests.
-`make package` builds distributable Python, JS/TS, and Java artifacts.
+`make package` builds distributable CLI/native, Python, JS/TS, and Java
+artifacts for the current platform.
 `make clean` removes generated Rust, Python, JS/TS, and Java build output.
+
+== Release Automation
+
+GitHub Actions builds and smoke-tests packages for pull requests and pushes to
+`main`. Version tags matching `v*` build the same package set, generate
+`SHA256SUMS`, and publish assets to the GitHub Release for that tag.
+
+The first-class native release targets are:
+
+* `linux-x86_64`
+* `linux-aarch64`
+* `macos-x86_64`
+* `macos-aarch64`
+* `windows-x86_64`
+
+Windows aarch64 is not part of the first release matrix. Other platforms may
+still work from source when Rust, Python, Java, or Node tooling is available,
+but packaged native artifacts are not promised for them.
+
+Release assets include:
+
+* platform CLI archives containing the `copperlace` binary and native library;
+* Python wheels with the platform native library bundled under
+  `copperlace/native/`;
+* Java API JARs plus platform native classifier JARs;
+* a JS/WASM package tarball generated from `wasm-pack --target bundler`;
+* `SHA256SUMS` for uploaded release assets.
+
+Use `make release-check` locally to verify Cargo, Python, and Maven versions
+match before creating a release tag. Release tags should use the package version
+prefixed with `v`, such as `v0.1.0`.
 
 == Rust Artifacts
 
@@ -26,6 +58,9 @@ The Rust package in `rust-core/` builds:
 * a `cdylib` native dynamic library;
 * the `copperlace` CLI binary.
 * a WebAssembly package when built with `wasm-pack`.
+
+`make cli-archive` builds the current-platform CLI release archive under
+`target/release-artifacts/`.
 
 The CLI supports:
 
