@@ -26,7 +26,7 @@ def main() -> int:
         commons = temp_dir / f"commons-lang3-{COMMONS_LANG3_VERSION}.jar"
         subprocess.run(
             [
-                "mvn",
+                command("mvn"),
                 "-q",
                 "dependency:copy",
                 f"-Dartifact=org.apache.commons:commons-lang3:{COMMONS_LANG3_VERSION}",
@@ -51,10 +51,10 @@ public final class Smoke {
             encoding="utf-8",
         )
         classpath = classpath_for([base_jar, native_jar, commons])
-        subprocess.run([java_tool("javac"), "--release", "25", "-cp", classpath, str(source)], cwd=temp_dir, check=True)
+        subprocess.run([command("javac"), "--release", "25", "-cp", classpath, str(source)], cwd=temp_dir, check=True)
         subprocess.run(
             [
-                java_tool("java"),
+                command("java"),
                 "--enable-native-access=ALL-UNNAMED",
                 "-cp",
                 classpath_for([temp_dir, base_jar, native_jar, commons]),
@@ -71,7 +71,7 @@ def classpath_for(paths: list[Path]) -> str:
     return (";" if platform.system() == "Windows" else ":").join(str(path) for path in paths)
 
 
-def java_tool(name: str) -> str:
+def command(name: str) -> str:
     tool = shutil.which(name)
     if tool is None:
         raise RuntimeError(f"Could not find {name} on PATH")
