@@ -61,6 +61,13 @@ You found an ancient key.
 The `article` processor chooses `a` or `an`, and `slug` turns text into a
 URL-friendly value such as `ancient-key`.
 
+== License
+
+Copyright 2026 Bruno Mahé.
+
+Copperlace is licensed under the Apache License, Version 2.0. See
+link:LICENSE[LICENSE] for details.
+
 == Quick Start
 
 Run the bundled example from the Rust project:
