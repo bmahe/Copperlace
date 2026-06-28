@@ -49,6 +49,7 @@
 
     <central.publishing.maven.plugin.version>0.11.0</central.publishing.maven.plugin.version>
     <maven.compiler.plugin.version>3.13.0</maven.compiler.plugin.version>
+    <maven.enforcer.plugin.version>3.5.0</maven.enforcer.plugin.version>
     <maven.gpg.plugin.version>3.2.7</maven.gpg.plugin.version>
     <maven.jar.plugin.version>3.4.2</maven.jar.plugin.version>
     <maven.javadoc.plugin.version>3.11.2</maven.javadoc.plugin.version>
@@ -93,6 +94,30 @@
           <groupId>org.apache.maven.plugins</groupId>
           <artifactId>maven-jar-plugin</artifactId>
           <version>${maven.jar.plugin.version}</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-enforcer-plugin</artifactId>
+          <version>${maven.enforcer.plugin.version}</version>
+          <executions>
+            <execution>
+              <id>require-staged-native-library</id>
+              <phase>validate</phase>
+              <goals>
+                <goal>enforce</goal>
+              </goals>
+              <configuration>
+                <rules>
+                  <requireFilesExist>
+                    <message>Missing staged Copperlace native library. Build the native library and run scripts/stage_java_native.py --classifier ${copperlace.native.classifier}, or use make java-package.</message>
+                    <files>
+                      <file>${maven.multiModuleProjectDirectory}/native-artifacts/${copperlace.native.classifier}/${copperlace.native.library}</file>
+                    </files>
+                  </requireFilesExist>
+                </rules>
+              </configuration>
+            </execution>
+          </executions>
         </plugin>
         <plugin>
           <groupId>org.apache.maven.plugins</groupId>
@@ -157,30 +182,75 @@
   <profiles>
     <profile>
       <id>linux-x86_64</id>
+      <activation>
+        <os>
+          <name>Linux</name>
+          <arch>amd64</arch>
+        </os>
+        <property>
+          <name>!copperlace.skip.current.native</name>
+        </property>
+      </activation>
       <modules>
         <module>native/linux-x86_64</module>
       </modules>
     </profile>
     <profile>
       <id>linux-aarch64</id>
+      <activation>
+        <os>
+          <name>Linux</name>
+          <arch>aarch64</arch>
+        </os>
+        <property>
+          <name>!copperlace.skip.current.native</name>
+        </property>
+      </activation>
       <modules>
         <module>native/linux-aarch64</module>
       </modules>
     </profile>
     <profile>
       <id>macos-x86_64</id>
+      <activation>
+        <os>
+          <family>mac</family>
+          <arch>x86_64</arch>
+        </os>
+        <property>
+          <name>!copperlace.skip.current.native</name>
+        </property>
+      </activation>
       <modules>
         <module>native/macos-x86_64</module>
       </modules>
     </profile>
     <profile>
       <id>macos-aarch64</id>
+      <activation>
+        <os>
+          <family>mac</family>
+          <arch>aarch64</arch>
+        </os>
+        <property>
+          <name>!copperlace.skip.current.native</name>
+        </property>
+      </activation>
       <modules>
         <module>native/macos-aarch64</module>
       </modules>
     </profile>
     <profile>
       <id>windows-x86_64</id>
+      <activation>
+        <os>
+          <family>windows</family>
+          <arch>amd64</arch>
+        </os>
+        <property>
+          <name>!copperlace.skip.current.native</name>
+        </property>
+      </activation>
       <modules>
         <module>native/windows-x86_64</module>
       </modules>

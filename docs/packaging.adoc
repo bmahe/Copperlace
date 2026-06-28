@@ -237,6 +237,13 @@ The Java API JAR contains only Java classes. Native binaries are packaged in
 platform artifacts for `linux-x86_64`, `linux-aarch64`, `macos-x86_64`,
 `macos-aarch64`, and `windows-x86_64`.
 
+Plain Maven builds include the current-system native Java package by default
+when the staged native library exists under
+`java/native-artifacts/<classifier>/`. Maven does not compile the native
+library; use `make java-package` to build Rust, stage the current native
+library, and package the Java API plus current-platform native JAR. To build
+only the Java API, run Maven with `-pl api`.
+
 At runtime, the Java wrapper loads the native library in this order:
 
 . `COPPERLACE_LIBRARY_PATH`

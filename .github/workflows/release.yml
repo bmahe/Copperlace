@@ -181,7 +181,7 @@ jobs:
           MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
           MAVEN_CENTRAL_TOKEN: ${{ secrets.MAVEN_CENTRAL_TOKEN }}
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
-        run: mvn -q -Pall-platform,central-publish -Dgpg.passphrase="${GPG_PASSPHRASE}" deploy
+        run: mvn -q -Pall-platform,central-publish -Dcopperlace.skip.current.native=true -Dgpg.passphrase="${GPG_PASSPHRASE}" deploy
         working-directory: java
 
   cli-archive:
