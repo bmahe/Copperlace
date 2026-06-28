@@ -234,14 +234,10 @@ fn pluralize_lowercase(value: &str) -> String {
         return format!("{stem}ves");
     }
 
-    if let Some(stem) = value.strip_suffix('y') {
-        if stem
-            .chars()
-            .last()
-            .is_some_and(|character| is_consonant(character))
-        {
-            return format!("{stem}ies");
-        }
+    if let Some(stem) = value.strip_suffix('y')
+        && stem.chars().last().is_some_and(is_consonant)
+    {
+        return format!("{stem}ies");
     }
 
     if value.ends_with('s')
@@ -304,10 +300,10 @@ fn singularize_lowercase(value: &str) -> String {
             .to_string();
     }
 
-    if value.len() > 1 {
-        if let Some(stem) = value.strip_suffix('s') {
-            return stem.to_string();
-        }
+    if value.len() > 1
+        && let Some(stem) = value.strip_suffix('s')
+    {
+        return stem.to_string();
     }
 
     value.to_string()
@@ -409,14 +405,10 @@ fn past_tense_lowercase(value: &str) -> String {
         return format!("{value}d");
     }
 
-    if let Some(stem) = value.strip_suffix('y') {
-        if stem
-            .chars()
-            .last()
-            .is_some_and(|character| is_consonant(character))
-        {
-            return format!("{stem}ied");
-        }
+    if let Some(stem) = value.strip_suffix('y')
+        && stem.chars().last().is_some_and(is_consonant)
+    {
+        return format!("{stem}ied");
     }
 
     if should_double_final_consonant(value) {
@@ -512,10 +504,11 @@ fn apply_case_style(original: &str, value: &str) -> String {
     let mut characters = original
         .chars()
         .filter(|character| character.is_alphabetic());
-    if let Some(first) = characters.next() {
-        if first.is_uppercase() && characters.all(|character| character.is_lowercase()) {
-            return capitalize(value).expect("capitalize is infallible");
-        }
+    if let Some(first) = characters.next()
+        && first.is_uppercase()
+        && characters.all(|character| character.is_lowercase())
+    {
+        return capitalize(value).expect("capitalize is infallible");
     }
 
     value.to_string()
