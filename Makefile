@@ -49,7 +49,7 @@ rust-test:
 
 .PHONY: rust-cli
 rust-cli:
-	cd $(RUST_DIR) && $(CARGO) run --bin copperlace -- render --config example.conf --rule origin
+	cd $(RUST_DIR) && $(CARGO) run --bin copperlace -- render --config ../examples/character_scene.conf --rule origin
 
 .PHONY: cli-archive
 cli-archive: rust-build
