@@ -3,6 +3,13 @@ name = "copperlace"
 version = "0.1.0"
 edition = "2024"
 license = "Apache-2.0"
+description = "Procedural text renderer for generative grammar configuration"
+repository = "https://github.com/bmahe/Copperlace"
+homepage = "https://bmahe.github.io/Copperlace/"
+documentation = "https://docs.rs/copperlace"
+readme = "../README.adoc"
+keywords = ["text-generation", "templates", "grammar", "procedural"]
+categories = ["template-engine", "text-processing"]
 
 [lib]
 crate-type = ["rlib", "cdylib"]

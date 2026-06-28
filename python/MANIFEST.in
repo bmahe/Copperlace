@@ -1,0 +1,11 @@
+include README.md
+include pyproject.toml
+include setup.py
+graft copperlace
+graft tests
+graft rust-core/src
+include rust-core/Cargo.toml
+include rust-core/Cargo.lock
+include rust-core/LICENSE
+prune rust-core/target
+global-exclude __pycache__ *.py[cod] target/*

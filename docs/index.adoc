@@ -14,6 +14,8 @@ the behavior currently implemented in `rust-core`.
   and render error conditions.
 * link:packaging.adoc[Packaging and language wrappers] describes build
   workflows, distributable artifacts, and Python/Java wrapper surfaces.
+* link:releasing.adoc[Release process] describes how to prepare, publish, and
+  verify Copperlace package releases.
 
 == Documented Renderer Surface
 
@@ -31,4 +33,4 @@ The package also builds and packages:
 * a `copperlace` CLI with `render --config <path> --rule <name>`;
 * a C ABI dynamic library with an opaque ruleset handle API;
 * Python wheels backed by the native library;
-* Java API and native classifier JARs.
+* Java API, all-platform, and platform native JARs.

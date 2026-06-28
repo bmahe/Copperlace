@@ -456,7 +456,7 @@ final class NativeLibrary {
                         + libraryName
                         + " for "
                         + nativeClassifier()
-                        + ". Add the matching native classifier artifact, build rust-core, or set COPPERLACE_LIBRARY_PATH.");
+                        + ". Add the matching native platform artifact, build rust-core, or set COPPERLACE_LIBRARY_PATH.");
     }
 
     private static Optional<Path> findPackagedLibrary(final String libraryName) {
@@ -490,6 +490,7 @@ final class NativeLibrary {
         final Path cwd = Path.of("").toAbsolutePath().normalize();
         return new Path[] {
             cwd.resolve("../rust-core/target/release").resolve(libraryName).normalize(),
+            cwd.resolve("../../rust-core/target/release").resolve(libraryName).normalize(),
             cwd.resolve("rust-core/target/release").resolve(libraryName).normalize()
         };
     }

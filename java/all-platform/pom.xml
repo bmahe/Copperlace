@@ -1,0 +1,86 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>dev.mahe.copperlace</groupId>
+    <artifactId>copperlace-java-parent</artifactId>
+    <version>0.1.0</version>
+    <relativePath>..</relativePath>
+  </parent>
+
+  <artifactId>copperlace</artifactId>
+  <packaging>jar</packaging>
+
+  <name>Copperlace Java All Platforms</name>
+  <description>Convenience Java dependency for Copperlace with all supported native platforms.</description>
+
+  <dependencies>
+    <dependency>
+      <groupId>dev.mahe.copperlace</groupId>
+      <artifactId>copperlace-api</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>dev.mahe.copperlace</groupId>
+      <artifactId>copperlace-linux-x86_64</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>dev.mahe.copperlace</groupId>
+      <artifactId>copperlace-linux-aarch64</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>dev.mahe.copperlace</groupId>
+      <artifactId>copperlace-macos-x86_64</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>dev.mahe.copperlace</groupId>
+      <artifactId>copperlace-macos-aarch64</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>dev.mahe.copperlace</groupId>
+      <artifactId>copperlace-windows-x86_64</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>attach-empty-sources</id>
+            <phase>package</phase>
+            <goals>
+              <goal>jar</goal>
+            </goals>
+            <configuration>
+              <classifier>sources</classifier>
+              <classesDirectory>${project.build.directory}/empty-sources</classesDirectory>
+              <skipIfEmpty>false</skipIfEmpty>
+            </configuration>
+          </execution>
+          <execution>
+            <id>attach-empty-javadocs</id>
+            <phase>package</phase>
+            <goals>
+              <goal>jar</goal>
+            </goals>
+            <configuration>
+              <classifier>javadoc</classifier>
+              <classesDirectory>${project.build.directory}/empty-javadoc</classesDirectory>
+              <skipIfEmpty>false</skipIfEmpty>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>

@@ -291,11 +291,16 @@ make java-package
 
 == Packaging Notes
 
-Python wheels and Java native classifier JARs are platform-specific because
-they include the Rust dynamic library. JS/TS packages are generated from the
-same Rust renderer as WebAssembly and require `wasm-pack`.
+Python wheels and Java native JARs are platform-specific because they include
+the Rust dynamic library. Python source distributions include the Rust sources
+needed to build that native library locally. JS/TS packages are generated from
+the same Rust renderer as WebAssembly and require `wasm-pack`.
 
-The Java module uses Maven coordinates `dev.mahe.copperlace:copperlace`. At
-runtime, the Java wrapper loads the native library from `COPPERLACE_LIBRARY_PATH`
-first, then from packaged native resources, then from local Rust build output
-for source-tree development.
+The simplest Java dependency is `dev.mahe.copperlace:copperlace`, which brings
+in the Java API plus all supported native platform artifacts. Users who only
+want one runtime platform can depend on a platform artifact such as
+`dev.mahe.copperlace:copperlace-linux-x86_64`, and advanced users can depend on
+`dev.mahe.copperlace:copperlace-api` directly. At runtime, the Java wrapper
+loads the native library from `COPPERLACE_LIBRARY_PATH` first, then from
+packaged native resources, then from local Rust build output for source-tree
+development.

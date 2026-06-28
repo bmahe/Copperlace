@@ -15,11 +15,13 @@ COMMONS_LANG3_VERSION = "3.20.0"
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Smoke-test Copperlace Java release JARs")
-    parser.add_argument("--base-jar", type=Path, required=True)
+    parser.add_argument("--api-jar", type=Path, required=True)
     parser.add_argument("--native-jar", type=Path, required=True)
+    parser.add_argument("--all-jar", type=Path)
     args = parser.parse_args()
-    base_jar = args.base_jar.resolve()
+    api_jar = args.api_jar.resolve()
     native_jar = args.native_jar.resolve()
+    all_jar = args.all_jar.resolve() if args.all_jar else None
 
     with tempfile.TemporaryDirectory(prefix="copperlace-java-smoke-") as temp:
         temp_dir = Path(temp)
@@ -50,21 +52,27 @@ public final class Smoke {
 """.strip(),
             encoding="utf-8",
         )
-        classpath = classpath_for([base_jar, native_jar, commons])
-        subprocess.run([command("javac"), "--release", "25", "-cp", classpath, str(source)], cwd=temp_dir, check=True)
-        subprocess.run(
-            [
-                command("java"),
-                "--enable-native-access=ALL-UNNAMED",
-                "-cp",
-                classpath_for([temp_dir, base_jar, native_jar, commons]),
-                "Smoke",
-            ],
-            cwd=temp_dir,
-            check=True,
-        )
+        smoke(temp_dir, source, [api_jar, native_jar, commons])
+        if all_jar is not None:
+            smoke(temp_dir, source, [all_jar, api_jar, native_jar, commons])
 
     return 0
+
+
+def smoke(temp_dir: Path, source: Path, dependencies: list[Path]) -> None:
+    classpath = classpath_for(dependencies)
+    subprocess.run([command("javac"), "--release", "25", "-cp", classpath, str(source)], cwd=temp_dir, check=True)
+    subprocess.run(
+        [
+            command("java"),
+            "--enable-native-access=ALL-UNNAMED",
+            "-cp",
+            classpath_for([temp_dir, *dependencies]),
+            "Smoke",
+        ],
+        cwd=temp_dir,
+        check=True,
+    )
 
 
 def classpath_for(paths: list[Path]) -> str:

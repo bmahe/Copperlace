@@ -4,11 +4,99 @@ use std::ptr;
 
 use copperlace::ffi::{
     COPPERLACE_INVALID_ARGUMENT, COPPERLACE_OK, COPPERLACE_RENDER_ERROR,
-    CopperlaceProcessorCallback, CopperlaceProcessorResult, copperlace_processor_result_set_error,
-    copperlace_processor_result_set_output, copperlace_ruleset_free,
-    copperlace_ruleset_from_string, copperlace_ruleset_from_string_with_processors,
-    copperlace_ruleset_render, copperlace_ruleset_render_with_context, copperlace_string_free,
+    CopperlaceProcessorCallback, CopperlaceProcessorResult, CopperlaceRuleSet,
+    copperlace_processor_result_set_error as raw_copperlace_processor_result_set_error,
+    copperlace_processor_result_set_output as raw_copperlace_processor_result_set_output,
+    copperlace_ruleset_free as raw_copperlace_ruleset_free,
+    copperlace_ruleset_from_string as raw_copperlace_ruleset_from_string,
+    copperlace_ruleset_from_string_with_processors as raw_copperlace_ruleset_from_string_with_processors,
+    copperlace_ruleset_render as raw_copperlace_ruleset_render,
+    copperlace_ruleset_render_with_context as raw_copperlace_ruleset_render_with_context,
+    copperlace_string_free as raw_copperlace_string_free,
 };
+
+fn copperlace_ruleset_from_string(
+    config: *const c_char,
+    out_handle: *mut *mut CopperlaceRuleSet,
+    out_error: *mut *mut c_char,
+) -> c_int {
+    unsafe { raw_copperlace_ruleset_from_string(config, out_handle, out_error) }
+}
+
+fn copperlace_ruleset_from_string_with_processors(
+    config: *const c_char,
+    processor_names: *const *const c_char,
+    processor_callbacks: *const Option<CopperlaceProcessorCallback>,
+    processor_user_data: *const *mut c_void,
+    processor_len: usize,
+    out_handle: *mut *mut CopperlaceRuleSet,
+    out_error: *mut *mut c_char,
+) -> c_int {
+    unsafe {
+        raw_copperlace_ruleset_from_string_with_processors(
+            config,
+            processor_names,
+            processor_callbacks,
+            processor_user_data,
+            processor_len,
+            out_handle,
+            out_error,
+        )
+    }
+}
+
+fn copperlace_ruleset_render(
+    handle: *const CopperlaceRuleSet,
+    rule: *const c_char,
+    out_string: *mut *mut c_char,
+    out_error: *mut *mut c_char,
+) -> c_int {
+    unsafe { raw_copperlace_ruleset_render(handle, rule, out_string, out_error) }
+}
+
+fn copperlace_ruleset_render_with_context(
+    handle: *const CopperlaceRuleSet,
+    rule: *const c_char,
+    context_keys: *const *const c_char,
+    context_values: *const *const c_char,
+    context_len: usize,
+    out_string: *mut *mut c_char,
+    out_error: *mut *mut c_char,
+) -> c_int {
+    unsafe {
+        raw_copperlace_ruleset_render_with_context(
+            handle,
+            rule,
+            context_keys,
+            context_values,
+            context_len,
+            out_string,
+            out_error,
+        )
+    }
+}
+
+fn copperlace_processor_result_set_output(
+    result: *mut CopperlaceProcessorResult,
+    value: *const c_char,
+) -> c_int {
+    unsafe { raw_copperlace_processor_result_set_output(result, value) }
+}
+
+fn copperlace_processor_result_set_error(
+    result: *mut CopperlaceProcessorResult,
+    message: *const c_char,
+) -> c_int {
+    unsafe { raw_copperlace_processor_result_set_error(result, message) }
+}
+
+fn copperlace_ruleset_free(handle: *mut CopperlaceRuleSet) {
+    unsafe { raw_copperlace_ruleset_free(handle) }
+}
+
+fn copperlace_string_free(value: *mut c_char) {
+    unsafe { raw_copperlace_string_free(value) }
+}
 
 #[test]
 fn creates_handle_and_renders_rule() {

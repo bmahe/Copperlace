@@ -1,5 +1,6 @@
 use std::fmt;
 use std::path::Path;
+use std::str::FromStr;
 
 use crate::render::{RenderContext, RenderError, RuleSet};
 
@@ -44,6 +45,7 @@ impl Copperlace {
     /// Returns [`ConfigError::Parse`] when the string is not valid configuration, and
     /// [`ConfigError::Render`] when the parsed config is not a valid Copperlace
     /// rule set.
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(config: &str) -> Result<Self, ConfigError> {
         Ok(Self {
             ruleset: ruleset_from_str(config)?,
@@ -79,6 +81,16 @@ impl Copperlace {
         context: RenderContext,
     ) -> Result<String, RenderError> {
         self.ruleset.render_rule_with_context(rule_name, context)
+    }
+}
+
+impl FromStr for Copperlace {
+    type Err = ConfigError;
+
+    fn from_str(config: &str) -> Result<Self, Self::Err> {
+        Ok(Self {
+            ruleset: ruleset_from_str(config)?,
+        })
     }
 }
 

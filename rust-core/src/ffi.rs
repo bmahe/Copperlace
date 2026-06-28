@@ -73,8 +73,15 @@ impl Processor for CallbackProcessor {
 /// [`COPPERLACE_OK`]. On failure, writes null to `out_handle`, writes an owned
 /// error string to `out_error` when provided, and returns a nonzero status code.
 /// Returned error strings must be released with `copperlace_string_free`.
+///
+/// # Safety
+///
+/// `path` must point to a valid NUL-terminated UTF-8 string. `out_handle` must
+/// be a valid writable pointer when non-null. `out_error` must be valid for
+/// writing when non-null, and any returned error string must be released with
+/// [`copperlace_string_free`].
 #[unsafe(no_mangle)]
-pub extern "C" fn copperlace_ruleset_from_file(
+pub unsafe extern "C" fn copperlace_ruleset_from_file(
     path: *const c_char,
     out_handle: *mut *mut CopperlaceRuleSet,
     out_error: *mut *mut c_char,
@@ -97,8 +104,19 @@ pub extern "C" fn copperlace_ruleset_from_file(
 }
 
 /// Loads a configuration file and returns a ruleset handle with custom processors.
+///
+/// # Safety
+///
+/// `path` must point to a valid NUL-terminated UTF-8 string. When
+/// `processor_len` is nonzero, `processor_names`, `processor_callbacks`, and
+/// `processor_user_data` must each point to arrays with at least
+/// `processor_len` entries. Processor names must point to valid NUL-terminated
+/// UTF-8 strings. `out_handle` must be a valid writable pointer when non-null.
+/// `out_error` must be valid for writing when non-null, and any returned error
+/// string must be released with [`copperlace_string_free`]. Processor callbacks
+/// and user data must remain valid until the returned ruleset handle is freed.
 #[unsafe(no_mangle)]
-pub extern "C" fn copperlace_ruleset_from_file_with_processors(
+pub unsafe extern "C" fn copperlace_ruleset_from_file_with_processors(
     path: *const c_char,
     processor_names: *const *const c_char,
     processor_callbacks: *const Option<CopperlaceProcessorCallback>,
@@ -140,8 +158,15 @@ pub extern "C" fn copperlace_ruleset_from_file_with_processors(
 /// [`COPPERLACE_OK`]. On failure, writes null to `out_handle`, writes an owned
 /// error string to `out_error` when provided, and returns a nonzero status code.
 /// Returned error strings must be released with `copperlace_string_free`.
+///
+/// # Safety
+///
+/// `config` must point to a valid NUL-terminated UTF-8 string. `out_handle`
+/// must be a valid writable pointer when non-null. `out_error` must be valid
+/// for writing when non-null, and any returned error string must be released
+/// with [`copperlace_string_free`].
 #[unsafe(no_mangle)]
-pub extern "C" fn copperlace_ruleset_from_string(
+pub unsafe extern "C" fn copperlace_ruleset_from_string(
     config: *const c_char,
     out_handle: *mut *mut CopperlaceRuleSet,
     out_error: *mut *mut c_char,
@@ -164,8 +189,19 @@ pub extern "C" fn copperlace_ruleset_from_string(
 }
 
 /// Compiles a configuration string and returns a ruleset handle with custom processors.
+///
+/// # Safety
+///
+/// `config` must point to a valid NUL-terminated UTF-8 string. When
+/// `processor_len` is nonzero, `processor_names`, `processor_callbacks`, and
+/// `processor_user_data` must each point to arrays with at least
+/// `processor_len` entries. Processor names must point to valid NUL-terminated
+/// UTF-8 strings. `out_handle` must be a valid writable pointer when non-null.
+/// `out_error` must be valid for writing when non-null, and any returned error
+/// string must be released with [`copperlace_string_free`]. Processor callbacks
+/// and user data must remain valid until the returned ruleset handle is freed.
 #[unsafe(no_mangle)]
-pub extern "C" fn copperlace_ruleset_from_string_with_processors(
+pub unsafe extern "C" fn copperlace_ruleset_from_string_with_processors(
     config: *const c_char,
     processor_names: *const *const c_char,
     processor_callbacks: *const Option<CopperlaceProcessorCallback>,
@@ -202,8 +238,13 @@ pub extern "C" fn copperlace_ruleset_from_string_with_processors(
 }
 
 /// Sets the output for a custom processor callback result.
+///
+/// # Safety
+///
+/// `result` must be the valid result handle passed to the active processor
+/// callback. `value` must point to a valid NUL-terminated UTF-8 string.
 #[unsafe(no_mangle)]
-pub extern "C" fn copperlace_processor_result_set_output(
+pub unsafe extern "C" fn copperlace_processor_result_set_output(
     result: *mut CopperlaceProcessorResult,
     value: *const c_char,
 ) -> c_int {
@@ -220,8 +261,13 @@ pub extern "C" fn copperlace_processor_result_set_output(
 }
 
 /// Sets the error for a custom processor callback result.
+///
+/// # Safety
+///
+/// `result` must be the valid result handle passed to the active processor
+/// callback. `message` must point to a valid NUL-terminated UTF-8 string.
 #[unsafe(no_mangle)]
-pub extern "C" fn copperlace_processor_result_set_error(
+pub unsafe extern "C" fn copperlace_processor_result_set_error(
     result: *mut CopperlaceProcessorResult,
     message: *const c_char,
 ) -> c_int {
@@ -244,22 +290,31 @@ pub extern "C" fn copperlace_processor_result_set_error(
 /// error string to `out_error` when provided, and returns a nonzero status code.
 /// Returned output and error strings must be released with
 /// `copperlace_string_free`.
+///
+/// # Safety
+///
+/// `handle` must be a live ruleset handle returned by Copperlace. `rule` must
+/// point to a valid NUL-terminated UTF-8 string. `out_string` and `out_error`
+/// must be valid for writing when non-null. Any returned output or error string
+/// must be released with [`copperlace_string_free`].
 #[unsafe(no_mangle)]
-pub extern "C" fn copperlace_ruleset_render(
+pub unsafe extern "C" fn copperlace_ruleset_render(
     handle: *const CopperlaceRuleSet,
     rule: *const c_char,
     out_string: *mut *mut c_char,
     out_error: *mut *mut c_char,
 ) -> c_int {
-    copperlace_ruleset_render_with_context(
-        handle,
-        rule,
-        ptr::null(),
-        ptr::null(),
-        0,
-        out_string,
-        out_error,
-    )
+    unsafe {
+        copperlace_ruleset_render_with_context(
+            handle,
+            rule,
+            ptr::null(),
+            ptr::null(),
+            0,
+            out_string,
+            out_error,
+        )
+    }
 }
 
 /// Renders a named rule from a ruleset handle with initial context values.
@@ -273,8 +328,18 @@ pub extern "C" fn copperlace_ruleset_render(
 /// error string to `out_error` when provided, and returns a nonzero status code.
 /// Returned output and error strings must be released with
 /// `copperlace_string_free`.
+///
+/// # Safety
+///
+/// `handle` must be a live ruleset handle returned by Copperlace. `rule` must
+/// point to a valid NUL-terminated UTF-8 string. When `context_len` is nonzero,
+/// `context_keys` and `context_values` must each point to arrays with at least
+/// `context_len` entries, and every entry must point to a valid
+/// NUL-terminated UTF-8 string. `out_string` and `out_error` must be valid for
+/// writing when non-null. Any returned output or error string must be released
+/// with [`copperlace_string_free`].
 #[unsafe(no_mangle)]
-pub extern "C" fn copperlace_ruleset_render_with_context(
+pub unsafe extern "C" fn copperlace_ruleset_render_with_context(
     handle: *const CopperlaceRuleSet,
     rule: *const c_char,
     context_keys: *const *const c_char,
@@ -411,8 +476,13 @@ fn ruleset_from_file_with_processors(
 /// Releases a ruleset handle returned by the C ABI.
 ///
 /// Passing null is allowed and has no effect.
+///
+/// # Safety
+///
+/// `handle` must be null or a handle previously returned by Copperlace that has
+/// not already been freed. After this call, the handle must not be used again.
 #[unsafe(no_mangle)]
-pub extern "C" fn copperlace_ruleset_free(handle: *mut CopperlaceRuleSet) {
+pub unsafe extern "C" fn copperlace_ruleset_free(handle: *mut CopperlaceRuleSet) {
     if !handle.is_null() {
         unsafe {
             drop(Box::from_raw(handle));
@@ -423,8 +493,14 @@ pub extern "C" fn copperlace_ruleset_free(handle: *mut CopperlaceRuleSet) {
 /// Releases a string returned by the C ABI.
 ///
 /// Passing null is allowed and has no effect.
+///
+/// # Safety
+///
+/// `value` must be null or a string pointer previously returned by Copperlace
+/// that has not already been freed. After this call, the pointer must not be
+/// used again.
 #[unsafe(no_mangle)]
-pub extern "C" fn copperlace_string_free(value: *mut c_char) {
+pub unsafe extern "C" fn copperlace_string_free(value: *mut c_char) {
     if !value.is_null() {
         unsafe {
             drop(CString::from_raw(value));

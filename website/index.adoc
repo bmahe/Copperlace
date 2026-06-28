@@ -48,6 +48,7 @@ origin = "{% snack:treat %}{note}"</textarea>
 * link:docs/configuration.html[Configuration]
 * link:examples/index.html[Examples]
 * link:docs/packaging.html[Packaging and wrappers]
+* link:docs/releasing.html[Release process]
 
 == Native API Docs
 

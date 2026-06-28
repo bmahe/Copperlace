@@ -3,6 +3,9 @@
 Copperlace is implemented in Rust and exposed through native and language
 wrapper packages.
 
+For the release operator checklist, see
+link:releasing.adoc[Copperlace release process].
+
 == Build Workflows
 
 Use the root `Makefile` for normal development workflows:
@@ -41,8 +44,9 @@ Release assets include:
 
 * platform CLI archives containing the `copperlace` binary and native library;
 * Python wheels with the platform native library bundled under
-  `copperlace/native/`;
-* Java API JARs plus platform native classifier JARs;
+  `copperlace/native/`, plus a source distribution that can build the bundled
+  Rust core from source;
+* Java API, all-platform, and platform native JARs;
 * a JS/WASM package tarball generated from `wasm-pack --target bundler`;
 * `SHA256SUMS` for uploaded release assets.
 
@@ -114,7 +118,16 @@ and `RuleSet` are context managers and release the native handle when closed.
 Wrapper failures are raised as `CopperlaceError`.
 
 The wheel build compiles `rust-core` and bundles the platform native library
-under `copperlace/native/`.
+under `copperlace/native/`. Linux wheels are repaired with `auditwheel` before
+publication so they use PyPI-compatible platform tags. The source distribution
+includes the Rust sources needed to build the native library from source.
+
+PyPI releases publish:
+
+* platform wheels for Linux x86_64/aarch64, macOS x86_64/aarch64, and Windows
+  x86_64;
+* one source distribution;
+* the same package version as Cargo, Java, and GitHub Release artifacts.
 
 Python rendering uses the builtin processor registry plus any custom processor
 callbacks provided at construction time.
@@ -158,8 +171,42 @@ functions provided at construction time.
 
 == Java Wrapper
 
-The Java module in `java/` uses Java FFM over the C ABI. Its Maven coordinates
-are `dev.mahe.copperlace:copperlace`. Public entry points are:
+The Java module in `java/` uses Java FFM over the C ABI. The simplest Maven
+Central dependency is `dev.mahe.copperlace:copperlace`, which depends on the
+Java API plus all first-class supported native platform artifacts.
+
+[source,xml]
+----
+<dependency>
+  <groupId>dev.mahe.copperlace</groupId>
+  <artifactId>copperlace</artifactId>
+  <version>0.1.0</version>
+</dependency>
+----
+
+Gradle Kotlin DSL:
+
+[source,kotlin]
+----
+implementation("dev.mahe.copperlace:copperlace:0.1.0")
+----
+
+Applications that only want one runtime platform can depend on one platform
+artifact instead. Choose the runtime platform, not necessarily the build
+platform:
+
+* `dev.mahe.copperlace:copperlace-linux-x86_64`
+* `dev.mahe.copperlace:copperlace-linux-aarch64`
+* `dev.mahe.copperlace:copperlace-macos-x86_64`
+* `dev.mahe.copperlace:copperlace-macos-aarch64`
+* `dev.mahe.copperlace:copperlace-windows-x86_64`
+
+Each platform artifact depends on `dev.mahe.copperlace:copperlace-api`
+transitively. Advanced users can depend on `copperlace-api` directly when they
+provide the native library through `COPPERLACE_LIBRARY_PATH` or source-tree
+build output.
+
+Public entry points are:
 
 * `Copperlace.fromString(config)`
 * `Copperlace.fromStringWithProcessors(config, processors)`
@@ -186,9 +233,16 @@ are `dev.mahe.copperlace:copperlace`. Public entry points are:
 and `RuleSet` implement `AutoCloseable`; callers should use try-with-resources
 or call `close`.
 
-The base Java JAR contains the Java API. Native binaries are packaged in
-platform classifier JARs, such as `linux-x86_64`, `linux-aarch64`,
-`macos-x86_64`, `macos-aarch64`, `windows-x86_64`, and `windows-aarch64`.
+The Java API JAR contains only Java classes. Native binaries are packaged in
+platform artifacts for `linux-x86_64`, `linux-aarch64`, `macos-x86_64`,
+`macos-aarch64`, and `windows-x86_64`.
+
+Plain Maven builds include the current-system native Java package by default
+when the staged native library exists under
+`java/native-artifacts/<classifier>/`. Maven does not compile the native
+library; use `make java-package` to build Rust, stage the current native
+library, and package the Java API plus current-platform native JAR. To build
+only the Java API, run Maven with `-pl api`.
 
 At runtime, the Java wrapper loads the native library in this order:
 

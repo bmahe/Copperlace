@@ -4,9 +4,13 @@
   <modelVersion>4.0.0</modelVersion>
 
   <groupId>dev.mahe.copperlace</groupId>
-  <artifactId>copperlace</artifactId>
+  <artifactId>copperlace-java-parent</artifactId>
   <version>0.1.0</version>
-  <packaging>jar</packaging>
+  <packaging>pom</packaging>
+
+  <name>Copperlace Java Parent</name>
+  <description>Java packaging parent for the Copperlace text renderer.</description>
+  <url>https://github.com/bmahe/Copperlace</url>
 
   <licenses>
     <license>
@@ -16,23 +20,164 @@
     </license>
   </licenses>
 
+  <developers>
+    <developer>
+      <name>Copperlace contributors</name>
+      <email>bruno@bmahe.net</email>
+      <organization>Copperlace</organization>
+      <organizationUrl>https://github.com/bmahe/Copperlace</organizationUrl>
+    </developer>
+  </developers>
+
+  <scm>
+    <connection>scm:git:https://github.com/bmahe/Copperlace.git</connection>
+    <developerConnection>scm:git:git@github.com:bmahe/Copperlace.git</developerConnection>
+    <url>https://github.com/bmahe/Copperlace</url>
+    <tag>HEAD</tag>
+  </scm>
+
+  <modules>
+    <module>api</module>
+  </modules>
+
   <properties>
     <maven.compiler.release>25</maven.compiler.release>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
-    <copperlace.native.classifier>unsupported</copperlace.native.classifier>
-    <copperlace.native.library>unsupported</copperlace.native.library>
-
-    <maven.antrun.plugin.version>3.1.0</maven.antrun.plugin.version>
-    <maven.javadoc.plugin.version>3.11.2</maven.javadoc.plugin.version>
-    <maven.jar.plugin.version>3.4.2</maven.jar.plugin.version>
-    <maven.site.plugin.version>3.21.0</maven.site.plugin.version>
-    <maven.surefire.plugin.version>3.5.2</maven.surefire.plugin.version>
-
     <apache.commons.lang3.version>3.20.0</apache.commons.lang3.version>
-
     <junit.version>5.11.4</junit.version>
+
+    <central.publishing.maven.plugin.version>0.11.0</central.publishing.maven.plugin.version>
+    <maven.compiler.plugin.version>3.13.0</maven.compiler.plugin.version>
+    <maven.enforcer.plugin.version>3.5.0</maven.enforcer.plugin.version>
+    <maven.gpg.plugin.version>3.2.7</maven.gpg.plugin.version>
+    <maven.jar.plugin.version>3.4.2</maven.jar.plugin.version>
+    <maven.javadoc.plugin.version>3.11.2</maven.javadoc.plugin.version>
+    <maven.resources.plugin.version>3.3.1</maven.resources.plugin.version>
+    <maven.site.plugin.version>3.21.0</maven.site.plugin.version>
+    <maven.source.plugin.version>3.3.1</maven.source.plugin.version>
+    <maven.surefire.plugin.version>3.5.2</maven.surefire.plugin.version>
   </properties>
+
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>org.apache.commons</groupId>
+        <artifactId>commons-lang3</artifactId>
+        <version>${apache.commons.lang3.version}</version>
+      </dependency>
+      <dependency>
+        <groupId>org.junit.jupiter</groupId>
+        <artifactId>junit-jupiter</artifactId>
+        <version>${junit.version}</version>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+  <build>
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-compiler-plugin</artifactId>
+          <version>${maven.compiler.plugin.version}</version>
+          <configuration>
+            <release>${maven.compiler.release}</release>
+          </configuration>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-resources-plugin</artifactId>
+          <version>${maven.resources.plugin.version}</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-jar-plugin</artifactId>
+          <version>${maven.jar.plugin.version}</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-enforcer-plugin</artifactId>
+          <version>${maven.enforcer.plugin.version}</version>
+          <executions>
+            <execution>
+              <id>require-staged-native-library</id>
+              <phase>validate</phase>
+              <goals>
+                <goal>enforce</goal>
+              </goals>
+              <configuration>
+                <rules>
+                  <requireFilesExist>
+                    <message>Missing staged Copperlace native library. Build the native library and run scripts/stage_java_native.py --classifier ${copperlace.native.classifier}, or use make java-package.</message>
+                    <files>
+                      <file>${maven.multiModuleProjectDirectory}/native-artifacts/${copperlace.native.classifier}/${copperlace.native.library}</file>
+                    </files>
+                  </requireFilesExist>
+                </rules>
+              </configuration>
+            </execution>
+          </executions>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-surefire-plugin</artifactId>
+          <version>${maven.surefire.plugin.version}</version>
+          <configuration>
+            <argLine>--enable-native-access=ALL-UNNAMED</argLine>
+          </configuration>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-source-plugin</artifactId>
+          <version>${maven.source.plugin.version}</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-javadoc-plugin</artifactId>
+          <version>${maven.javadoc.plugin.version}</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-gpg-plugin</artifactId>
+          <version>${maven.gpg.plugin.version}</version>
+        </plugin>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-site-plugin</artifactId>
+          <version>${maven.site.plugin.version}</version>
+        </plugin>
+      </plugins>
+    </pluginManagement>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-source-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>attach-sources</id>
+            <phase>verify</phase>
+            <goals>
+              <goal>jar-no-fork</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-javadoc-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>attach-javadocs</id>
+            <phase>verify</phase>
+            <goals>
+              <goal>jar</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
 
   <profiles>
     <profile>
@@ -42,24 +187,13 @@
           <name>Linux</name>
           <arch>amd64</arch>
         </os>
+        <property>
+          <name>!copperlace.skip.current.native</name>
+        </property>
       </activation>
-      <properties>
-        <copperlace.native.classifier>linux-x86_64</copperlace.native.classifier>
-        <copperlace.native.library>libcopperlace.so</copperlace.native.library>
-      </properties>
-    </profile>
-    <profile>
-      <id>linux-x86_64-alt</id>
-      <activation>
-        <os>
-          <name>Linux</name>
-          <arch>x86_64</arch>
-        </os>
-      </activation>
-      <properties>
-        <copperlace.native.classifier>linux-x86_64</copperlace.native.classifier>
-        <copperlace.native.library>libcopperlace.so</copperlace.native.library>
-      </properties>
+      <modules>
+        <module>native/linux-x86_64</module>
+      </modules>
     </profile>
     <profile>
       <id>linux-aarch64</id>
@@ -68,11 +202,13 @@
           <name>Linux</name>
           <arch>aarch64</arch>
         </os>
+        <property>
+          <name>!copperlace.skip.current.native</name>
+        </property>
       </activation>
-      <properties>
-        <copperlace.native.classifier>linux-aarch64</copperlace.native.classifier>
-        <copperlace.native.library>libcopperlace.so</copperlace.native.library>
-      </properties>
+      <modules>
+        <module>native/linux-aarch64</module>
+      </modules>
     </profile>
     <profile>
       <id>macos-x86_64</id>
@@ -81,11 +217,13 @@
           <family>mac</family>
           <arch>x86_64</arch>
         </os>
+        <property>
+          <name>!copperlace.skip.current.native</name>
+        </property>
       </activation>
-      <properties>
-        <copperlace.native.classifier>macos-x86_64</copperlace.native.classifier>
-        <copperlace.native.library>libcopperlace.dylib</copperlace.native.library>
-      </properties>
+      <modules>
+        <module>native/macos-x86_64</module>
+      </modules>
     </profile>
     <profile>
       <id>macos-aarch64</id>
@@ -94,11 +232,13 @@
           <family>mac</family>
           <arch>aarch64</arch>
         </os>
+        <property>
+          <name>!copperlace.skip.current.native</name>
+        </property>
       </activation>
-      <properties>
-        <copperlace.native.classifier>macos-aarch64</copperlace.native.classifier>
-        <copperlace.native.library>libcopperlace.dylib</copperlace.native.library>
-      </properties>
+      <modules>
+        <module>native/macos-aarch64</module>
+      </modules>
     </profile>
     <profile>
       <id>windows-x86_64</id>
@@ -107,138 +247,55 @@
           <family>windows</family>
           <arch>amd64</arch>
         </os>
+        <property>
+          <name>!copperlace.skip.current.native</name>
+        </property>
       </activation>
-      <properties>
-        <copperlace.native.classifier>windows-x86_64</copperlace.native.classifier>
-        <copperlace.native.library>copperlace.dll</copperlace.native.library>
-      </properties>
+      <modules>
+        <module>native/windows-x86_64</module>
+      </modules>
     </profile>
     <profile>
-      <id>windows-x86_64-alt</id>
-      <activation>
-        <os>
-          <family>windows</family>
-          <arch>x86_64</arch>
-        </os>
-      </activation>
-      <properties>
-        <copperlace.native.classifier>windows-x86_64</copperlace.native.classifier>
-        <copperlace.native.library>copperlace.dll</copperlace.native.library>
-      </properties>
+      <id>all-platform</id>
+      <modules>
+        <module>native/linux-x86_64</module>
+        <module>native/linux-aarch64</module>
+        <module>native/macos-x86_64</module>
+        <module>native/macos-aarch64</module>
+        <module>native/windows-x86_64</module>
+        <module>all-platform</module>
+      </modules>
     </profile>
     <profile>
-      <id>windows-aarch64</id>
-      <activation>
-        <os>
-          <family>windows</family>
-          <arch>aarch64</arch>
-        </os>
-      </activation>
-      <properties>
-        <copperlace.native.classifier>windows-aarch64</copperlace.native.classifier>
-        <copperlace.native.library>copperlace.dll</copperlace.native.library>
-      </properties>
+      <id>central-publish</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.apache.maven.plugins</groupId>
+            <artifactId>maven-gpg-plugin</artifactId>
+            <executions>
+              <execution>
+                <id>sign-artifacts</id>
+                <phase>verify</phase>
+                <goals>
+                  <goal>sign</goal>
+                </goals>
+              </execution>
+            </executions>
+          </plugin>
+          <plugin>
+            <groupId>org.sonatype.central</groupId>
+            <artifactId>central-publishing-maven-plugin</artifactId>
+            <version>${central.publishing.maven.plugin.version}</version>
+            <extensions>true</extensions>
+            <configuration>
+              <publishingServerId>central</publishingServerId>
+              <autoPublish>true</autoPublish>
+              <waitUntil>published</waitUntil>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
     </profile>
   </profiles>
-
-  <dependencies>
-
-    <dependency>
-      <groupId>org.apache.commons</groupId>
-      <artifactId>commons-lang3</artifactId>
-      <version>${apache.commons.lang3.version}</version>
-      <scope>compile</scope>
-    </dependency>
-
-    <dependency>
-      <groupId>org.junit.jupiter</groupId>
-      <artifactId>junit-jupiter</artifactId>
-      <version>${junit.version}</version>
-      <scope>test</scope>
-    </dependency>
-  </dependencies>
-
-  <build>
-    <plugins>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-antrun-plugin</artifactId>
-        <version>${maven.antrun.plugin.version}</version>
-        <executions>
-          <execution>
-            <id>build-native-library</id>
-            <phase>generate-resources</phase>
-            <goals>
-              <goal>run</goal>
-            </goals>
-            <configuration>
-              <target>
-                <fail message="Unsupported native platform: ${os.name} ${os.arch}">
-                  <condition>
-                    <equals arg1="${copperlace.native.classifier}" arg2="unsupported" />
-                  </condition>
-                </fail>
-                <exec executable="cargo" dir="${project.basedir}/.." failonerror="true">
-                  <arg value="build" />
-                  <arg value="--release" />
-                  <arg value="--manifest-path" />
-                  <arg value="${project.basedir}/../rust-core/Cargo.toml" />
-                </exec>
-                <mkdir
-                  dir="${project.build.outputDirectory}/dev/mahe/copperlace/native/${copperlace.native.classifier}" />
-                <copy
-                  file="${project.basedir}/../rust-core/target/release/${copperlace.native.library}"
-                  todir="${project.build.outputDirectory}/dev/mahe/copperlace/native/${copperlace.native.classifier}" />
-              </target>
-            </configuration>
-          </execution>
-        </executions>
-      </plugin>
-      <plugin>
-        <artifactId>maven-jar-plugin</artifactId>
-        <version>${maven.jar.plugin.version}</version>
-        <executions>
-          <execution>
-            <id>default-jar</id>
-            <configuration>
-              <excludes>
-                <exclude>dev/mahe/copperlace/native/**</exclude>
-              </excludes>
-            </configuration>
-          </execution>
-          <execution>
-            <id>native-jar</id>
-            <phase>package</phase>
-            <goals>
-              <goal>jar</goal>
-            </goals>
-            <configuration>
-              <classifier>${copperlace.native.classifier}</classifier>
-              <includes>
-                <include>dev/mahe/copperlace/native/**</include>
-              </includes>
-            </configuration>
-          </execution>
-        </executions>
-      </plugin>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-surefire-plugin</artifactId>
-        <version>${maven.surefire.plugin.version}</version>
-        <configuration>
-          <argLine>--enable-native-access=ALL-UNNAMED</argLine>
-        </configuration>
-      </plugin>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-javadoc-plugin</artifactId>
-        <version>${maven.javadoc.plugin.version}</version>
-      </plugin>
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-site-plugin</artifactId>
-        <version>${maven.site.plugin.version}</version>
-      </plugin>
-    </plugins>
-  </build>
 </project>
