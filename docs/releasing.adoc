@@ -16,14 +16,16 @@ Before tagging a release, confirm that:
 * the package version is final and is not already published to PyPI, Maven
   Central, or npm;
 * the `Package Check` workflow passes for the release commit;
+* crates.io ownership is available for `copperlace`;
 * GitHub release publishing is available for the repository;
-* PyPI trusted publishing is configured for the release workflow;
-* Maven Central credentials and GPG signing secrets are configured as GitHub
-  Actions secrets;
+* a PyPI API token is available for manual publication;
+* Maven Central credentials and GPG signing configuration are available for
+  manual publication;
 * the npm package owner has permission to publish `copperlace`.
 
-The release workflow publishes Python and Java artifacts automatically. JS/TS
-npm publication is a manual step after the generated package has been checked.
+The release workflow builds and smoke-tests release artifacts, then attaches
+them to the GitHub Release. Registry publication to crates.io, PyPI, Maven
+Central, and npm is manual after the generated packages have been checked.
 
 == Prepare the Version
 
@@ -51,7 +53,7 @@ make release-check
 ----
 
 The release tag must be the package version prefixed with `v`, such as
-`v0.1.0`.
+`v0.1.1`.
 
 == Validate Before Tagging
 
@@ -97,15 +99,117 @@ Pushing a `v*` tag starts `.github/workflows/release.yml`. The workflow:
 
 * verifies the tag matches the Cargo, Python, and Java package version;
 * builds and smoke-tests Python wheels and the source distribution;
-* publishes Python artifacts to PyPI;
 * builds and smoke-tests Java API, all-platform, and platform native JARs;
-* publishes Java artifacts to Maven Central;
 * builds and smoke-tests platform CLI archives;
 * builds, packs, and smoke-tests the JS/TS WebAssembly tarball;
 * generates `SHA256SUMS`;
 * creates or updates the GitHub Release for the tag.
 
-Wait for the full release workflow to finish before publishing npm.
+Wait for the full release workflow to finish before publishing registry
+packages from its artifacts or from the release tag.
+
+== Publish Rust to crates.io
+
+Publish the Rust crate from the release tag after the release commit has passed
+checks and before or after pushing the GitHub release tag. The crate version is
+immutable once accepted by crates.io.
+
+[source,sh]
+----
+VERSION=$(python scripts/check_versions.py)
+git switch --detach "v${VERSION}"
+cargo fmt --check --manifest-path rust-core/Cargo.toml
+cargo test --manifest-path rust-core/Cargo.toml
+cargo clippy --manifest-path rust-core/Cargo.toml --all-targets -- -D warnings
+RUSTDOCFLAGS=-Dwarnings cargo doc --manifest-path rust-core/Cargo.toml --no-deps
+cargo package --list --manifest-path rust-core/Cargo.toml
+cargo publish --dry-run --manifest-path rust-core/Cargo.toml
+cargo publish --manifest-path rust-core/Cargo.toml
+----
+
+`cargo package --list` includes Cargo-generated files such as
+`.cargo_vcs_info.json` and `Cargo.toml.orig`; those are expected. Do not publish
+if the dry run warns about missing package metadata or fails verification.
+
+Return to the normal branch after publishing:
+
+[source,sh]
+----
+git switch main
+----
+
+== Publish Python to PyPI
+
+PyPI publication is manual. For Linux x86_64 publication, build the wheel
+inside a PyPA manylinux container, repair it with `auditwheel`, smoke-test the
+repaired wheel, and upload only the repaired `manylinux` wheel.
+
+From the repository root:
+
+[source,sh]
+----
+rm -rf python/build python/dist python/*.egg-info
+
+docker run --rm -v "$PWD:/io" quay.io/pypa/manylinux2014_x86_64 /bin/bash -lc '
+  set -eux
+  curl https://sh.rustup.rs -sSf | sh -s -- -y
+  . "$HOME/.cargo/env"
+
+  cd /io/python
+  rm -rf build dist *.egg-info
+
+  /opt/python/cp310-cp310/bin/python -m pip install build auditwheel
+  /opt/python/cp310-cp310/bin/python -m build --wheel --outdir dist/raw
+  auditwheel repair dist/raw/*.whl --wheel-dir dist
+'
+
+python3 -m twine check python/dist/*manylinux*.whl
+python3 scripts/smoke_python_wheel.py python/dist/*manylinux*.whl
+python3 -m twine upload --verbose python/dist/*manylinux*.whl
+----
+
+Do not upload raw Linux wheels such as
+`copperlace-<version>-py3-none-linux_x86_64.whl`; PyPI rejects the
+`linux_x86_64` platform tag. If `auditwheel` reports too-recent versioned
+symbols, the wheel was built on a host that is too new. Rebuild inside the
+manylinux container instead of repairing the host-built wheel.
+
+On SELinux hosts, Docker may need a relabeled volume mount:
+
+[source,sh]
+----
+docker run --rm -v "$PWD:/io:Z" quay.io/pypa/manylinux2014_x86_64 /bin/bash -lc '...'
+----
+
+== Publish Java to Maven Central
+
+Maven Central publication is manual. Use the Java artifacts from the GitHub
+release workflow, collect the native libraries into `java/native-artifacts/`,
+then deploy with the all-platform and Central publishing profiles.
+
+[source,sh]
+----
+VERSION=$(python scripts/check_versions.py)
+RELEASE_RUN_ID=<release-workflow-run-id>
+gh run download "${RELEASE_RUN_ID}" --name 'java-jars-linux-x86_64' --dir java-release-artifacts
+gh run download "${RELEASE_RUN_ID}" --name 'java-jars-linux-aarch64' --dir java-release-artifacts
+gh run download "${RELEASE_RUN_ID}" --name 'java-jars-macos-x86_64' --dir java-release-artifacts
+gh run download "${RELEASE_RUN_ID}" --name 'java-jars-macos-aarch64' --dir java-release-artifacts
+gh run download "${RELEASE_RUN_ID}" --name 'java-jars-windows-x86_64' --dir java-release-artifacts
+
+python scripts/collect_java_native_artifacts.py \
+  --output-dir java/native-artifacts \
+  java-release-artifacts
+
+cd java
+mvn -q -Pall-platform,central-publish \
+  -Dcopperlace.skip.current.native=true \
+  -Dgpg.passphrase="${GPG_PASSPHRASE}" \
+  deploy
+----
+
+The Maven command expects Central credentials in Maven settings under server id
+`central` and local GPG signing material available to `maven-gpg-plugin`.
 
 == Publish JS/TS to npm
 

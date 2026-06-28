@@ -52,7 +52,7 @@ Release assets include:
 
 Use `make release-check` locally to verify Cargo, Python, and Maven versions
 match before creating a release tag. Release tags should use the package version
-prefixed with `v`, such as `v0.1.0`.
+prefixed with `v`, such as `v0.1.1`.
 
 == Rust Artifacts
 
@@ -180,7 +180,7 @@ Java API plus all first-class supported native platform artifacts.
 <dependency>
   <groupId>dev.mahe.copperlace</groupId>
   <artifactId>copperlace</artifactId>
-  <version>0.1.0</version>
+  <version>0.1.1</version>
 </dependency>
 ----
 
@@ -188,7 +188,7 @@ Gradle Kotlin DSL:
 
 [source,kotlin]
 ----
-implementation("dev.mahe.copperlace:copperlace:0.1.0")
+implementation("dev.mahe.copperlace:copperlace:0.1.1")
 ----
 
 Applications that only want one runtime platform can depend on one platform
