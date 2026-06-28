@@ -9,6 +9,7 @@ RUST_DIR := rust-core
 PYTHON_DIR := python
 JAVA_DIR := java
 JS_DIR := js
+JAVA_NATIVE_CLASSIFIER := $(shell $(PYTHON) scripts/stage_java_native.py --print-classifier 2>/dev/null)
 
 .PHONY: help
 help:
@@ -23,7 +24,7 @@ help:
 	@printf '%s\n' '  make js-package     Build JS/TS WebAssembly package for bundlers'
 	@printf '%s\n' '  make js-web         Build JS/TS WebAssembly package for direct browser import'
 	@printf '%s\n' '  make java-test      Run Java FFM tests'
-	@printf '%s\n' '  make java-package   Build Java API and native classifier JARs'
+	@printf '%s\n' '  make java-package   Build Java API and current-platform native JARs'
 	@printf '%s\n' '  make site           Build website and native API documentation'
 	@printf '%s\n' '  make site-main      Build website pages from AsciiDoc sources'
 	@printf '%s\n' '  make site-api       Build native API documentation sub-sites'
@@ -71,12 +72,13 @@ js-web:
 	$(WASM_PACK) build $(RUST_DIR) --target web --out-dir ../$(JS_DIR)/pkg
 
 .PHONY: java-test
-java-test:
-	cd $(JAVA_DIR) && $(MVN) -q test
+java-test: rust-build
+	cd $(JAVA_DIR) && $(MVN) -q -pl api test
 
 .PHONY: java-package
-java-package:
-	cd $(JAVA_DIR) && $(MVN) -q package
+java-package: rust-build
+	$(PYTHON) scripts/stage_java_native.py --classifier $(JAVA_NATIVE_CLASSIFIER)
+	cd $(JAVA_DIR) && $(MVN) -q -P$(JAVA_NATIVE_CLASSIFIER) package
 
 .PHONY: site
 site:
@@ -113,5 +115,6 @@ clean:
 	rm -rf target/release-artifacts
 	rm -rf $(PYTHON_DIR)/build $(PYTHON_DIR)/dist $(PYTHON_DIR)/*.egg-info
 	rm -rf $(JS_DIR)/pkg
+	rm -rf $(JAVA_DIR)/native-artifacts
 	find $(PYTHON_DIR) -type d -name __pycache__ -prune -exec rm -rf {} +
 	cd $(JAVA_DIR) && $(MVN) -q clean

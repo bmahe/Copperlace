@@ -1,0 +1,63 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>dev.mahe.copperlace</groupId>
+    <artifactId>copperlace-java-parent</artifactId>
+    <version>0.1.0</version>
+    <relativePath>../..</relativePath>
+  </parent>
+
+  <artifactId>copperlace-linux-x86_64</artifactId>
+  <packaging>jar</packaging>
+
+  <name>Copperlace Native Linux x86_64</name>
+  <description>Linux x86_64 native library for the Copperlace Java API.</description>
+
+  <properties>
+    <copperlace.native.classifier>linux-x86_64</copperlace.native.classifier>
+    <copperlace.native.library>libcopperlace.so</copperlace.native.library>
+  </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>dev.mahe.copperlace</groupId>
+      <artifactId>copperlace-api</artifactId>
+      <version>${project.version}</version>
+    </dependency>
+  </dependencies>
+
+  <build>
+    <resources>
+      <resource>
+        <directory>${maven.multiModuleProjectDirectory}/native-artifacts/${copperlace.native.classifier}</directory>
+        <targetPath>dev/mahe/copperlace/native/${copperlace.native.classifier}</targetPath>
+        <includes>
+          <include>${copperlace.native.library}</include>
+        </includes>
+      </resource>
+    </resources>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-jar-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>attach-empty-javadocs</id>
+            <phase>package</phase>
+            <goals>
+              <goal>jar</goal>
+            </goals>
+            <configuration>
+              <classifier>javadoc</classifier>
+              <classesDirectory>${project.build.directory}/empty-javadoc</classesDirectory>
+              <skipIfEmpty>false</skipIfEmpty>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+</project>

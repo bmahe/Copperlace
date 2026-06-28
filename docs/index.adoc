@@ -31,4 +31,4 @@ The package also builds and packages:
 * a `copperlace` CLI with `render --config <path> --rule <name>`;
 * a C ABI dynamic library with an opaque ruleset handle API;
 * Python wheels backed by the native library;
-* Java API and native classifier JARs.
+* Java API, all-platform, and platform native JARs.

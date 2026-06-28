@@ -23,8 +23,9 @@ APIs for safe native-handle cleanup.
 
 == Java
 
-The Java package uses the Java FFM API, publishes the Java API JAR, and packages
-platform native classifier JARs.
+The Java package uses the Java FFM API, publishes a convenience all-platform
+dependency, and also packages one-dependency native artifacts for individual
+runtime platforms.
 
 * link:api/java/index.html[Java API docs]
 * link:docs/packaging.html#_java_wrapper[Java wrapper notes]

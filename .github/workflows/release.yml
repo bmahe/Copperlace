@@ -83,18 +83,55 @@ jobs:
           distribution: temurin
           java-version: "25"
       - uses: dtolnay/rust-toolchain@stable
-      - run: mvn -q package
-        working-directory: java
+      - shell: bash
+        run: |
+          cargo build --release --manifest-path rust-core/Cargo.toml
+          python scripts/stage_java_native.py --classifier "${{ matrix.classifier }}"
+          mvn -q -P"${{ matrix.classifier }}" package -f java/pom.xml
       - shell: bash
         run: |
           VERSION=$(python scripts/check_versions.py)
-          BASE_JAR="java/target/copperlace-${VERSION}.jar"
-          NATIVE_JAR="java/target/copperlace-${VERSION}-${{ matrix.classifier }}.jar"
-          python scripts/smoke_java_artifacts.py --base-jar "$BASE_JAR" --native-jar "$NATIVE_JAR"
+          API_JAR="java/api/target/copperlace-api-${VERSION}.jar"
+          NATIVE_JAR="java/native/${{ matrix.classifier }}/target/copperlace-${{ matrix.classifier }}-${VERSION}.jar"
+          python scripts/smoke_java_artifacts.py --api-jar "$API_JAR" --native-jar "$NATIVE_JAR"
       - uses: actions/upload-artifact@v4
         with:
           name: java-jars-${{ matrix.target }}
-          path: java/target/*.jar
+          path: |
+            java/api/target/*.jar
+            java/native/${{ matrix.classifier }}/target/*.jar
+
+  java-maven-publish:
+    name: Publish Java to Maven Central
+    needs: java-package
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "25"
+          server-id: central
+          server-username: MAVEN_CENTRAL_USERNAME
+          server-password: MAVEN_CENTRAL_TOKEN
+          gpg-private-key: ${{ secrets.GPG_PRIVATE_KEY }}
+          gpg-passphrase: GPG_PASSPHRASE
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: java-jars-*
+          path: java-release-artifacts
+      - name: Stage Java native libraries
+        run: python scripts/collect_java_native_artifacts.py --output-dir java/native-artifacts java-release-artifacts
+      - name: Publish Java artifacts
+        env:
+          MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          MAVEN_CENTRAL_TOKEN: ${{ secrets.MAVEN_CENTRAL_TOKEN }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+        run: mvn -q -Pall-platform,central-publish -Dgpg.passphrase="${GPG_PASSPHRASE}" deploy
+        working-directory: java
 
   cli-archive:
     name: CLI archive (${{ matrix.target }})
@@ -155,6 +192,7 @@ jobs:
     needs:
       - python-wheel
       - java-package
+      - java-maven-publish
       - cli-archive
       - js-package
     runs-on: ubuntu-24.04

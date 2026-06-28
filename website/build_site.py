@@ -500,14 +500,14 @@ def build_python_docs() -> None:
 
 
 def build_java_docs() -> None:
-    java_site = ROOT / "java" / "target" / "site"
-    java_apidocs = ROOT / "java" / "target" / "reports" / "apidocs"
+    java_site = ROOT / "java" / "api" / "target" / "site"
+    java_apidocs = ROOT / "java" / "api" / "target" / "reports" / "apidocs"
     if java_site.exists():
         shutil.rmtree(java_site)
     if java_apidocs.exists():
         shutil.rmtree(java_apidocs)
-    subprocess.run(["mvn", "site", "-DgenerateReports=false"], cwd=ROOT / "java", check=True)
-    subprocess.run(["mvn", "javadoc:javadoc"], cwd=ROOT / "java", check=True)
+    subprocess.run(["mvn", "-pl", "api", "site", "-DgenerateReports=false"], cwd=ROOT / "java", check=True)
+    subprocess.run(["mvn", "-pl", "api", "javadoc:javadoc"], cwd=ROOT / "java", check=True)
     java_output = SITE / "api" / "java"
     if java_output.exists():
         shutil.rmtree(java_output)

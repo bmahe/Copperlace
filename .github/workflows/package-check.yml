@@ -87,19 +87,24 @@ jobs:
           java-version: "25"
       - uses: dtolnay/rust-toolchain@stable
       - name: Build Java jars
-        run: mvn -q package
-        working-directory: java
+        shell: bash
+        run: |
+          cargo build --release --manifest-path rust-core/Cargo.toml
+          python scripts/stage_java_native.py --classifier "${{ matrix.classifier }}"
+          mvn -q -P"${{ matrix.classifier }}" package -f java/pom.xml
       - name: Smoke-test Java jars
         shell: bash
         run: |
           VERSION=$(python scripts/check_versions.py)
-          BASE_JAR="java/target/copperlace-${VERSION}.jar"
-          NATIVE_JAR="java/target/copperlace-${VERSION}-${{ matrix.classifier }}.jar"
-          python scripts/smoke_java_artifacts.py --base-jar "$BASE_JAR" --native-jar "$NATIVE_JAR"
+          API_JAR="java/api/target/copperlace-api-${VERSION}.jar"
+          NATIVE_JAR="java/native/${{ matrix.classifier }}/target/copperlace-${{ matrix.classifier }}-${VERSION}.jar"
+          python scripts/smoke_java_artifacts.py --api-jar "$API_JAR" --native-jar "$NATIVE_JAR"
       - uses: actions/upload-artifact@v4
         with:
           name: java-jars-${{ matrix.target }}
-          path: java/target/*.jar
+          path: |
+            java/api/target/*.jar
+            java/native/${{ matrix.classifier }}/target/*.jar
 
   cli-archive:
     name: CLI archive (${{ matrix.target }})
