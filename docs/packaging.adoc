@@ -41,7 +41,8 @@ Release assets include:
 
 * platform CLI archives containing the `copperlace` binary and native library;
 * Python wheels with the platform native library bundled under
-  `copperlace/native/`;
+  `copperlace/native/`, plus a source distribution that can build the bundled
+  Rust core from source;
 * Java API, all-platform, and platform native JARs;
 * a JS/WASM package tarball generated from `wasm-pack --target bundler`;
 * `SHA256SUMS` for uploaded release assets.
@@ -114,7 +115,16 @@ and `RuleSet` are context managers and release the native handle when closed.
 Wrapper failures are raised as `CopperlaceError`.
 
 The wheel build compiles `rust-core` and bundles the platform native library
-under `copperlace/native/`.
+under `copperlace/native/`. Linux wheels are repaired with `auditwheel` before
+publication so they use PyPI-compatible platform tags. The source distribution
+includes the Rust sources needed to build the native library from source.
+
+PyPI releases publish:
+
+* platform wheels for Linux x86_64/aarch64, macOS x86_64/aarch64, and Windows
+  x86_64;
+* one source distribution;
+* the same package version as Cargo, Java, and GitHub Release artifacts.
 
 Python rendering uses the builtin processor registry plus any custom processor
 callbacks provided at construction time.

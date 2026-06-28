@@ -44,7 +44,20 @@ jobs:
           python-version: "3.12"
       - uses: dtolnay/rust-toolchain@stable
       - run: python -m pip install build
-      - run: python -m build --wheel
+      - name: Install Linux wheel repair tooling
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y patchelf
+          python -m pip install auditwheel
+      - shell: bash
+        run: |
+          if [[ "${RUNNER_OS}" == "Linux" ]]; then
+            python -m build --wheel --outdir dist/raw
+            python -m auditwheel repair dist/raw/*.whl --wheel-dir dist
+          else
+            python -m build --wheel
+          fi
         working-directory: python
       - shell: bash
         run: python scripts/smoke_python_wheel.py python/dist/*.whl
@@ -52,6 +65,44 @@ jobs:
         with:
           name: python-wheel-${{ matrix.target }}
           path: python/dist/*.whl
+
+  python-sdist:
+    name: Python sdist
+    needs: versions
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: dtolnay/rust-toolchain@stable
+      - run: python -m pip install build
+      - run: python -m build --sdist
+        working-directory: python
+      - shell: bash
+        run: python scripts/smoke_python_artifact.py python/dist/*.tar.gz
+      - uses: actions/upload-artifact@v4
+        with:
+          name: python-sdist
+          path: python/dist/*.tar.gz
+
+  python-publish:
+    name: Publish Python to PyPI
+    needs:
+      - python-wheel
+      - python-sdist
+    runs-on: ubuntu-24.04
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: python-*
+          path: python-release-artifacts
+          merge-multiple: true
+      - uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: python-release-artifacts
 
   java-package:
     name: Java package (${{ matrix.target }})
@@ -191,6 +242,8 @@ jobs:
     name: Publish GitHub Release
     needs:
       - python-wheel
+      - python-sdist
+      - python-publish
       - java-package
       - java-maven-publish
       - cli-archive

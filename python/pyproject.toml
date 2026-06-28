@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=68", "wheel"]
+requires = ["setuptools>=70.1", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -12,6 +12,27 @@ license = "Apache-2.0"
 authors = [
   { name = "Copperlace contributors" }
 ]
+keywords = ["text-generation", "templates", "procedural-generation", "grammar"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "Intended Audience :: Developers",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3 :: Only",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Programming Language :: Python :: 3.13",
+  "Programming Language :: Python :: 3.14",
+  "Programming Language :: Rust",
+  "Topic :: Software Development :: Libraries :: Python Modules",
+  "Topic :: Text Processing",
+]
+
+[project.urls]
+Homepage = "https://github.com/bmahe/Copperlace"
+Repository = "https://github.com/bmahe/Copperlace"
+Documentation = "https://bmahe.github.io/Copperlace/"
+Issues = "https://github.com/bmahe/Copperlace/issues"
 
 [tool.setuptools]
 packages = ["copperlace"]
