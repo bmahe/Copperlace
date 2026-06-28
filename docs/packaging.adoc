@@ -3,6 +3,9 @@
 Copperlace is implemented in Rust and exposed through native and language
 wrapper packages.
 
+For the release operator checklist, see
+link:releasing.adoc[Copperlace release process].
+
 == Build Workflows
 
 Use the root `Makefile` for normal development workflows:

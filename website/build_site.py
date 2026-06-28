@@ -23,6 +23,7 @@ MAIN_PAGES = [
     ("docs", ROOT / "docs" / "configuration.adoc", SITE / "docs" / "configuration.html"),
     ("docs", ROOT / "docs" / "errors.adoc", SITE / "docs" / "errors.html"),
     ("docs", ROOT / "docs" / "packaging.adoc", SITE / "docs" / "packaging.html"),
+    ("docs", ROOT / "docs" / "releasing.adoc", SITE / "docs" / "releasing.html"),
     ("examples", ROOT / "examples" / "README.adoc", SITE / "examples" / "index.html"),
     ("wrappers", ROOT / "js" / "README.adoc", SITE / "wrappers" / "js.html"),
 ]
@@ -362,11 +363,13 @@ def rewrite_links(body: str) -> str:
         'href="configuration.adoc"': 'href="configuration.html"',
         'href="errors.adoc"': 'href="errors.html"',
         'href="packaging.adoc"': 'href="packaging.html"',
+        'href="releasing.adoc"': 'href="releasing.html"',
         'href="docs/index.adoc"': 'href="docs/index.html"',
         'href="docs/capabilities.adoc"': 'href="docs/capabilities.html"',
         'href="docs/configuration.adoc"': 'href="docs/configuration.html"',
         'href="docs/errors.adoc"': 'href="docs/errors.html"',
         'href="docs/packaging.adoc"': 'href="docs/packaging.html"',
+        'href="docs/releasing.adoc"': 'href="docs/releasing.html"',
         'href="examples/README.adoc"': 'href="examples/index.html"',
     }
     for old, new in replacements.items():

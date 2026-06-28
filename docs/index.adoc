@@ -14,6 +14,8 @@ the behavior currently implemented in `rust-core`.
   and render error conditions.
 * link:packaging.adoc[Packaging and language wrappers] describes build
   workflows, distributable artifacts, and Python/Java wrapper surfaces.
+* link:releasing.adoc[Release process] describes how to prepare, publish, and
+  verify Copperlace package releases.
 
 == Documented Renderer Surface
 
