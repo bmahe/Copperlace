@@ -16,6 +16,7 @@ Copperlace is split into a Rust core plus language wrappers. `rust-core/` contai
 - `make package`: builds current-platform CLI/native, Python, JS/WASM, and Java distributable artifacts.
 - `make release-check`: verifies package version consistency across Rust, Python, and Java metadata.
 - `make clean`: removes Rust, Python, JS/WASM, Java, and release archive build outputs.
+- Prefer `podman` over `docker` for containerized development and release commands.
 
 ## Coding Style & Naming Conventions
 
