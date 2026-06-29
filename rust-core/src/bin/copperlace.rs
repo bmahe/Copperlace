@@ -2,7 +2,7 @@ use std::env;
 use std::io::{self, Read};
 use std::process;
 
-use copperlace::{Copperlace, RenderContext, ruleset_from_file, ruleset_from_str};
+use copperlace::{RenderContext, RuleSet, StructuredNode, ruleset_from_file, ruleset_from_str};
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -50,6 +50,7 @@ fn render(args: &[String], start_index: usize) -> Result<Option<String>, String>
     let mut rule = None;
     let mut context = RenderContext::new();
     let mut count = 1usize;
+    let mut compact_json = false;
     let mut index = start_index;
 
     while index < args.len() {
@@ -73,6 +74,9 @@ fn render(args: &[String], start_index: usize) -> Result<Option<String>, String>
                 let (key, context_value) = parse_context_binding(&value)?;
                 context.insert(key, context_value);
             }
+            "--compact-json" => {
+                compact_json = true;
+            }
             "--help" | "-h" => return Ok(Some(render_help())),
             "--version" | "-V" => {
                 return Ok(Some(format!("copperlace {}\n", env!("CARGO_PKG_VERSION"))));
@@ -86,28 +90,84 @@ fn render(args: &[String], start_index: usize) -> Result<Option<String>, String>
         .ok_or_else(|| format!("missing required argument: --config\n\n{}", render_help()))?;
     let rule = rule.unwrap_or_else(|| "origin".to_string());
 
-    let copperlace = copperlace_from_render_config(&config)?;
+    let ruleset = ruleset_from_render_config(&config)?;
+    let render_mode = render_mode(&ruleset, &rule)?;
+    if compact_json && render_mode != RenderMode::StructuredJson {
+        return Err(format!(
+            "--compact-json can only be used with object-valued structured rules: {rule}"
+        ));
+    }
+
     let mut output = String::new();
     for render_index in 0..count {
         if render_index > 0 {
             output.push('\n');
         }
-        output.push_str(
-            &copperlace
-                .render_with_context(&rule, context.clone())
-                .map_err(|error| error.to_string())?,
-        );
+        match render_mode {
+            RenderMode::Text => output.push_str(
+                &ruleset
+                    .render_rule_with_context(&rule, context.clone())
+                    .map_err(|error| error.to_string())?,
+            ),
+            RenderMode::StructuredJson => {
+                let value = ruleset
+                    .render_rule_structured_with_context(&rule, context.clone())
+                    .map_err(|error| error.to_string())?;
+                let json = if compact_json {
+                    value.to_compact_json()
+                } else {
+                    value.to_formatted_json()
+                }
+                .map_err(|error| error.to_string())?;
+                output.push_str(&json);
+            }
+        }
     }
     output.push('\n');
     Ok(Some(output))
 }
 
-fn copperlace_from_render_config(config: &str) -> Result<Copperlace, String> {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RenderMode {
+    Text,
+    StructuredJson,
+}
+
+fn render_mode(ruleset: &RuleSet, rule: &str) -> Result<RenderMode, String> {
+    match structured_node(ruleset.structured_document(), rule) {
+        Some(StructuredNode::Object(_)) => Ok(RenderMode::StructuredJson),
+        Some(
+            StructuredNode::Array(_)
+            | StructuredNode::Text(_)
+            | StructuredNode::Number(_)
+            | StructuredNode::Boolean(_)
+            | StructuredNode::Null,
+        )
+        | None => Ok(RenderMode::Text),
+    }
+}
+
+fn structured_node<'a>(document: &'a StructuredNode, rule: &str) -> Option<&'a StructuredNode> {
+    let mut node = document;
+    for segment in rule.split('.') {
+        if segment.is_empty() {
+            return None;
+        }
+        let StructuredNode::Object(values) = node else {
+            return None;
+        };
+        let next_node = values.get(segment)?;
+        node = next_node;
+    }
+    Some(node)
+}
+
+fn ruleset_from_render_config(config: &str) -> Result<RuleSet, String> {
     if config == "-" {
         let input = read_stdin_config()?;
-        Copperlace::from_str(&input).map_err(|error| error.to_string())
+        ruleset_from_str(&input).map_err(|error| error.to_string())
     } else {
-        Copperlace::from_file(config).map_err(|error| error.to_string())
+        ruleset_from_file(config).map_err(|error| error.to_string())
     }
 }
 
@@ -269,6 +329,7 @@ Render options:
   -r, --rule <name>      Rule name to render (default: origin)
   -n, --count <n>        Number of outputs to render from one loaded config
       --set <key=value>  Initial render context value; may be repeated
+      --compact-json     Render object-valued structured rules as compact JSON
   -h, --help             Show render help
   -V, --version          Show version"
         .to_string()
