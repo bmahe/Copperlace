@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use std::fmt;
 use std::sync::Arc;
 
@@ -134,14 +134,14 @@ impl<'a> RenderState<'a> {
     }
 }
 
-/// A renderable piece of a compiled rule.
+/// A renderable text-generating piece of a compiled rule.
 ///
 /// Nodes are produced from config values, template expressions, and template
-/// statements. Rendering is driven by `RenderState`, which carries the rule
-/// table, bound variables, RNG, and rule call stack for cycle detection.
-pub trait Node {
-    /// Renders this node using the supplied render state.
-    fn render(&self, state: &mut RenderState) -> Result<String, RenderError>;
+/// statements. Text generation is driven by `RenderState`, which carries the
+/// rule table, bound variables, RNG, and rule call stack for cycle detection.
+pub trait TextGeneratorNode {
+    /// Generates text using the supplied render state.
+    fn generate_text(&self, state: &mut RenderState) -> Result<String, RenderError>;
 }
 
 /// Literal text node.
@@ -149,9 +149,112 @@ pub trait Node {
 /// `String` is used for plain template spans such as `"Hello "` and for scalar
 /// config values that do not need further expansion. Rendering returns the
 /// string unchanged.
-impl Node for String {
-    fn render(&self, _state: &mut RenderState) -> Result<String, RenderError> {
+impl TextGeneratorNode for String {
+    fn generate_text(&self, _state: &mut RenderState) -> Result<String, RenderError> {
         Ok(self.clone())
+    }
+}
+
+/// Compiled structured document tree.
+///
+/// Text leaves reuse the same text-generation nodes as existing string render
+/// APIs. Arrays and objects remain structural here even when equivalent
+/// top-level entries are also indexed as text choice rules for compatibility.
+pub enum StructuredNode {
+    /// Object entries keyed by field name.
+    Object(BTreeMap<String, StructuredNode>),
+    /// Array entries in source order.
+    Array(Vec<StructuredNode>),
+    /// A text-generating template leaf.
+    Text(Box<dyn TextGeneratorNode>),
+    /// Numeric scalar.
+    Number(CopperlaceNumber),
+    /// Boolean scalar.
+    Boolean(bool),
+    /// Null scalar.
+    Null,
+}
+
+/// Native Copperlace structured render result.
+#[derive(Debug, Clone, PartialEq)]
+pub enum CopperlaceValue {
+    /// Object entries keyed by field name.
+    Object(BTreeMap<String, CopperlaceValue>),
+    /// Array entries in render order.
+    Array(Vec<CopperlaceValue>),
+    /// String scalar.
+    String(String),
+    /// Numeric scalar.
+    Number(CopperlaceNumber),
+    /// Boolean scalar.
+    Boolean(bool),
+    /// Null scalar.
+    Null,
+}
+
+impl CopperlaceValue {
+    /// Converts this value into a JSON value.
+    pub fn into_json_value(self) -> serde_json::Value {
+        match self {
+            CopperlaceValue::Object(values) => serde_json::Value::Object(
+                values
+                    .into_iter()
+                    .map(|(key, value)| (key, value.into_json_value()))
+                    .collect(),
+            ),
+            CopperlaceValue::Array(values) => serde_json::Value::Array(
+                values
+                    .into_iter()
+                    .map(CopperlaceValue::into_json_value)
+                    .collect(),
+            ),
+            CopperlaceValue::String(value) => serde_json::Value::String(value),
+            CopperlaceValue::Number(value) => value.into_json_number(),
+            CopperlaceValue::Boolean(value) => serde_json::Value::Bool(value),
+            CopperlaceValue::Null => serde_json::Value::Null,
+        }
+    }
+
+    /// Converts this value into a JSON value without consuming it.
+    pub fn to_json_value(&self) -> serde_json::Value {
+        self.clone().into_json_value()
+    }
+}
+
+/// Numeric scalar used by structured Copperlace values.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum CopperlaceNumber {
+    /// Integer value representable as `i64`.
+    Integer(i64),
+    /// Floating-point value representable as finite `f64`.
+    Float(f64),
+}
+
+impl CopperlaceNumber {
+    fn from_json_number(number: serde_json::Number) -> Result<Self, RenderError> {
+        if let Some(value) = number.as_i64() {
+            return Ok(CopperlaceNumber::Integer(value));
+        }
+        let Some(value) = number.as_f64() else {
+            return Err(RenderError::UnsupportedValue(
+                "number must be representable as i64 or f64".to_string(),
+            ));
+        };
+        if !value.is_finite() {
+            return Err(RenderError::UnsupportedValue(
+                "number must be finite".to_string(),
+            ));
+        }
+        Ok(CopperlaceNumber::Float(value))
+    }
+
+    fn into_json_number(self) -> serde_json::Value {
+        match self {
+            CopperlaceNumber::Integer(value) => serde_json::Value::Number(value.into()),
+            CopperlaceNumber::Float(value) => serde_json::Number::from_f64(value)
+                .map(serde_json::Value::Number)
+                .unwrap_or(serde_json::Value::Null),
+        }
     }
 }
 
@@ -163,8 +266,10 @@ impl Node for String {
 /// bound variables, so `{hero}` can generate and cache `context.hero` on first
 /// use within a render.
 pub struct RuleSet {
-    rules: HashMap<String, Box<dyn Node>>,
-    context_defaults: HashMap<String, Box<dyn Node>>,
+    #[allow(dead_code)]
+    pub(crate) document: StructuredNode,
+    text_rules: HashMap<String, Box<dyn TextGeneratorNode>>,
+    context_defaults: HashMap<String, Box<dyn TextGeneratorNode>>,
     processors: ProcessorRegistry,
 }
 
@@ -194,14 +299,19 @@ impl RuleSet {
         let mut processors = builtin_processors();
         processors.extend(custom_processors);
 
-        let mut rules = HashMap::new();
+        let mut document_values = BTreeMap::new();
+        let mut text_rules = HashMap::new();
         let mut context_defaults = HashMap::new();
 
         for (name, value) in values {
+            document_values.insert(
+                name.clone(),
+                value_to_structured_node(value.clone(), &processors)?,
+            );
             if name == "context" {
                 if let hocon_rs::Value::Object(context_values) = value {
                     for (context_name, context_value) in context_values {
-                        insert_named_nodes(
+                        insert_named_text_nodes(
                             &mut context_defaults,
                             context_name,
                             context_value,
@@ -209,15 +319,16 @@ impl RuleSet {
                         )?;
                     }
                 } else {
-                    insert_named_nodes(&mut rules, name, value, &processors)?;
+                    insert_named_text_nodes(&mut text_rules, name, value, &processors)?;
                 }
             } else {
-                insert_named_nodes(&mut rules, name, value, &processors)?;
+                insert_named_text_nodes(&mut text_rules, name, value, &processors)?;
             }
         }
 
         Ok(RuleSet {
-            rules,
+            document: StructuredNode::Object(document_values),
+            text_rules,
             context_defaults,
             processors,
         })
@@ -251,7 +362,7 @@ impl RuleSet {
         state: &mut RenderState,
     ) -> Result<String, RenderError> {
         let Some(rule) = self
-            .rules
+            .text_rules
             .get(rule_name)
             .or_else(|| self.context_defaults.get(rule_name))
         else {
@@ -265,7 +376,7 @@ impl RuleSet {
         }
 
         state.call_stack.push(rule_name.to_string());
-        let result = rule.render(state);
+        let result = rule.generate_text(state);
         state.call_stack.pop();
         result
     }
@@ -286,7 +397,7 @@ impl RuleSet {
         }
 
         state.call_stack.push(name.to_string());
-        let result = rule.render(state);
+        let result = rule.generate_text(state);
         state.call_stack.pop();
         result.map(Some)
     }
@@ -340,8 +451,8 @@ impl VariableNode {
     }
 }
 
-impl Node for VariableNode {
-    fn render(&self, state: &mut RenderState) -> Result<String, RenderError> {
+impl TextGeneratorNode for VariableNode {
+    fn generate_text(&self, state: &mut RenderState) -> Result<String, RenderError> {
         state
             .context
             .get(&self.name)
@@ -368,8 +479,8 @@ impl RuleCallNode {
     }
 }
 
-impl Node for RuleCallNode {
-    fn render(&self, state: &mut RenderState) -> Result<String, RenderError> {
+impl TextGeneratorNode for RuleCallNode {
+    fn generate_text(&self, state: &mut RenderState) -> Result<String, RenderError> {
         if let Some(value) = state.context.get(&self.name) {
             return Ok(value.clone());
         }
@@ -404,24 +515,24 @@ pub enum BindMode {
 /// `{alias}` references reuse the generated value.
 pub struct BindNode {
     name: String,
-    node: Box<dyn Node>,
+    node: Box<dyn TextGeneratorNode>,
     mode: BindMode,
 }
 
 impl BindNode {
     /// Creates a binding node for a target name, source node, and binding mode.
-    pub fn new(name: String, node: Box<dyn Node>, mode: BindMode) -> Self {
+    pub fn new(name: String, node: Box<dyn TextGeneratorNode>, mode: BindMode) -> Self {
         BindNode { name, node, mode }
     }
 }
 
-impl Node for BindNode {
-    fn render(&self, state: &mut RenderState) -> Result<String, RenderError> {
+impl TextGeneratorNode for BindNode {
+    fn generate_text(&self, state: &mut RenderState) -> Result<String, RenderError> {
         if matches!(self.mode, BindMode::IfMissing) && state.context.contains_key(&self.name) {
             return Ok(String::new());
         }
 
-        let value = self.node.render(state)?;
+        let value = self.node.generate_text(state)?;
         state.context.insert(self.name.clone(), value);
         Ok(String::new())
     }
@@ -429,20 +540,20 @@ impl Node for BindNode {
 
 /// Applies named processors to a rendered child value from left to right.
 pub struct ProcessorPipelineNode {
-    node: Box<dyn Node>,
+    node: Box<dyn TextGeneratorNode>,
     processors: Vec<String>,
 }
 
 impl ProcessorPipelineNode {
     /// Creates a pipeline node that applies processors to the rendered child.
-    pub fn new(node: Box<dyn Node>, processors: Vec<String>) -> Self {
+    pub fn new(node: Box<dyn TextGeneratorNode>, processors: Vec<String>) -> Self {
         ProcessorPipelineNode { node, processors }
     }
 }
 
-impl Node for ProcessorPipelineNode {
-    fn render(&self, state: &mut RenderState) -> Result<String, RenderError> {
-        let mut value = self.node.render(state)?;
+impl TextGeneratorNode for ProcessorPipelineNode {
+    fn generate_text(&self, state: &mut RenderState) -> Result<String, RenderError> {
+        let mut value = self.node.generate_text(state)?;
         for processor_name in &self.processors {
             value = state.ruleset.process(processor_name, &value)?;
         }
@@ -456,23 +567,23 @@ impl Node for ProcessorPipelineNode {
 /// becomes a choice between two literal nodes. If the array is empty, rendering
 /// returns `RenderError::EmptyChoice`.
 pub struct ChoiceNode {
-    nodes: Vec<Box<dyn Node>>,
+    nodes: Vec<Box<dyn TextGeneratorNode>>,
 }
 
 impl ChoiceNode {
     /// Creates a choice node from renderable alternatives.
-    pub fn new(nodes: Vec<Box<dyn Node>>) -> Self {
+    pub fn new(nodes: Vec<Box<dyn TextGeneratorNode>>) -> Self {
         ChoiceNode { nodes }
     }
 }
 
-impl Node for ChoiceNode {
-    fn render(&self, state: &mut RenderState) -> Result<String, RenderError> {
+impl TextGeneratorNode for ChoiceNode {
+    fn generate_text(&self, state: &mut RenderState) -> Result<String, RenderError> {
         let random_node = self
             .nodes
             .choose(&mut state.rng)
             .ok_or(RenderError::EmptyChoice)?;
-        random_node.render(state)
+        random_node.generate_text(state)
     }
 }
 
@@ -482,13 +593,13 @@ impl Node for ChoiceNode {
 /// object entry, such as `{ value = "common", weight = 9 }`. Plain entries in
 /// the same array receive weight `1.0`.
 pub struct WeightedChoiceNode {
-    nodes: Vec<Box<dyn Node>>,
+    nodes: Vec<Box<dyn TextGeneratorNode>>,
     distribution: WeightedIndex<f64>,
 }
 
 impl WeightedChoiceNode {
     /// Creates a weighted choice node from renderable alternatives and weights.
-    pub fn new(entries: Vec<(Box<dyn Node>, f64)>) -> Result<Self, RenderError> {
+    pub fn new(entries: Vec<(Box<dyn TextGeneratorNode>, f64)>) -> Result<Self, RenderError> {
         let (nodes, weights): (Vec<_>, Vec<_>) = entries.into_iter().unzip();
         let distribution = WeightedIndex::new(weights)
             .map_err(|error| RenderError::InvalidWeightedChoice(error.to_string()))?;
@@ -499,10 +610,10 @@ impl WeightedChoiceNode {
     }
 }
 
-impl Node for WeightedChoiceNode {
-    fn render(&self, state: &mut RenderState) -> Result<String, RenderError> {
+impl TextGeneratorNode for WeightedChoiceNode {
+    fn generate_text(&self, state: &mut RenderState) -> Result<String, RenderError> {
         let index = self.distribution.sample(&mut state.rng);
-        self.nodes[index].render(state)
+        self.nodes[index].generate_text(state)
     }
 }
 
@@ -513,22 +624,22 @@ impl Node for WeightedChoiceNode {
 /// `"Hello {name}"` becomes a `VecNode` containing a literal `"Hello "` and a
 /// `RuleCallNode` for `name`.
 pub struct VecNode {
-    nodes: Vec<Box<dyn Node>>,
+    nodes: Vec<Box<dyn TextGeneratorNode>>,
 }
 
 impl VecNode {
     /// Creates a sequence node that renders children in order.
-    pub fn new(nodes: Vec<Box<dyn Node>>) -> Self {
+    pub fn new(nodes: Vec<Box<dyn TextGeneratorNode>>) -> Self {
         VecNode { nodes }
     }
 }
 
-impl Node for VecNode {
-    fn render(&self, state: &mut RenderState) -> Result<String, RenderError> {
+impl TextGeneratorNode for VecNode {
+    fn generate_text(&self, state: &mut RenderState) -> Result<String, RenderError> {
         let mut output = String::new();
 
         for node in &self.nodes {
-            output.push_str(&node.render(state)?);
+            output.push_str(&node.generate_text(state)?);
         }
 
         Ok(output)
@@ -538,7 +649,7 @@ impl Node for VecNode {
 fn value_to_node(
     value: hocon_rs::Value,
     processors: &ProcessorRegistry,
-) -> Result<Box<dyn Node>, RenderError> {
+) -> Result<Box<dyn TextGeneratorNode>, RenderError> {
     Ok(match value {
         hocon_rs::Value::String(template) => template_to_node(&template, processors)?,
         hocon_rs::Value::Array(values) => {
@@ -557,8 +668,37 @@ fn value_to_node(
     })
 }
 
-fn insert_named_nodes(
-    nodes: &mut HashMap<String, Box<dyn Node>>,
+fn value_to_structured_node(
+    value: hocon_rs::Value,
+    processors: &ProcessorRegistry,
+) -> Result<StructuredNode, RenderError> {
+    Ok(match value {
+        hocon_rs::Value::Object(values) => {
+            let mut nodes = BTreeMap::new();
+            for (name, value) in values {
+                nodes.insert(name, value_to_structured_node(value, processors)?);
+            }
+            StructuredNode::Object(nodes)
+        }
+        hocon_rs::Value::Array(values) => StructuredNode::Array(
+            values
+                .into_iter()
+                .map(|value| value_to_structured_node(value, processors))
+                .collect::<Result<Vec<_>, _>>()?,
+        ),
+        hocon_rs::Value::String(template) => {
+            StructuredNode::Text(template_to_node(&template, processors)?)
+        }
+        hocon_rs::Value::Number(number) => {
+            StructuredNode::Number(CopperlaceNumber::from_json_number(number)?)
+        }
+        hocon_rs::Value::Boolean(value) => StructuredNode::Boolean(value),
+        hocon_rs::Value::Null => StructuredNode::Null,
+    })
+}
+
+fn insert_named_text_nodes(
+    nodes: &mut HashMap<String, Box<dyn TextGeneratorNode>>,
     name: String,
     value: hocon_rs::Value,
     processors: &ProcessorRegistry,
@@ -570,7 +710,7 @@ fn insert_named_nodes(
                 Box::new(UnsupportedValueNode::new("object".to_string())),
             );
             for (child_name, child_value) in values {
-                insert_named_nodes(
+                insert_named_text_nodes(
                     nodes,
                     format!("{name}.{child_name}"),
                     child_value,
@@ -611,7 +751,7 @@ fn weighted_choice_node(
 fn weighted_choice_entry(
     value: hocon_rs::Value,
     processors: &ProcessorRegistry,
-) -> Result<(Box<dyn Node>, f64), RenderError> {
+) -> Result<(Box<dyn TextGeneratorNode>, f64), RenderError> {
     let mut object = match value {
         hocon_rs::Value::Object(object) => object,
         value => return Ok((value_to_node(value, processors)?, 1.0)),
@@ -665,8 +805,8 @@ fn weight_to_f64(value: hocon_rs::Value) -> Result<f64, RenderError> {
 fn template_to_node(
     template: &str,
     processors: &ProcessorRegistry,
-) -> Result<Box<dyn Node>, RenderError> {
-    let mut nodes: Vec<Box<dyn Node>> = Vec::new();
+) -> Result<Box<dyn TextGeneratorNode>, RenderError> {
+    let mut nodes: Vec<Box<dyn TextGeneratorNode>> = Vec::new();
     let mut literal = String::new();
     let mut chars = template.char_indices().peekable();
 
@@ -759,7 +899,7 @@ fn template_to_node(
 fn statement_to_node(
     statement: &str,
     processors: &ProcessorRegistry,
-) -> Result<Box<dyn Node>, RenderError> {
+) -> Result<Box<dyn TextGeneratorNode>, RenderError> {
     let (base_expression, processor_names) = parse_pipeline(statement, processors)?;
 
     if let Some((name, source)) = base_expression.split_once(":=") {
@@ -788,7 +928,7 @@ fn statement_to_node(
 fn expression_to_node(
     expression: &str,
     processors: &ProcessorRegistry,
-) -> Result<Box<dyn Node>, RenderError> {
+) -> Result<Box<dyn TextGeneratorNode>, RenderError> {
     let (base_expression, processor_names) = parse_pipeline(expression, processors)?;
 
     if base_expression.contains(':') {
@@ -835,7 +975,7 @@ fn bind_node(
     source: &str,
     processor_names: Vec<String>,
     mode: BindMode,
-) -> Result<Box<dyn Node>, RenderError> {
+) -> Result<Box<dyn TextGeneratorNode>, RenderError> {
     let name = name.trim();
     let source = source.trim();
     if name.is_empty() || source.is_empty() {
@@ -848,7 +988,10 @@ fn bind_node(
     Ok(Box::new(BindNode::new(name.to_string(), node, mode)))
 }
 
-fn pipeline_node(node: Box<dyn Node>, processors: Vec<String>) -> Box<dyn Node> {
+fn pipeline_node(
+    node: Box<dyn TextGeneratorNode>,
+    processors: Vec<String>,
+) -> Box<dyn TextGeneratorNode> {
     if processors.is_empty() {
         node
     } else {
@@ -872,8 +1015,190 @@ impl UnsupportedValueNode {
     }
 }
 
-impl Node for UnsupportedValueNode {
-    fn render(&self, _state: &mut RenderState) -> Result<String, RenderError> {
+impl TextGeneratorNode for UnsupportedValueNode {
+    fn generate_text(&self, _state: &mut RenderState) -> Result<String, RenderError> {
         Err(RenderError::UnsupportedValue(self.value_type.clone()))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn ruleset(config: &str) -> RuleSet {
+        let value = hocon_rs::Config::parse_str::<hocon_rs::Value>(config, None).unwrap();
+        RuleSet::from_config(value).unwrap()
+    }
+
+    fn root_object(rules: &RuleSet) -> &BTreeMap<String, StructuredNode> {
+        let StructuredNode::Object(values) = &rules.document else {
+            panic!("expected root object");
+        };
+        values
+    }
+
+    #[test]
+    fn top_level_list_compiles_to_structured_array_and_text_choice() {
+        let rules = ruleset(
+            r#"
+            origin = ["red", "blue"]
+            "#,
+        );
+
+        let root = root_object(&rules);
+        let StructuredNode::Array(values) = root.get("origin").unwrap() else {
+            panic!("expected structured array");
+        };
+        assert_eq!(values.len(), 2);
+        assert!(matches!(values[0], StructuredNode::Text(_)));
+        assert!(matches!(values[1], StructuredNode::Text(_)));
+
+        let output = rules.render_rule("origin").unwrap();
+        assert!(["red", "blue"].contains(&output.as_str()));
+    }
+
+    #[test]
+    fn object_values_compile_to_structured_objects_and_dotted_text_rules() {
+        let rules = ruleset(
+            r#"
+            origin {
+                title = "Scene"
+                nested {
+                    mood = "Quiet"
+                }
+            }
+            "#,
+        );
+
+        let root = root_object(&rules);
+        let StructuredNode::Object(origin) = root.get("origin").unwrap() else {
+            panic!("expected structured object");
+        };
+        assert!(matches!(
+            origin.get("title").unwrap(),
+            StructuredNode::Text(_)
+        ));
+        assert!(matches!(
+            origin.get("nested").unwrap(),
+            StructuredNode::Object(_)
+        ));
+
+        assert_eq!(rules.render_rule("origin.title").unwrap(), "Scene");
+        assert_eq!(rules.render_rule("origin.nested.mood").unwrap(), "Quiet");
+        assert_eq!(
+            rules.render_rule("origin"),
+            Err(RenderError::UnsupportedValue("object".to_string()))
+        );
+    }
+
+    #[test]
+    fn structured_arrays_inside_objects_do_not_compile_as_choices() {
+        let rules = ruleset(
+            r#"
+            origin {
+                entries = [
+                    { value = "common", weight = 1 },
+                    { value = "rare", weight = 2 }
+                ]
+            }
+            "#,
+        );
+
+        let root = root_object(&rules);
+        let StructuredNode::Object(origin) = root.get("origin").unwrap() else {
+            panic!("expected structured object");
+        };
+        let StructuredNode::Array(entries) = origin.get("entries").unwrap() else {
+            panic!("expected structured array");
+        };
+        assert_eq!(entries.len(), 2);
+        assert!(matches!(entries[0], StructuredNode::Object(_)));
+        assert!(matches!(entries[1], StructuredNode::Object(_)));
+    }
+
+    #[test]
+    fn structured_scalars_compile_to_native_scalar_nodes() {
+        let rules = ruleset(
+            r#"
+            origin {
+                count = 3
+                ratio = 2.5
+                active = true
+                missing = null
+            }
+            "#,
+        );
+
+        let root = root_object(&rules);
+        let StructuredNode::Object(origin) = root.get("origin").unwrap() else {
+            panic!("expected structured object");
+        };
+        assert!(matches!(
+            origin.get("count").unwrap(),
+            StructuredNode::Number(CopperlaceNumber::Integer(3))
+        ));
+        assert!(matches!(
+            origin.get("ratio").unwrap(),
+            StructuredNode::Number(CopperlaceNumber::Float(2.5))
+        ));
+        assert!(matches!(
+            origin.get("active").unwrap(),
+            StructuredNode::Boolean(true)
+        ));
+        assert!(matches!(
+            origin.get("missing").unwrap(),
+            StructuredNode::Null
+        ));
+    }
+
+    #[test]
+    fn structured_text_leaves_use_text_generator_nodes() {
+        let rules = ruleset(
+            r#"
+            name = "Mia"
+            origin {
+                title = "Hello {name}"
+            }
+            "#,
+        );
+
+        let root = root_object(&rules);
+        let StructuredNode::Object(origin) = root.get("origin").unwrap() else {
+            panic!("expected structured object");
+        };
+        let StructuredNode::Text(node) = origin.get("title").unwrap() else {
+            panic!("expected text leaf");
+        };
+        let mut state = RenderState::new(&rules);
+        assert_eq!(node.generate_text(&mut state).unwrap(), "Hello Mia");
+    }
+
+    #[test]
+    fn copperlace_value_converts_to_json_values() {
+        let mut nested = BTreeMap::new();
+        nested.insert(
+            "array".to_string(),
+            CopperlaceValue::Array(vec![
+                CopperlaceValue::String("Mia".to_string()),
+                CopperlaceValue::Number(CopperlaceNumber::Integer(3)),
+                CopperlaceValue::Number(CopperlaceNumber::Float(2.5)),
+                CopperlaceValue::Boolean(true),
+                CopperlaceValue::Null,
+            ]),
+        );
+        let value = CopperlaceValue::Object(nested);
+
+        assert_eq!(
+            value.to_json_value(),
+            serde_json::json!({
+                "array": ["Mia", 3, 2.5, true, null]
+            })
+        );
+        assert_eq!(
+            value.into_json_value(),
+            serde_json::json!({
+                "array": ["Mia", 3, 2.5, true, null]
+            })
+        );
     }
 }
