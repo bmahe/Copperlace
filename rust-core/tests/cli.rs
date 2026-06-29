@@ -280,6 +280,55 @@ fn renders_object_rule_as_compact_json() {
 }
 
 #[test]
+fn structured_item_example_renders_valid_json() {
+    let output = Command::new(env!("CARGO_BIN_EXE_copperlace"))
+        .args([
+            "render",
+            "--config",
+            "../examples/structured_item.conf",
+            "--set",
+            "itemType=compass",
+            "--set",
+            "itemRarity=rare",
+            "--set",
+            "itemMaterial=moonstone",
+            "--set",
+            "itemEffect=spark",
+            "--set",
+            "itemLevel=2",
+            "--set",
+            "itemCharges=3",
+            "--set",
+            "history=save",
+            "--set",
+            "use=search",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("\n\t"));
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(stdout.trim()).unwrap(),
+        json!({
+            "description": "A moonstone compass once saved a lost caravan. It still releases 3 sparks when its bearer is searching in the dark.",
+            "id": "rare-moonstone-compass-2nd",
+            "level": "2",
+            "name": "Rare Moonstone Compass",
+            "properties": {
+                "charges": "3",
+                "effect": "spark",
+                "material": "moonstone"
+            },
+            "rarity": "rare",
+            "tags": ["rare", "compass", "spark"],
+            "type": "compass"
+        })
+    );
+}
+
+#[test]
 fn structured_render_uses_initial_context() {
     let config_path = write_temp_config(
         r#"

@@ -34,6 +34,11 @@ JSON item data. Demonstrates JSON-safe quoted strings, bindings, scalar values,
 `slug`, `ordinal`, `article`, `past_tense`, `pluralize`, and
 `present_participle`.
 
+`structured_item.conf`::
+Structured item data. Demonstrates native object-valued structured rendering,
+nested objects, arrays, bindings, and processors without hand-assembling JSON
+as text.
+
 `product_blurb.conf`::
 Product or marketing microcopy. Demonstrates multiple render rules plus
 `titlecase`, `sentence`, `article`, `quote`, `pluralize`, and `slug`.
@@ -62,8 +67,21 @@ cargo run --bin copperlace -- render --config ../examples/proverbs.conf --rule s
 cargo run --bin copperlace -- render --config ../examples/gendered_pronouns.conf --rule origin
 cargo run --bin copperlace -- render --config ../examples/gendered_pronouns.conf --rule profile
 cargo run --bin copperlace -- render --config ../examples/item_json.conf --rule origin
+cargo run --bin copperlace -- render --config ../examples/structured_item.conf --rule origin
 cargo run --bin copperlace -- render --config ../examples/quest_log.conf --rule objective
 cargo run --bin copperlace -- render --config ../examples/culture_names.conf --rule first_name
 cargo run --bin copperlace -- render --config ../examples/culture_names.conf --rule family_name
 cargo run --bin copperlace -- render --config ../examples/culture_names.conf --rule place_name
+----
+
+`item_json.conf` shows the older pattern of generating JSON as text with
+explicit quoting. `structured_item.conf` uses an object-valued `origin` rule, so
+the CLI infers structured output and writes formatted JSON by default:
+
+[source,sh]
+----
+cargo run --bin copperlace -- render --config ../examples/structured_item.conf
+cargo run --bin copperlace -- render --config ../examples/structured_item.conf --compact-json
+cargo run --bin copperlace -- render --config ../examples/structured_item.conf --count 2
+cargo run --bin copperlace -- render --config ../examples/structured_item.conf --set itemRarity=mythic
 ----
