@@ -33,6 +33,8 @@ Use this shape with Vite, Webpack, SvelteKit, Next, or similar bundlers:
 ----
 import {
   Copperlace,
+  renderStringInferred,
+  renderStringInferredWithContext,
   renderString,
   renderStringWithContext,
   renderStringWithProcessors,
@@ -40,23 +42,33 @@ import {
 
 const config = `
 name = ["Mia", "Lina"]
-origin = "Hello {name}"
+origin {
+  title = "Hello {name}"
+  tags = ["structured", "{name | slug}"]
+}
+text = "Hello {name}"
 `;
 
 const copperlace = new Copperlace(config);
-const first = copperlace.render("origin");
-const second = copperlace.render("origin");
-const seeded = copperlace.renderWithContext("origin", { name: "Darcy" });
+const first = copperlace.renderInferred("origin");
+const second = copperlace.renderInferred("origin");
+const seeded = copperlace.renderInferredWithContext("origin", { name: "Darcy" });
 const custom = Copperlace.withProcessors(config, {
   shout: (value) => value.toUpperCase(),
-}).render("origin");
+}).render("text");
 
-const oneShot = renderString(config, "origin");
-const seededOneShot = renderStringWithContext(config, "origin", { name: "Lina" });
-const customOneShot = renderStringWithProcessors(config, "origin", {
+const oneShot = renderStringInferred(config, "origin");
+const seededOneShot = renderStringInferredWithContext(config, "origin", { name: "Lina" });
+const textOnly = renderString(config, "text");
+const seededTextOnly = renderStringWithContext(config, "text", { name: "Lina" });
+const customOneShot = renderStringWithProcessors(config, "text", {
   shout: (value) => value.toUpperCase(),
 });
 ----
+
+Inferred rendering returns text for text-valued rules and formatted JSON text
+for object-valued structured rules. Formatted structured JSON uses tabs by
+default.
 
 == Direct Browser Usage
 
@@ -73,7 +85,7 @@ Use `make js-web` for direct browser imports:
   const config = await response.text();
   const copperlace = new Copperlace(config);
 
-  document.body.textContent = copperlace.render("origin");
+  document.body.textContent = copperlace.renderInferred("origin");
 </script>
 ----
 
@@ -87,17 +99,33 @@ Compiles configuration once with custom processor functions. Custom processor
 names override builtin names.
 
 `Copperlace.render(rule: string): string`::
-Renders a named rule. Each call uses a fresh render context.
+Renders a named text rule. Each call uses a fresh render context.
 
 `Copperlace.renderWithContext(rule: string, context: Record<string, string>): string`::
-Renders a named rule with initial context values for this render only.
+Renders a named text rule with initial context values for this render only.
+
+`Copperlace.renderInferred(rule: string): string`::
+Renders a named rule, inferring the output mode. Text rules return text, and
+object-valued structured rules return formatted JSON text.
+
+`Copperlace.renderInferredWithContext(rule: string, context: Record<string, string>): string`::
+Renders a named rule with initial context values, inferring text or formatted
+structured JSON output for this render only.
 
 `renderString(config: string, rule: string): string`::
-Compiles config, renders one rule, and releases the compiled ruleset.
+Compiles config, renders one text rule, and releases the compiled ruleset.
 
 `renderStringWithContext(config: string, rule: string, context: Record<string, string>): string`::
-Compiles config, renders one rule with initial context values, and releases the
-compiled ruleset.
+Compiles config, renders one text rule with initial context values, and releases
+the compiled ruleset.
+
+`renderStringInferred(config: string, rule: string): string`::
+Compiles config, renders one rule with inferred text or formatted structured
+JSON output, and releases the compiled ruleset.
+
+`renderStringInferredWithContext(config: string, rule: string, context: Record<string, string>): string`::
+Compiles config, renders one rule with initial context values and inferred text
+or formatted structured JSON output, and releases the compiled ruleset.
 
 `renderStringWithProcessors(config: string, rule: string, processors: Record<string, (value: string) => string>): string`::
 Compiles config with custom processor functions, renders one rule, and releases
