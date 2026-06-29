@@ -118,6 +118,8 @@ impl CopperlaceValue {
 pub enum CopperlaceNumber {
     /// Integer value representable as `i64`.
     Integer(i64),
+    /// Unsigned integer value larger than `i64::MAX`.
+    Unsigned(u64),
     /// Floating-point value representable as finite `f64`.
     Float(f64),
 }
@@ -127,9 +129,12 @@ impl CopperlaceNumber {
         if let Some(value) = number.as_i64() {
             return Ok(CopperlaceNumber::Integer(value));
         }
+        if let Some(value) = number.as_u64() {
+            return Ok(CopperlaceNumber::Unsigned(value));
+        }
         let Some(value) = number.as_f64() else {
             return Err(RenderError::UnsupportedValue(
-                "number must be representable as i64 or f64".to_string(),
+                "number must be representable as i64, u64, or f64".to_string(),
             ));
         };
         if !value.is_finite() {
@@ -143,6 +148,7 @@ impl CopperlaceNumber {
     fn into_json_number(self) -> serde_json::Value {
         match self {
             CopperlaceNumber::Integer(value) => serde_json::Value::Number(value.into()),
+            CopperlaceNumber::Unsigned(value) => serde_json::Value::Number(value.into()),
             CopperlaceNumber::Float(value) => serde_json::Number::from_f64(value)
                 .map(serde_json::Value::Number)
                 .unwrap_or(serde_json::Value::Null),

@@ -228,6 +228,30 @@ fn structured_render_uses_context_defaults_and_initial_context() {
 }
 
 #[test]
+fn structured_render_keeps_context_array_defaults_as_text_choices() {
+    let rules = ruleset(
+        r#"
+        context {
+            mood = ["calm"]
+        }
+        origin {
+            mood = "{mood}"
+        }
+        "#,
+    );
+
+    assert_eq!(
+        rules
+            .render_rule_structured("origin")
+            .unwrap()
+            .to_json_value(),
+        serde_json::json!({
+            "mood": "calm"
+        })
+    );
+}
+
+#[test]
 fn structured_object_fields_use_context_defaults_without_order_dependency() {
     let rules = ruleset(
         r#"
@@ -475,6 +499,30 @@ fn compact_and_formatted_json_serialization_are_valid() {
 }
 
 #[test]
+fn structured_render_preserves_large_unsigned_integers() {
+    let value = render_str_structured(
+        r#"
+        origin {
+            id = 18446744073709551615
+        }
+        "#,
+        "origin",
+    )
+    .unwrap();
+
+    assert_eq!(
+        value.to_json_value(),
+        serde_json::json!({
+            "id": 18446744073709551615_u64
+        })
+    );
+    assert_eq!(
+        value.to_compact_json().unwrap(),
+        r#"{"id":18446744073709551615}"#
+    );
+}
+
+#[test]
 fn text_apis_for_string_and_list_rules_stay_unchanged() {
     let rules = ruleset(
         r#"
@@ -539,6 +587,50 @@ fn structured_render_surfaces_text_leaf_errors() {
 }
 
 #[test]
+fn structured_arrays_of_records_do_not_trigger_weighted_choice_validation() {
+    let value = render_str_structured(
+        r#"
+        origin {
+            sizes = [
+                { value = "S", label = "small" },
+                { weight = 2, label = "medium" }
+            ]
+        }
+        "#,
+        "origin",
+    )
+    .unwrap();
+
+    assert_eq!(
+        value.to_json_value(),
+        serde_json::json!({
+            "sizes": [
+                { "label": "small", "value": "S" },
+                { "label": "medium", "weight": 2 }
+            ]
+        })
+    );
+}
+
+#[test]
+fn dotted_text_rules_for_invalid_weighted_structured_arrays_are_unsupported() {
+    let rules = ruleset(
+        r#"
+        origin {
+            sizes = [
+                { value = "S", label = "small" }
+            ]
+        }
+        "#,
+    );
+
+    assert_eq!(
+        rules.render_rule("origin.sizes"),
+        Err(RenderError::UnsupportedValue("array".to_string()))
+    );
+}
+
+#[test]
 fn structured_render_surfaces_processor_failures_and_cycles() {
     let value = hocon_rs::Config::parse_str::<hocon_rs::Value>(
         r#"
@@ -593,12 +685,10 @@ fn structured_compile_errors_cover_invalid_config_and_weighted_choices() {
     assert!(matches!(
         ruleset_result(
             r#"
-            origin {
-                values = [
+            origin = [
                     { value = red, weight = 1 },
                     { nested = blue }
-                ]
-            }
+            ]
             "#
         ),
         Err(RenderError::InvalidWeightedChoice(_))

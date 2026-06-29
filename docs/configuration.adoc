@@ -264,6 +264,11 @@ Inside an object-valued structured rule, arrays preserve their shape instead of
 acting as random choices. Top-level list structured rendering is not supported
 in v1; top-level list rules remain text choices.
 
+Arrays inside object-valued structured rules are preserved for structured
+rendering. When a nested array looks like a malformed weighted text choice, it
+is still accepted as structured data; rendering that array as a dotted text
+rule fails with `UnsupportedValue("array")`.
+
 == Scalar Values
 
 Scalar values that are not strings, arrays, or objects are converted to strings

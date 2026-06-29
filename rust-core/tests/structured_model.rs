@@ -99,6 +99,7 @@ fn structured_scalars_compile_to_native_scalar_nodes() {
         r#"
         origin {
             count = 3
+            large = 18446744073709551615
             ratio = 2.5
             active = true
             missing = null
@@ -113,6 +114,10 @@ fn structured_scalars_compile_to_native_scalar_nodes() {
     assert!(matches!(
         origin.get("count").unwrap(),
         StructuredNode::Number(CopperlaceNumber::Integer(3))
+    ));
+    assert!(matches!(
+        origin.get("large").unwrap(),
+        StructuredNode::Number(CopperlaceNumber::Unsigned(18446744073709551615))
     ));
     assert!(matches!(
         origin.get("ratio").unwrap(),
@@ -165,6 +170,7 @@ fn copperlace_value_converts_to_json_values() {
         CopperlaceValue::Array(vec![
             CopperlaceValue::String("Mia".to_string()),
             CopperlaceValue::Number(CopperlaceNumber::Integer(3)),
+            CopperlaceValue::Number(CopperlaceNumber::Unsigned(18446744073709551615)),
             CopperlaceValue::Number(CopperlaceNumber::Float(2.5)),
             CopperlaceValue::Boolean(true),
             CopperlaceValue::Null,
@@ -175,13 +181,13 @@ fn copperlace_value_converts_to_json_values() {
     assert_eq!(
         value.to_json_value(),
         serde_json::json!({
-            "array": ["Mia", 3, 2.5, true, null]
+            "array": ["Mia", 3, 18446744073709551615_u64, 2.5, true, null]
         })
     );
     assert_eq!(
         value.into_json_value(),
         serde_json::json!({
-            "array": ["Mia", 3, 2.5, true, null]
+            "array": ["Mia", 3, 18446744073709551615_u64, 2.5, true, null]
         })
     );
 }

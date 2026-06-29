@@ -155,9 +155,9 @@ impl TextGeneratorNode for ProcessorPipelineNode {
 
 /// Randomly renders one child node from a list of alternatives.
 ///
-/// This is produced from config arrays. For example, `mood = [happy, sad]`
-/// becomes a choice between two literal nodes. If the array is empty, rendering
-/// returns `RenderError::EmptyChoice`.
+/// This is produced from text-rendered config arrays. For example,
+/// `mood = [happy, sad]` becomes a choice between two literal nodes. If the
+/// array is empty, rendering returns `RenderError::EmptyChoice`.
 pub struct ChoiceNode {
     nodes: Vec<Box<dyn TextGeneratorNode>>,
 }

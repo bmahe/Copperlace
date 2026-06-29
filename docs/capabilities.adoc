@@ -98,6 +98,11 @@ Arrays inside structured object-valued rules are different from top-level list
 rules: they render as arrays and preserve their children in order. Top-level
 list rules remain random text choices in v1.
 
+Arrays inside structured objects are preserved for structured rendering. Nested
+arrays that are valid structured data but not valid weighted text choices are
+accepted structurally and rejected only if callers try to render that nested
+array as a dotted text rule.
+
 == Bindings
 
 Copperlace supports two binding forms. Both forms emit no text directly.

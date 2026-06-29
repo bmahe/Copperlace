@@ -2,7 +2,9 @@ use std::collections::{BTreeMap, HashMap};
 
 use crate::processors::builtin_processors;
 
-use super::compile::{insert_named_text_nodes, value_to_structured_node};
+use super::compile::{
+    insert_context_text_nodes, insert_named_text_nodes, value_to_structured_node,
+};
 use super::error::RenderError;
 use super::nodes::TextGeneratorNode;
 use super::processor::ProcessorRegistry;
@@ -61,7 +63,7 @@ impl RuleSet {
             if name == "context" {
                 if let hocon_rs::Value::Object(context_values) = value {
                     for (context_name, context_value) in context_values {
-                        insert_named_text_nodes(
+                        insert_context_text_nodes(
                             &mut context_defaults,
                             context_name,
                             context_value,

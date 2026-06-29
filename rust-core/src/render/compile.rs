@@ -73,12 +73,84 @@ pub(crate) fn insert_named_text_nodes(
                 Box::new(UnsupportedValueNode::new("object".to_string())),
             );
             for (child_name, child_value) in values {
-                insert_named_text_nodes(
+                insert_structured_child_text_nodes(
                     nodes,
                     format!("{name}.{child_name}"),
                     child_value,
                     processors,
                 )?;
+            }
+        }
+        value => {
+            nodes.insert(name, value_to_node(value, processors)?);
+        }
+    }
+
+    Ok(())
+}
+
+pub(crate) fn insert_context_text_nodes(
+    nodes: &mut HashMap<String, Box<dyn TextGeneratorNode>>,
+    name: String,
+    value: hocon_rs::Value,
+    processors: &ProcessorRegistry,
+) -> Result<(), RenderError> {
+    match value {
+        hocon_rs::Value::Object(values) => {
+            nodes.insert(
+                name.clone(),
+                Box::new(UnsupportedValueNode::new("object".to_string())),
+            );
+            for (child_name, child_value) in values {
+                insert_context_text_nodes(
+                    nodes,
+                    format!("{name}.{child_name}"),
+                    child_value,
+                    processors,
+                )?;
+            }
+        }
+        value => {
+            nodes.insert(name, value_to_node(value, processors)?);
+        }
+    }
+
+    Ok(())
+}
+
+fn insert_structured_child_text_nodes(
+    nodes: &mut HashMap<String, Box<dyn TextGeneratorNode>>,
+    name: String,
+    value: hocon_rs::Value,
+    processors: &ProcessorRegistry,
+) -> Result<(), RenderError> {
+    match value {
+        hocon_rs::Value::Object(values) => {
+            nodes.insert(
+                name.clone(),
+                Box::new(UnsupportedValueNode::new("object".to_string())),
+            );
+            for (child_name, child_value) in values {
+                insert_structured_child_text_nodes(
+                    nodes,
+                    format!("{name}.{child_name}"),
+                    child_value,
+                    processors,
+                )?;
+            }
+        }
+        hocon_rs::Value::Array(values) => {
+            match value_to_node(hocon_rs::Value::Array(values), processors) {
+                Ok(node) => {
+                    nodes.insert(name, node);
+                }
+                Err(RenderError::InvalidWeightedChoice(_)) => {
+                    nodes.insert(
+                        name,
+                        Box::new(UnsupportedValueNode::new("array".to_string())),
+                    );
+                }
+                Err(error) => return Err(error),
             }
         }
         value => {
