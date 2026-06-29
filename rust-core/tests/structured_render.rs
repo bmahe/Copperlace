@@ -125,15 +125,17 @@ fn named_list_rules_referenced_from_structured_text_remain_choices() {
 }
 
 #[test]
-fn text_leaves_share_bindings_within_one_structured_render() {
+fn structured_arrays_share_bindings_in_order() {
     let rules = ruleset(
         r#"
         hero = ["Mia"]
         fallback = ["Darcy"]
         origin {
-            first = "{% name:hero %}{name}"
-            second = "{name}"
-            preserved = "{% name:fallback %}{name}"
+            entries = [
+                "{% name:hero %}{name}",
+                "{name}",
+                "{% name:fallback %}{name}"
+            ]
         }
         "#,
     );
@@ -144,23 +146,23 @@ fn text_leaves_share_bindings_within_one_structured_render() {
             .unwrap()
             .to_json_value(),
         serde_json::json!({
-            "first": "Mia",
-            "preserved": "Mia",
-            "second": "Mia"
+            "entries": ["Mia", "Mia", "Mia"]
         })
     );
 }
 
 #[test]
-fn overwrite_bindings_update_shared_structured_render_state() {
+fn structured_arrays_apply_overwrite_bindings_in_order() {
     let rules = ruleset(
         r#"
         first = ["Mia"]
         second = ["Darcy"]
         origin {
-            a_before = "{% name:first %}{name}"
-            b_overwrite = "{% name:=second %}{name}"
-            c_after = "{name}"
+            entries = [
+                "{% name:first %}{name}",
+                "{% name:=second %}{name}",
+                "{name}"
+            ]
         }
         "#,
     );
@@ -171,9 +173,7 @@ fn overwrite_bindings_update_shared_structured_render_state() {
             .unwrap()
             .to_json_value(),
         serde_json::json!({
-            "a_before": "Mia",
-            "b_overwrite": "Darcy",
-            "c_after": "Darcy"
+            "entries": ["Mia", "Darcy", "Darcy"]
         })
     );
 }
@@ -223,6 +223,33 @@ fn structured_render_uses_context_defaults_and_initial_context() {
             .to_json_value(),
         serde_json::json!({
             "greeting": "Hello Lina"
+        })
+    );
+}
+
+#[test]
+fn structured_object_fields_use_context_defaults_without_order_dependency() {
+    let rules = ruleset(
+        r#"
+        name = ["Mia"]
+        context {
+            hero = "{name}"
+        }
+        origin {
+            summary = "{hero} visits"
+            visitor = "{hero}"
+        }
+        "#,
+    );
+
+    assert_eq!(
+        rules
+            .render_rule_structured("origin")
+            .unwrap()
+            .to_json_value(),
+        serde_json::json!({
+            "summary": "Mia visits",
+            "visitor": "Mia"
         })
     );
 }

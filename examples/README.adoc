@@ -76,7 +76,9 @@ cargo run --bin copperlace -- render --config ../examples/culture_names.conf --r
 
 `item_json.conf` shows the older pattern of generating JSON as text with
 explicit quoting. `structured_item.conf` uses an object-valued `origin` rule, so
-the CLI infers structured output and writes formatted JSON by default:
+the CLI infers structured output and writes formatted JSON by default. Shared
+generated item values live in `context` defaults so object fields do not depend
+on sibling field evaluation order:
 
 [source,sh]
 ----

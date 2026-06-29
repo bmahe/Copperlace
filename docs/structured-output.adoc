@@ -25,13 +25,14 @@ title = ["moon garden"]
 
 context {
   city = "Istanbul"
+  hero = "{name}"
 }
 
 origin {
   kind = "scene"
   title = "{title | titlecase}"
   slug = "{title | slug}"
-  visitor = "{% hero:name %}{hero}"
+  visitor = "{hero}"
   summary = "{hero} visits {city}."
   tags = ["structured", "{city | slug}"]
   nested {
@@ -46,14 +47,18 @@ still use normal Copperlace text behavior:
 
 * rule calls like `{title}`;
 * builtin processors like `titlecase` and `slug`;
-* bindings like `{% hero:name %}`;
-* top-level `context` defaults like `{city}`;
+* top-level `context` defaults like `{hero}` and `{city}`;
 * initial context values passed by the caller or by CLI `--set`.
 
 Named list rules referenced from text leaves remain random text choices. In the
 example above, `{name}` and `{title}` choose one list item when the text leaf
 renders. The `tags` field itself is an array because it is inside a structured
 object.
+
+Object fields are not an ordering mechanism. If multiple fields need the same
+generated value, put that value in `context` defaults or pass it as initial
+context instead of relying on one sibling field to bind a value before another
+sibling renders.
 
 == Rust Values and JSON
 
