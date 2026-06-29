@@ -33,6 +33,16 @@ Each top-level rule can be rendered directly by passing its key to
 `RuleSet::render_rule`. Dotted leaves can also be rendered directly, such as
 `RuleSet::render_rule("name.first")`.
 
+The selected top-level rule's value shape also determines whether it is a text
+or structured render target:
+
+* string-valued top-level rules render as text;
+* list-valued top-level rules render as random text choices;
+* object-valued top-level rules can render structurally.
+
+See link:structured-output.adoc[Structured output] for examples and CLI mode
+inference.
+
 == Special `context` Object
 
 When top-level `context` is an object, its entries become lazy default values
@@ -250,6 +260,10 @@ one entry with a positive weight. Invalid weighted choices fail during
 An empty array is accepted during `RuleSet` construction, but rendering it fails
 with `EmptyChoice`.
 
+Inside an object-valued structured rule, arrays preserve their shape instead of
+acting as random choices. Top-level list structured rendering is not supported
+in v1; top-level list rules remain text choices.
+
 == Scalar Values
 
 Scalar values that are not strings, arrays, or objects are converted to strings
@@ -279,6 +293,11 @@ origin = "{name.first} {name.family}"
 
 Object parents are not directly renderable. Rendering `name` in the example
 above fails with `UnsupportedValue("object")`.
+
+Object-valued top-level rules are structured render targets. Structured
+rendering preserves nested objects and arrays, while string leaves still use
+normal templates, rule calls, processors, bindings, context defaults, and
+initial context values.
 
 Objects are also supported as the special top-level `context` value and as
 weighted choice entries inside arrays. Nested context values use the same dotted
