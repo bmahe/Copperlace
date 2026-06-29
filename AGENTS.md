@@ -24,7 +24,7 @@ Rust code must pass `cargo fmt --check`; keep tests outside `rust-core/src/`. Py
 
 ## Testing Guidelines
 
-Add behavior coverage in the wrapper closest to the change. Rust renderer behavior belongs in `rust-core/tests/`; Python wrapper behavior in `python/tests/`; Java FFM behavior in `java/src/test/`. Packaging behavior should be covered by the relevant `scripts/smoke_*` helper and, when possible, the GitHub Actions package-check workflow. Keep tests direct and focused on observable rendering, binding, configuration, packaging, or wrapper behavior. Do not commit generated artifacts such as `target/`, `python/build/`, `python/dist/`, `*.egg-info`, `__pycache__/`, `java/target/`, `js/pkg/`, or local release archives.
+Add behavior coverage in the wrapper closest to the change. Tests must live in separate test files, never colocated with production source code; `make check` enforces this for Rust source files. Rust renderer behavior belongs in `rust-core/tests/`; Python wrapper behavior in `python/tests/`; Java FFM behavior in `java/src/test/`. Packaging behavior should be covered by the relevant `scripts/smoke_*` helper and, when possible, the GitHub Actions package-check workflow. Keep tests direct and focused on observable rendering, binding, configuration, packaging, or wrapper behavior. Do not commit generated artifacts such as `target/`, `python/build/`, `python/dist/`, `*.egg-info`, `__pycache__/`, `java/target/`, `js/pkg/`, or local release archives.
 
 ## Packaging Notes
 

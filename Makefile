@@ -17,6 +17,7 @@ help:
 	@printf '%s\n' '  make rust-fmt       Check Rust formatting'
 	@printf '%s\n' '  make rust-build     Build Rust library, native library, and CLI'
 	@printf '%s\n' '  make rust-test      Run Rust tests'
+	@printf '%s\n' '  make test-locations Check that tests are not colocated with source'
 	@printf '%s\n' '  make rust-cli       Run the sample CLI render command'
 	@printf '%s\n' '  make cli-archive    Build a CLI and native-library release archive'
 	@printf '%s\n' '  make python-test    Run Python wrapper tests'
@@ -46,6 +47,10 @@ rust-build:
 .PHONY: rust-test
 rust-test:
 	cd $(RUST_DIR) && $(CARGO) test
+
+.PHONY: test-locations
+test-locations:
+	$(PYTHON) scripts/check_test_locations.py
 
 .PHONY: rust-cli
 rust-cli:
@@ -107,7 +112,7 @@ release-check:
 	$(PYTHON) scripts/check_versions.py
 
 .PHONY: check
-check: rust-fmt test
+check: test-locations rust-fmt test
 
 .PHONY: clean
 clean:
