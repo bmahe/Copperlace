@@ -41,3 +41,13 @@ print(render_str_structured(config, "origin"))
 `render_str_structured`, and `render_file_structured` use compact native JSON
 internally and parse it into `dict`, `list`, scalar, boolean, and `None` values
 before returning.
+
+Use inferred rendering when callers want the CLI-style behavior from one method:
+text rules return text, list rules keep random text choice behavior, and
+object-valued rules return a formatted JSON string.
+
+```python
+from copperlace import render_str_inferred
+
+print(render_str_inferred(config, "origin"))
+```

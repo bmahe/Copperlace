@@ -2,8 +2,10 @@ use std::collections::BTreeMap;
 
 use copperlace::{
     ConfigError, Copperlace, CopperlaceNumber, CopperlaceValue, RenderContext, RenderError,
-    RuleSet, processor, render_config_rule_structured_with_context, render_file_structured,
-    render_file_structured_with_context, render_str_structured, render_str_structured_with_context,
+    RuleSet, processor, render_config_rule_structured_with_context, render_file_inferred,
+    render_file_inferred_with_context, render_file_structured, render_file_structured_with_context,
+    render_str_inferred, render_str_inferred_with_context, render_str_structured,
+    render_str_structured_with_context,
 };
 
 fn ruleset(config: &str) -> RuleSet {
@@ -352,6 +354,64 @@ fn string_file_and_config_helpers_render_structured_values() {
             .to_json_value(),
         serde_json::json!({"name": "Mia"})
     );
+
+    let _ = std::fs::remove_file(config_path);
+}
+
+#[test]
+fn inferred_render_returns_text_or_formatted_structured_json() {
+    let rules = ruleset(
+        r#"
+        text = "Mia"
+        choice = ["Lina"]
+        origin {
+            greeting = "Hello {name}"
+        }
+        "#,
+    );
+    let mut context = RenderContext::new();
+    context.insert("name".to_string(), "Darcy".to_string());
+
+    assert_eq!(rules.render_rule_inferred("text").unwrap(), "Mia");
+    assert_eq!(rules.render_rule_inferred("choice").unwrap(), "Lina");
+    let structured = rules
+        .render_rule_inferred_with_context("origin", context)
+        .unwrap();
+    assert_eq!(structured, "{\n\t\"greeting\": \"Hello Darcy\"\n}");
+}
+
+#[test]
+fn copperlace_and_helpers_render_inferred_strings() {
+    let config = r#"
+        text = "Mia"
+        origin {
+            greeting = "Hello {name}"
+        }
+        "#;
+    let copperlace = Copperlace::from_str(config).unwrap();
+    let mut context = RenderContext::new();
+    context.insert("name".to_string(), "Lina".to_string());
+    let config_path =
+        std::env::temp_dir().join(format!("copperlace-inferred-{}.conf", std::process::id()));
+    std::fs::write(&config_path, config).unwrap();
+
+    assert_eq!(copperlace.render_inferred("text").unwrap(), "Mia");
+    assert_eq!(
+        copperlace
+            .render_inferred_with_context("origin", context.clone())
+            .unwrap(),
+        "{\n\t\"greeting\": \"Hello Lina\"\n}"
+    );
+    assert_eq!(
+        render_str_inferred_with_context(config, "origin", context.clone()).unwrap(),
+        "{\n\t\"greeting\": \"Hello Lina\"\n}"
+    );
+    assert_eq!(
+        render_file_inferred_with_context(&config_path, "origin", context).unwrap(),
+        "{\n\t\"greeting\": \"Hello Lina\"\n}"
+    );
+    assert_eq!(render_str_inferred(config, "text").unwrap(), "Mia");
+    assert_eq!(render_file_inferred(&config_path, "text").unwrap(), "Mia");
 
     let _ = std::fs::remove_file(config_path);
 }

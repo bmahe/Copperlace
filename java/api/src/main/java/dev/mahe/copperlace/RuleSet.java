@@ -131,15 +131,47 @@ public final class RuleSet implements AutoCloseable {
     }
 
     /**
-     * Renders a named structured rule from this ruleset as compact JSON text.
+     * Renders a named rule as text, returning formatted JSON for object-valued rules.
+     *
+     * @param rule name of the rule to render
+     * @return rendered text, or formatted JSON for an object-valued rule
+     * @throws IllegalArgumentException if {@code rule} is blank
+     * @throws CopperlaceException if this ruleset is closed or rendering fails
+     */
+    public String renderInferred(final String rule) {
+        ensureOpen();
+        Validate.notBlank(rule, "rule must not be blank");
+        return NativeLibrary.INSTANCE.renderInferred(handle, rule);
+    }
+
+    /**
+     * Renders a named rule as text with initial context, returning formatted JSON for object-valued rules.
+     *
+     * @param rule name of the rule to render
+     * @param context initial render context values
+     * @return rendered text, or formatted JSON for an object-valued rule
+     * @throws NullPointerException if {@code context}, a context key, or a context value is null
+     * @throws IllegalArgumentException if {@code rule} is blank
+     * @throws CopperlaceException if this ruleset is closed or rendering fails
+     */
+    public String renderInferred(final String rule, final Map<String, String> context) {
+        ensureOpen();
+        Validate.notBlank(rule, "rule must not be blank");
+        Objects.requireNonNull(context, "context");
+        validateContext(context);
+        return NativeLibrary.INSTANCE.renderInferredWithContext(handle, rule, context);
+    }
+
+    /**
+     * Renders a named structured rule from this ruleset as formatted JSON text.
      *
      * @param rule name of the structured rule to render
-     * @return compact JSON for {@code rule}
+     * @return formatted JSON for {@code rule}
      * @throws IllegalArgumentException if {@code rule} is blank
      * @throws CopperlaceException if this ruleset is closed or rendering fails
      */
     public String renderStructuredJson(final String rule) {
-        return renderStructuredJson(rule, false);
+        return renderStructuredJson(rule, true);
     }
 
     /**
@@ -158,17 +190,17 @@ public final class RuleSet implements AutoCloseable {
     }
 
     /**
-     * Renders a named structured rule from this ruleset as compact JSON text with initial context values.
+     * Renders a named structured rule from this ruleset as formatted JSON text with initial context values.
      *
      * @param rule name of the structured rule to render
      * @param context initial render context values
-     * @return compact JSON for {@code rule}
+     * @return formatted JSON for {@code rule}
      * @throws NullPointerException if {@code context}, a context key, or a context value is null
      * @throws IllegalArgumentException if {@code rule} is blank
      * @throws CopperlaceException if this ruleset is closed or rendering fails
      */
     public String renderStructuredJson(final String rule, final Map<String, String> context) {
-        return renderStructuredJson(rule, context, false);
+        return renderStructuredJson(rule, context, true);
     }
 
     /**

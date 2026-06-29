@@ -170,10 +170,16 @@ with Copperlace.from_string(config) as copperlace:
 Python also exposes `RuleSet.render_structured`, `Copperlace.render_structured`,
 `render_str_structured`, and `render_file_structured`.
 
+For callers that want the same shape inference as the CLI, Python exposes
+`RuleSet.render_inferred`, `Copperlace.render_inferred`, `render_str_inferred`,
+and `render_file_inferred`. These return normal text for string-valued and
+list-valued rules, or a formatted JSON string for object-valued rules.
+
 == Java API
 
 Java structured APIs return JSON strings to avoid adding a JSON dependency.
-Pass `true` for formatted JSON with tabs or `false` for compact JSON.
+The no-argument structured JSON overloads return formatted JSON with tabs.
+Pass `false` to the overloads with `formatJson` for compact JSON.
 
 [source,java]
 ----
@@ -184,15 +190,20 @@ try (Copperlace copperlace = Copperlace.fromString("""
           tags = ["structured", "{name | slug}"]
         }
         """)) {
-    String compact = copperlace.renderStructuredJson("origin");
-    String formatted = copperlace.renderStructuredJson("origin", true);
+    String formatted = copperlace.renderStructuredJson("origin");
+    String compact = copperlace.renderStructuredJson("origin", false);
     String withContext = copperlace.renderStructuredJson(
             "origin",
             Map.of("name", "Lina"),
-            false);
+            true);
+    String inferred = copperlace.renderInferred("origin");
 }
 ----
 
 Java also exposes `RuleSet.renderStructuredJson`, `Copperlace.renderStructuredJson`,
 `Copperlace.renderStringStructuredJson`, and
 `Copperlace.renderFileStructuredJson`.
+The matching inferred entry points are `RuleSet.renderInferred`,
+`Copperlace.renderInferred`, `Copperlace.renderStringInferred`, and
+`Copperlace.renderFileInferred`; they return text or formatted JSON strings
+based on the selected rule shape.

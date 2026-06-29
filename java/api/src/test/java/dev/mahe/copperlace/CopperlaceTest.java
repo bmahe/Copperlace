@@ -84,13 +84,38 @@ final class CopperlaceTest {
 
         assertTrue(output.startsWith("{"));
         assertTrue(output.endsWith("}"));
-        assertFalse(output.contains("\n"));
-        assertTrue(output.contains("\"active\":true"));
-        assertTrue(output.contains("\"count\":3"));
-        assertTrue(output.contains("\"items\":[\"one\",\"two\"]"));
-        assertTrue(output.contains("\"missing\":null"));
-        assertTrue(output.contains("\"nested\":{\"value\":\"ok\"}"));
-        assertTrue(output.contains("\"title\":\"Hello Mia\""));
+        assertTrue(output.contains("\n\t"));
+        assertTrue(output.contains("\"active\": true"));
+        assertTrue(output.contains("\"count\": 3"));
+        assertTrue(output.contains("\"items\": ["));
+        assertTrue(output.contains("\"missing\": null"));
+        assertTrue(output.contains("\"nested\": {"));
+        assertTrue(output.contains("\"title\": \"Hello Mia\""));
+
+        final String compact = Copperlace.renderStringStructuredJson(
+                """
+                name = ["Mia"]
+                origin {
+                    title = "Hello {name}"
+                    items = ["one", "two"]
+                    count = 3
+                    active = true
+                    missing = null
+                    nested {
+                        value = "ok"
+                    }
+                }
+                """,
+                "origin",
+                false);
+
+        assertFalse(compact.contains("\n"));
+        assertTrue(compact.contains("\"active\":true"));
+        assertTrue(compact.contains("\"count\":3"));
+        assertTrue(compact.contains("\"items\":[\"one\",\"two\"]"));
+        assertTrue(compact.contains("\"missing\":null"));
+        assertTrue(compact.contains("\"nested\":{\"value\":\"ok\"}"));
+        assertTrue(compact.contains("\"title\":\"Hello Mia\""));
     }
 
     @Test
@@ -124,8 +149,11 @@ final class CopperlaceTest {
                     """);
 
             assertEquals(
-                    "{\"greeting\":\"Hello Lina\"}",
+                    "{\n\t\"greeting\": \"Hello Lina\"\n}",
                     Copperlace.renderFileStructuredJson(config, "origin", Map.of("name", "Lina")));
+            assertEquals(
+                    "{\"greeting\":\"Hello Lina\"}",
+                    Copperlace.renderFileStructuredJson(config, "origin", Map.of("name", "Lina"), false));
         } finally {
             Files.deleteIfExists(config);
         }
@@ -143,8 +171,11 @@ final class CopperlaceTest {
                 """,
                 Map.of("surround", value -> "[" + value + "]"))) {
             assertEquals(
-                    "{\"builtin\":\"MIA\",\"custom\":\"[Mia]\"}",
+                    "{\n\t\"builtin\": \"MIA\",\n\t\"custom\": \"[Mia]\"\n}",
                     rules.renderStructuredJson("origin"));
+            assertEquals(
+                    "{\"builtin\":\"MIA\",\"custom\":\"[Mia]\"}",
+                    rules.renderStructuredJson("origin", false));
         }
     }
 
@@ -156,9 +187,65 @@ final class CopperlaceTest {
                 }
                 """)) {
             assertEquals(
-                    "{\"greeting\":\"Hello Mia\"}",
+                    "{\n\t\"greeting\": \"Hello Mia\"\n}",
                     copperlace.renderStructuredJson("origin", Map.of("name", "Mia")));
         }
+    }
+
+    @Test
+    void rulesetRendersInferredTextOrFormattedStructuredJson() {
+        try (final RuleSet rules = RuleSet.fromString(
+                """
+                text = "Mia"
+                choice = ["Lina"]
+                origin {
+                    greeting = "Hello {name}"
+                }
+                """)) {
+            assertEquals("Mia", rules.renderInferred("text"));
+            assertEquals("Lina", rules.renderInferred("choice"));
+            assertEquals(
+                    "{\n\t\"greeting\": \"Hello Darcy\"\n}",
+                    rules.renderInferred("origin", Map.of("name", "Darcy")));
+        }
+    }
+
+    @Test
+    void copperlaceRendersInferredWithContext() {
+        try (final Copperlace copperlace = Copperlace.fromString("""
+                origin {
+                    greeting = "Hello {name}"
+                }
+                """)) {
+            assertEquals(
+                    "{\n\t\"greeting\": \"Hello Mia\"\n}",
+                    copperlace.renderInferred("origin", Map.of("name", "Mia")));
+        }
+    }
+
+    @Test
+    void staticConveniencesRenderInferred() {
+        assertEquals(
+                "Mia",
+                Copperlace.renderStringInferred(
+                        """
+                        text = "Mia"
+                        origin {
+                            greeting = "Hello {name}"
+                        }
+                        """,
+                        "text"));
+        assertEquals(
+                "{\n\t\"greeting\": \"Hello Lina\"\n}",
+                Copperlace.renderStringInferred(
+                        """
+                        text = "Mia"
+                        origin {
+                            greeting = "Hello {name}"
+                        }
+                        """,
+                        "origin",
+                        Map.of("name", "Lina")));
     }
 
     @Test

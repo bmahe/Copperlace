@@ -26,8 +26,10 @@ The behavior documented here is exported by the Rust library in
 
 * `RuleSet::from_config`
 * `RuleSet::render_rule`
+* `RuleSet::render_rule_inferred`
 * `RuleSet::render_rule_structured`
 * `render_config_rule`
+* `render_str_inferred` / `render_file_inferred`
 * `render_config_rule_structured`
 * `RenderError`
 * configuration file and string helper APIs

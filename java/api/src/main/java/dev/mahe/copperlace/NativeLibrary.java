@@ -37,6 +37,8 @@ final class NativeLibrary {
     private final MethodHandle rulesetFromStringWithProcessors;
     private final MethodHandle rulesetRender;
     private final MethodHandle rulesetRenderWithContext;
+    private final MethodHandle rulesetRenderInferred;
+    private final MethodHandle rulesetRenderInferredWithContext;
     private final MethodHandle rulesetRenderStructuredJson;
     private final MethodHandle rulesetRenderStructuredJsonWithContext;
     private final MethodHandle rulesetFree;
@@ -107,6 +109,29 @@ final class NativeLibrary {
                 linker,
                 lookup,
                 "copperlace_ruleset_render_with_context",
+                FunctionDescriptor.of(
+                        ValueLayout.JAVA_INT,
+                        ValueLayout.ADDRESS,
+                        ValueLayout.ADDRESS,
+                        ValueLayout.ADDRESS,
+                        ValueLayout.ADDRESS,
+                        ValueLayout.JAVA_LONG,
+                        ValueLayout.ADDRESS,
+                        ValueLayout.ADDRESS));
+        rulesetRenderInferred = downcall(
+                linker,
+                lookup,
+                "copperlace_ruleset_render_inferred",
+                FunctionDescriptor.of(
+                        ValueLayout.JAVA_INT,
+                        ValueLayout.ADDRESS,
+                        ValueLayout.ADDRESS,
+                        ValueLayout.ADDRESS,
+                        ValueLayout.ADDRESS));
+        rulesetRenderInferredWithContext = downcall(
+                linker,
+                lookup,
+                "copperlace_ruleset_render_inferred_with_context",
                 FunctionDescriptor.of(
                         ValueLayout.JAVA_INT,
                         ValueLayout.ADDRESS,
@@ -284,6 +309,82 @@ final class NativeLibrary {
             throw exception;
         } catch (final Throwable throwable) {
             throw new CopperlaceException("Failed to render Copperlace structured rule", throwable);
+        }
+    }
+
+    String renderInferred(final MemorySegment handle, final String rule) {
+        Validate.isTrue(!isNull(handle), "handle must not be null");
+        Validate.notBlank(rule, "rule must not be blank");
+
+        try (Arena arena = Arena.ofConfined()) {
+            final MemorySegment outString = arena.allocate(ValueLayout.ADDRESS);
+            final MemorySegment outError = arena.allocate(ValueLayout.ADDRESS);
+            final MemorySegment ruleString = arena.allocateFrom(rule);
+
+            final int status = (int) rulesetRenderInferred.invokeExact(handle, ruleString, outString, outError);
+            checkStatus(status, outError);
+
+            final MemorySegment nativeString = outString.get(ValueLayout.ADDRESS, 0);
+            try {
+                return readNativeString(nativeString);
+            } finally {
+                stringFree(nativeString);
+            }
+        } catch (final CopperlaceException exception) {
+            throw exception;
+        } catch (final Throwable throwable) {
+            throw new CopperlaceException("Failed to render Copperlace rule", throwable);
+        }
+    }
+
+    String renderInferredWithContext(
+            final MemorySegment handle, final String rule, final Map<String, String> context) {
+        Validate.isTrue(!isNull(handle), "handle must not be null");
+        Validate.notBlank(rule, "rule must not be blank");
+        Objects.requireNonNull(context, "context");
+
+        try (Arena arena = Arena.ofConfined()) {
+            final MemorySegment outString = arena.allocate(ValueLayout.ADDRESS);
+            final MemorySegment outError = arena.allocate(ValueLayout.ADDRESS);
+            final MemorySegment ruleString = arena.allocateFrom(rule);
+            final long contextLength = context.size();
+            final long contextBytes = ValueLayout.ADDRESS.byteSize() * contextLength;
+            final MemorySegment contextKeys = contextLength == 0
+                    ? MemorySegment.NULL
+                    : arena.allocate(contextBytes, ValueLayout.ADDRESS.byteAlignment());
+            final MemorySegment contextValues = contextLength == 0
+                    ? MemorySegment.NULL
+                    : arena.allocate(contextBytes, ValueLayout.ADDRESS.byteAlignment());
+
+            long index = 0;
+            for (final Map.Entry<String, String> entry : context.entrySet()) {
+                final String key = Objects.requireNonNull(entry.getKey(), "context key");
+                final String value = Objects.requireNonNull(entry.getValue(), "context value");
+                contextKeys.setAtIndex(ValueLayout.ADDRESS, index, arena.allocateFrom(key));
+                contextValues.setAtIndex(ValueLayout.ADDRESS, index, arena.allocateFrom(value));
+                index++;
+            }
+
+            final int status = (int) rulesetRenderInferredWithContext.invokeExact(
+                    handle,
+                    ruleString,
+                    contextKeys,
+                    contextValues,
+                    contextLength,
+                    outString,
+                    outError);
+            checkStatus(status, outError);
+
+            final MemorySegment nativeString = outString.get(ValueLayout.ADDRESS, 0);
+            try {
+                return readNativeString(nativeString);
+            } finally {
+                stringFree(nativeString);
+            }
+        } catch (final CopperlaceException exception) {
+            throw exception;
+        } catch (final Throwable throwable) {
+            throw new CopperlaceException("Failed to render Copperlace rule", throwable);
         }
     }
 

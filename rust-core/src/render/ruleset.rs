@@ -106,6 +106,31 @@ impl RuleSet {
         self.render_rule_with_state(rule_name, &mut state)
     }
 
+    /// Renders a named rule as text, inferring structured JSON for object-valued rules.
+    ///
+    /// String-valued and list-valued rules use existing text rendering. Object-valued
+    /// rules render as formatted JSON using tab indentation.
+    pub fn render_rule_inferred(&self, rule_name: &str) -> Result<String, RenderError> {
+        self.render_rule_inferred_with_context(rule_name, RenderContext::new())
+    }
+
+    /// Renders a named rule with initial context, inferring structured JSON for object-valued rules.
+    pub fn render_rule_inferred_with_context(
+        &self,
+        rule_name: &str,
+        context: RenderContext,
+    ) -> Result<String, RenderError> {
+        if matches!(
+            self.structured_node(rule_name),
+            Ok(StructuredNode::Object(_))
+        ) {
+            return self
+                .render_rule_structured_with_context(rule_name, context)
+                .and_then(|value| value.to_formatted_json());
+        }
+        self.render_rule_with_context(rule_name, context)
+    }
+
     /// Renders an object-valued rule as a native structured value.
     ///
     /// Each call starts with a fresh render context. Text leaves within the

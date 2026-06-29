@@ -11,6 +11,8 @@ use copperlace::ffi::{
     copperlace_ruleset_from_string as raw_copperlace_ruleset_from_string,
     copperlace_ruleset_from_string_with_processors as raw_copperlace_ruleset_from_string_with_processors,
     copperlace_ruleset_render as raw_copperlace_ruleset_render,
+    copperlace_ruleset_render_inferred as raw_copperlace_ruleset_render_inferred,
+    copperlace_ruleset_render_inferred_with_context as raw_copperlace_ruleset_render_inferred_with_context,
     copperlace_ruleset_render_structured_json as raw_copperlace_ruleset_render_structured_json,
     copperlace_ruleset_render_structured_json_with_context as raw_copperlace_ruleset_render_structured_json_with_context,
     copperlace_ruleset_render_with_context as raw_copperlace_ruleset_render_with_context,
@@ -68,6 +70,37 @@ fn copperlace_ruleset_render_with_context(
 ) -> c_int {
     unsafe {
         raw_copperlace_ruleset_render_with_context(
+            handle,
+            rule,
+            context_keys,
+            context_values,
+            context_len,
+            out_string,
+            out_error,
+        )
+    }
+}
+
+fn copperlace_ruleset_render_inferred(
+    handle: *const CopperlaceRuleSet,
+    rule: *const c_char,
+    out_string: *mut *mut c_char,
+    out_error: *mut *mut c_char,
+) -> c_int {
+    unsafe { raw_copperlace_ruleset_render_inferred(handle, rule, out_string, out_error) }
+}
+
+fn copperlace_ruleset_render_inferred_with_context(
+    handle: *const CopperlaceRuleSet,
+    rule: *const c_char,
+    context_keys: *const *const c_char,
+    context_values: *const *const c_char,
+    context_len: usize,
+    out_string: *mut *mut c_char,
+    out_error: *mut *mut c_char,
+) -> c_int {
+    unsafe {
+        raw_copperlace_ruleset_render_inferred_with_context(
             handle,
             rule,
             context_keys,
@@ -440,6 +473,71 @@ fn rejects_null_processor_callback() {
     assert!(!error.is_null());
 
     copperlace_string_free(error);
+}
+
+#[test]
+fn renders_inferred_text_or_formatted_structured_json() {
+    let config = CString::new(
+        r#"
+        text = "Mia"
+        choice = ["Lina"]
+        origin {
+            greeting = "Hello {name}"
+        }
+        "#,
+    )
+    .unwrap();
+    let text_rule = CString::new("text").unwrap();
+    let choice_rule = CString::new("choice").unwrap();
+    let object_rule = CString::new("origin").unwrap();
+    let key = CString::new("name").unwrap();
+    let value = CString::new("Darcy").unwrap();
+    let keys = [key.as_ptr()];
+    let values = [value.as_ptr()];
+    let mut handle = ptr::null_mut();
+    let mut error = ptr::null_mut();
+    let mut output = ptr::null_mut();
+
+    assert_eq!(
+        copperlace_ruleset_from_string(config.as_ptr(), &mut handle, &mut error),
+        COPPERLACE_OK
+    );
+
+    assert_eq!(
+        copperlace_ruleset_render_inferred(handle, text_rule.as_ptr(), &mut output, &mut error),
+        COPPERLACE_OK
+    );
+    assert_eq!(unsafe { CStr::from_ptr(output) }.to_str().unwrap(), "Mia");
+    copperlace_string_free(output);
+    output = ptr::null_mut();
+
+    assert_eq!(
+        copperlace_ruleset_render_inferred(handle, choice_rule.as_ptr(), &mut output, &mut error),
+        COPPERLACE_OK
+    );
+    assert_eq!(unsafe { CStr::from_ptr(output) }.to_str().unwrap(), "Lina");
+    copperlace_string_free(output);
+    output = ptr::null_mut();
+
+    assert_eq!(
+        copperlace_ruleset_render_inferred_with_context(
+            handle,
+            object_rule.as_ptr(),
+            keys.as_ptr(),
+            values.as_ptr(),
+            keys.len(),
+            &mut output,
+            &mut error,
+        ),
+        COPPERLACE_OK
+    );
+    assert_eq!(
+        unsafe { CStr::from_ptr(output) }.to_str().unwrap(),
+        "{\n\t\"greeting\": \"Hello Darcy\"\n}"
+    );
+
+    copperlace_string_free(output);
+    copperlace_ruleset_free(handle);
 }
 
 #[test]

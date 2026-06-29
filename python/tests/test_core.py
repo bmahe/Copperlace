@@ -9,10 +9,13 @@ from copperlace import (
     CopperlaceError,
     RuleSet,
     render_file,
+    render_file_inferred,
     render_file_structured,
     render_str,
+    render_str_inferred,
     render_str_structured,
 )
+from copperlace._native import native
 
 
 class CopperlaceTests(unittest.TestCase):
@@ -124,6 +127,68 @@ class CopperlaceTests(unittest.TestCase):
         )
 
         self.assertEqual(output, {"builtin": "MIA", "custom": "[Mia]"})
+
+    def test_native_structured_json_defaults_to_formatted(self) -> None:
+        with RuleSet.from_string('origin { greeting = "Hello Mia" }') as ruleset:
+            output = native().ruleset_render_structured_json(ruleset._handle, "origin")
+
+        self.assertEqual(output, '{\n\t"greeting": "Hello Mia"\n}')
+
+    def test_render_inferred_from_config_string(self) -> None:
+        text = render_str_inferred(
+            """
+            text = "Mia"
+            choice = ["Lina"]
+            origin {
+                greeting = "Hello {name}"
+            }
+            """,
+            "text",
+        )
+        choice = render_str_inferred(
+            """
+            text = "Mia"
+            choice = ["Lina"]
+            origin {
+                greeting = "Hello {name}"
+            }
+            """,
+            "choice",
+        )
+        structured = render_str_inferred(
+            """
+            text = "Mia"
+            choice = ["Lina"]
+            origin {
+                greeting = "Hello {name}"
+            }
+            """,
+            "origin",
+            {"name": "Darcy"},
+        )
+
+        self.assertEqual(text, "Mia")
+        self.assertEqual(choice, "Lina")
+        self.assertEqual(structured, '{\n\t"greeting": "Hello Darcy"\n}')
+
+    def test_render_inferred_from_config_file(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "story.conf"
+            path.write_text(
+                """
+                text = "Mia"
+                origin {
+                    greeting = "Hello {name}"
+                }
+                """,
+                encoding="utf-8",
+            )
+
+            self.assertEqual(render_file_inferred(path, "text"), "Mia")
+            self.assertEqual(
+                render_file_inferred(path, "origin", {"name": "Lina"}),
+                '{\n\t"greeting": "Hello Lina"\n}',
+            )
 
     def test_missing_rule_raises_error(self) -> None:
         with self.assertRaisesRegex(CopperlaceError, "unknown rule"):
@@ -274,6 +339,21 @@ class CopperlaceTests(unittest.TestCase):
             )
             self.assertEqual(ruleset.render("plain"), "Mia")
 
+    def test_ruleset_renders_inferred(self) -> None:
+        with RuleSet.from_string(
+            """
+            text = "Mia"
+            origin {
+                greeting = "Hello {name}"
+            }
+            """
+        ) as ruleset:
+            self.assertEqual(ruleset.render_inferred("text"), "Mia")
+            self.assertEqual(
+                ruleset.render_inferred("origin", {"name": "Darcy"}),
+                '{\n\t"greeting": "Hello Darcy"\n}',
+            )
+
     def test_repeated_renders_on_one_copperlace_instance(self) -> None:
         copperlace = Copperlace.from_string(
             'name = ["Mia"]\npet = ["owl"]\norigin = "{name}"\ncompanion = "{name} and {pet}"'
@@ -294,6 +374,13 @@ class CopperlaceTests(unittest.TestCase):
             self.assertEqual(
                 copperlace.render_structured("origin", {"name": "Mia"}),
                 {"greeting": "Hello Mia"},
+            )
+
+    def test_copperlace_renders_inferred_with_context(self) -> None:
+        with Copperlace.from_string('origin { greeting = "Hello {name}" }') as copperlace:
+            self.assertEqual(
+                copperlace.render_inferred("origin", {"name": "Mia"}),
+                '{\n\t"greeting": "Hello Mia"\n}',
             )
 
     def test_context_rejects_non_string_key(self) -> None:
@@ -349,6 +436,9 @@ class CopperlaceTests(unittest.TestCase):
         with self.assertRaisesRegex(CopperlaceError, "closed"):
             ruleset.render_structured("origin")
 
+        with self.assertRaisesRegex(CopperlaceError, "closed"):
+            ruleset.render_inferred("origin")
+
     def test_context_manager_closes_copperlace(self) -> None:
         with Copperlace.from_string('name = ["Mia"]\norigin = "{name}"') as copperlace:
             self.assertEqual(copperlace.render("origin"), "Mia")
@@ -358,6 +448,9 @@ class CopperlaceTests(unittest.TestCase):
 
         with self.assertRaisesRegex(CopperlaceError, "closed"):
             copperlace.render_structured("origin")
+
+        with self.assertRaisesRegex(CopperlaceError, "closed"):
+            copperlace.render_inferred("origin")
 
     def test_explicit_close_is_idempotent(self) -> None:
         ruleset = RuleSet.from_string('name = ["Mia"]\norigin = "{name}"')

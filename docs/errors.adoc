@@ -18,6 +18,13 @@ Starts a fresh render for `rule_name` using the previously loaded config.
 `Copperlace::render_with_context(&self, rule_name, context)`::
 Starts a fresh render with initial context values.
 
+`Copperlace::render_inferred(&self, rule_name)`::
+Starts a fresh render and returns text for string-valued or list-valued rules,
+or formatted JSON for object-valued rules.
+
+`Copperlace::render_inferred_with_context(&self, rule_name, context)`::
+Starts an inferred render with initial context values.
+
 `Copperlace::render_structured(&self, rule_name)`::
 Starts a fresh structured render for an object-valued rule and returns a
 `CopperlaceValue`.
@@ -35,6 +42,13 @@ new thread-local random number generator.
 
 `RuleSet::render_rule_with_context(&self, rule_name, context)`::
 Starts a fresh render with initial context values.
+
+`RuleSet::render_rule_inferred(&self, rule_name)`::
+Starts a fresh render and returns text for string-valued or list-valued rules,
+or formatted JSON for object-valued rules.
+
+`RuleSet::render_rule_inferred_with_context(&self, rule_name, context)`::
+Starts an inferred render with initial context values.
 
 `RuleSet::render_rule_structured(&self, rule_name)`::
 Starts a fresh structured render for an object-valued rule and returns a
@@ -55,6 +69,10 @@ Parse configuration input and compile it into a `RuleSet`.
 
 `render_str` / `render_file`::
 Parse configuration input and render one rule in a single call.
+
+`render_str_inferred` / `render_file_inferred`::
+Parse configuration input and render one rule in a single call, returning text
+or formatted JSON based on the selected rule shape.
 
 `RuleSet::from_config_with_processors(config, processors)`::
 Compiles a config with the builtin processor registry plus Rust-provided custom
@@ -98,6 +116,8 @@ The dynamic library exposes an opaque ruleset handle API:
 * `copperlace_ruleset_from_string_with_processors`
 * `copperlace_ruleset_render`
 * `copperlace_ruleset_render_with_context`
+* `copperlace_ruleset_render_inferred`
+* `copperlace_ruleset_render_inferred_with_context`
 * `copperlace_ruleset_render_structured_json`
 * `copperlace_ruleset_render_structured_json_with_context`
 * `copperlace_processor_result_set_output`

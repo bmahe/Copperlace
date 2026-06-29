@@ -118,6 +118,38 @@ class RuleSet:
         except NativeError as error:
             raise CopperlaceError(str(error)) from error
 
+    def render_inferred(self, rule: str, context: Mapping[str, str] | None = None) -> str:
+        """Render a rule as text, returning formatted JSON for object-valued rules.
+
+        String-valued and list-valued rules use normal text rendering. Object-valued
+        structured rules return formatted JSON text.
+
+        Args:
+            rule: Name of the rule to render.
+            context: Optional initial render context values.
+
+        Returns:
+            Rendered text, or formatted JSON for an object-valued rule.
+
+        Raises:
+            CopperlaceError: If this ruleset is closed or rendering fails.
+        """
+
+        self._ensure_open()
+        if context is not None:
+            validated_context = _validate_context(context)
+            try:
+                return native().ruleset_render_inferred_with_context(
+                    self._handle, rule, validated_context
+                )
+            except NativeError as error:
+                raise CopperlaceError(str(error)) from error
+
+        try:
+            return native().ruleset_render_inferred(self._handle, rule)
+        except NativeError as error:
+            raise CopperlaceError(str(error)) from error
+
     def render_structured(
         self, rule: str, context: Mapping[str, str] | None = None
     ) -> StructuredValue:
@@ -143,13 +175,15 @@ class RuleSet:
             validated_context = _validate_context(context)
             try:
                 output = native().ruleset_render_structured_json_with_context(
-                    self._handle, rule, validated_context
+                    self._handle, rule, validated_context, False
                 )
             except NativeError as error:
                 raise CopperlaceError(str(error)) from error
         else:
             try:
-                output = native().ruleset_render_structured_json(self._handle, rule)
+                output = native().ruleset_render_structured_json(
+                    self._handle, rule, False
+                )
             except NativeError as error:
                 raise CopperlaceError(str(error)) from error
 
@@ -265,6 +299,22 @@ class Copperlace:
 
         return self._ruleset.render(rule, context)
 
+    def render_inferred(self, rule: str, context: Mapping[str, str] | None = None) -> str:
+        """Render a rule as text, returning formatted JSON for object-valued rules.
+
+        Args:
+            rule: Name of the rule to render.
+            context: Optional initial render context values.
+
+        Returns:
+            Rendered text, or formatted JSON for an object-valued rule.
+
+        Raises:
+            CopperlaceError: If the renderer is closed or rendering fails.
+        """
+
+        return self._ruleset.render_inferred(rule, context)
+
     def render_structured(
         self, rule: str, context: Mapping[str, str] | None = None
     ) -> StructuredValue:
@@ -363,6 +413,32 @@ def render_file(
 
     with RuleSet.from_file(path, processors) as ruleset:
         return ruleset.render(rule, context)
+
+
+def render_str_inferred(
+    config: str,
+    rule: str,
+    context: Mapping[str, str] | None = None,
+    *,
+    processors: Mapping[str, Callable[[str], str]] | None = None,
+) -> str:
+    """Render one rule from a configuration string, returning formatted JSON for object-valued rules."""
+
+    with RuleSet.from_string(config, processors) as ruleset:
+        return ruleset.render_inferred(rule, context)
+
+
+def render_file_inferred(
+    path: str | Path,
+    rule: str,
+    context: Mapping[str, str] | None = None,
+    *,
+    processors: Mapping[str, Callable[[str], str]] | None = None,
+) -> str:
+    """Render one rule from a configuration file, returning formatted JSON for object-valued rules."""
+
+    with RuleSet.from_file(path, processors) as ruleset:
+        return ruleset.render_inferred(rule, context)
 
 
 def render_str_structured(
