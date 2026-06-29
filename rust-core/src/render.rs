@@ -5,6 +5,7 @@ use std::sync::Arc;
 use rand::distr::Distribution;
 use rand::distr::weighted::WeightedIndex;
 use rand::seq::IndexedRandom;
+use serde::Serialize;
 
 use crate::processors::builtin_processors;
 
@@ -32,6 +33,10 @@ pub enum RenderError {
     UnsupportedValue(String),
     /// The root configuration value was not an object.
     InvalidConfigRoot,
+    /// A structured render was requested for a non-object path.
+    UnsupportedStructuredTarget(String),
+    /// A structured value could not be serialized to JSON.
+    JsonSerialization(String),
 }
 
 impl fmt::Display for RenderError {
@@ -58,6 +63,18 @@ impl fmt::Display for RenderError {
                 write!(formatter, "unsupported value type: {value_type}")
             }
             RenderError::InvalidConfigRoot => write!(formatter, "config root must be an object"),
+            RenderError::UnsupportedStructuredTarget(rule) => {
+                write!(
+                    formatter,
+                    "structured render target must be an object: {rule}"
+                )
+            }
+            RenderError::JsonSerialization(message) => {
+                write!(
+                    formatter,
+                    "failed to serialize structured value as JSON: {message}"
+                )
+            }
         }
     }
 }
@@ -175,6 +192,27 @@ pub enum StructuredNode {
     Null,
 }
 
+impl StructuredNode {
+    fn generate_value(&self, state: &mut RenderState) -> Result<CopperlaceValue, RenderError> {
+        match self {
+            StructuredNode::Object(values) => values
+                .iter()
+                .map(|(key, value)| Ok((key.clone(), value.generate_value(state)?)))
+                .collect::<Result<BTreeMap<_, _>, _>>()
+                .map(CopperlaceValue::Object),
+            StructuredNode::Array(values) => values
+                .iter()
+                .map(|value| value.generate_value(state))
+                .collect::<Result<Vec<_>, _>>()
+                .map(CopperlaceValue::Array),
+            StructuredNode::Text(node) => node.generate_text(state).map(CopperlaceValue::String),
+            StructuredNode::Number(value) => Ok(CopperlaceValue::Number(*value)),
+            StructuredNode::Boolean(value) => Ok(CopperlaceValue::Boolean(*value)),
+            StructuredNode::Null => Ok(CopperlaceValue::Null),
+        }
+    }
+}
+
 /// Native Copperlace structured render result.
 #[derive(Debug, Clone, PartialEq)]
 pub enum CopperlaceValue {
@@ -218,6 +256,23 @@ impl CopperlaceValue {
     /// Converts this value into a JSON value without consuming it.
     pub fn to_json_value(&self) -> serde_json::Value {
         self.clone().into_json_value()
+    }
+
+    /// Serializes this value as compact JSON.
+    pub fn to_compact_json(&self) -> Result<String, RenderError> {
+        serde_json::to_string(&self.to_json_value())
+            .map_err(|error| RenderError::JsonSerialization(error.to_string()))
+    }
+
+    /// Serializes this value as formatted JSON using tabs for indentation.
+    pub fn to_formatted_json(&self) -> Result<String, RenderError> {
+        let mut output = Vec::new();
+        let formatter = serde_json::ser::PrettyFormatter::with_indent(b"\t");
+        let mut serializer = serde_json::Serializer::with_formatter(&mut output, formatter);
+        self.to_json_value()
+            .serialize(&mut serializer)
+            .map_err(|error| RenderError::JsonSerialization(error.to_string()))?;
+        String::from_utf8(output).map_err(|error| RenderError::JsonSerialization(error.to_string()))
     }
 }
 
@@ -355,9 +410,51 @@ impl RuleSet {
         self.render_rule_with_state(rule_name, &mut state)
     }
 
+    /// Renders an object-valued rule as a native structured value.
+    ///
+    /// Each call starts with a fresh render context. Text leaves within the
+    /// structured object share one render state, so bindings and lazy context
+    /// defaults are stable within the structured render.
+    pub fn render_rule_structured(&self, rule_name: &str) -> Result<CopperlaceValue, RenderError> {
+        self.render_rule_structured_with_context(rule_name, RenderContext::new())
+    }
+
+    /// Renders an object-valued rule as a native structured value with initial context.
+    pub fn render_rule_structured_with_context(
+        &self,
+        rule_name: &str,
+        context: RenderContext,
+    ) -> Result<CopperlaceValue, RenderError> {
+        let node = self.structured_node(rule_name)?;
+        if !matches!(node, StructuredNode::Object(_)) {
+            return Err(RenderError::UnsupportedStructuredTarget(
+                rule_name.to_string(),
+            ));
+        }
+        let mut state = RenderState::with_context(self, context);
+        node.generate_value(&mut state)
+    }
+
     /// Returns the compiled structured document tree.
     pub fn structured_document(&self) -> &StructuredNode {
         &self.document
+    }
+
+    fn structured_node(&self, rule_name: &str) -> Result<&StructuredNode, RenderError> {
+        let mut node = &self.document;
+        for segment in rule_name.split('.') {
+            if segment.is_empty() {
+                return Err(RenderError::UnknownRule(rule_name.to_string()));
+            }
+            let StructuredNode::Object(values) = node else {
+                return Err(RenderError::UnknownRule(rule_name.to_string()));
+            };
+            let Some(next_node) = values.get(segment) else {
+                return Err(RenderError::UnknownRule(rule_name.to_string()));
+            };
+            node = next_node;
+        }
+        Ok(node)
     }
 
     fn render_rule_with_state(
@@ -436,6 +533,24 @@ pub fn render_config_rule_with_context(
 ) -> Result<String, RenderError> {
     let ruleset = RuleSet::from_config(config)?;
     ruleset.render_rule_with_context(rule_name, context)
+}
+
+/// Compiles a parsed configuration root value and renders one object-valued rule.
+pub fn render_config_rule_structured(
+    config: hocon_rs::Value,
+    rule_name: &str,
+) -> Result<CopperlaceValue, RenderError> {
+    render_config_rule_structured_with_context(config, rule_name, RenderContext::new())
+}
+
+/// Compiles a parsed configuration root value and renders one object-valued rule with initial context.
+pub fn render_config_rule_structured_with_context(
+    config: hocon_rs::Value,
+    rule_name: &str,
+    context: RenderContext,
+) -> Result<CopperlaceValue, RenderError> {
+    let ruleset = RuleSet::from_config(config)?;
+    ruleset.render_rule_structured_with_context(rule_name, context)
 }
 
 /// Looks up a previously bound variable in the current render context.
