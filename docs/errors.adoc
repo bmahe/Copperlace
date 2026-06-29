@@ -18,6 +18,20 @@ Starts a fresh render for `rule_name` using the previously loaded config.
 `Copperlace::render_with_context(&self, rule_name, context)`::
 Starts a fresh render with initial context values.
 
+`Copperlace::render_inferred(&self, rule_name)`::
+Starts a fresh render and returns text for string-valued or list-valued rules,
+or formatted JSON for object-valued rules.
+
+`Copperlace::render_inferred_with_context(&self, rule_name, context)`::
+Starts an inferred render with initial context values.
+
+`Copperlace::render_structured(&self, rule_name)`::
+Starts a fresh structured render for an object-valued rule and returns a
+`CopperlaceValue`.
+
+`Copperlace::render_structured_with_context(&self, rule_name, context)`::
+Starts a fresh structured render with initial context values.
+
 `RuleSet::from_config(config) -> Result<RuleSet, RenderError>`::
 Compiles a parsed root value into named render rules and context defaults. The
 root must be an object.
@@ -29,14 +43,36 @@ new thread-local random number generator.
 `RuleSet::render_rule_with_context(&self, rule_name, context)`::
 Starts a fresh render with initial context values.
 
+`RuleSet::render_rule_inferred(&self, rule_name)`::
+Starts a fresh render and returns text for string-valued or list-valued rules,
+or formatted JSON for object-valued rules.
+
+`RuleSet::render_rule_inferred_with_context(&self, rule_name, context)`::
+Starts an inferred render with initial context values.
+
+`RuleSet::render_rule_structured(&self, rule_name)`::
+Starts a fresh structured render for an object-valued rule and returns a
+`CopperlaceValue`.
+
+`RuleSet::render_rule_structured_with_context(&self, rule_name, context)`::
+Starts a fresh structured render with initial context values.
+
 `render_config_rule(config, rule_name) -> Result<String, RenderError>`::
 Convenience function that compiles the config and renders one rule.
+
+`render_config_rule_structured(config, rule_name) -> Result<CopperlaceValue, RenderError>`::
+Convenience function that compiles the config and renders one object-valued rule
+as a structured value.
 
 `ruleset_from_str` / `ruleset_from_file`::
 Parse configuration input and compile it into a `RuleSet`.
 
 `render_str` / `render_file`::
 Parse configuration input and render one rule in a single call.
+
+`render_str_inferred` / `render_file_inferred`::
+Parse configuration input and render one rule in a single call, returning text
+or formatted JSON based on the selected rule shape.
 
 `RuleSet::from_config_with_processors(config, processors)`::
 Compiles a config with the builtin processor registry plus Rust-provided custom
@@ -56,6 +92,7 @@ The package builds a `copperlace` binary:
 copperlace render --config <path>
 copperlace render --config -
 copperlace render -c <path> -r <name> --count <n> --set name=Mia
+copperlace render -c <path> -r <object-rule> --compact-json
 copperlace check --config -
 ----
 
@@ -63,6 +100,11 @@ The CLI renders `origin` when `--rule` is omitted. Passing `-` as the render or
 check config path reads configuration from standard input. It writes rendered output,
 help, version text, and successful check output to stdout. Parse, render, check,
 and argument errors are written to stderr and return a nonzero exit code.
+
+For render commands, the CLI infers text versus structured JSON output from the
+selected rule shape. Object-valued rules render as formatted JSON with tab
+indentation by default. `--compact-json` selects compact JSON and is valid only
+for object-valued structured rules.
 
 == C ABI
 
@@ -74,6 +116,10 @@ The dynamic library exposes an opaque ruleset handle API:
 * `copperlace_ruleset_from_string_with_processors`
 * `copperlace_ruleset_render`
 * `copperlace_ruleset_render_with_context`
+* `copperlace_ruleset_render_inferred`
+* `copperlace_ruleset_render_inferred_with_context`
+* `copperlace_ruleset_render_structured_json`
+* `copperlace_ruleset_render_structured_json_with_context`
 * `copperlace_processor_result_set_output`
 * `copperlace_processor_result_set_error`
 * `copperlace_ruleset_free`
@@ -136,8 +182,17 @@ vector contains the detected path, including the repeated final rule name.
 
 `UnsupportedValue(String)`::
 Returned when rendering a value type that compiled to an unsupported node. The
-current unsupported value type is `"object"` for object parents such as `name`
-when only dotted leaves such as `name.first` are renderable.
+current unsupported value types are `"object"` for object parents such as
+`name` when only dotted leaves such as `name.first` are renderable, and
+`"array"` for nested arrays that are valid structured data but not valid dotted
+text-choice rules.
+
+`UnsupportedStructuredTarget(String)`::
+Returned when structured rendering is requested for a target that is not an
+object-valued rule.
+
+`JsonSerialization(String)`::
+Returned when a structured value cannot be serialized to JSON.
 
 `InvalidConfigRoot`::
 Returned by `RuleSet::from_config` when the provided value root is not an

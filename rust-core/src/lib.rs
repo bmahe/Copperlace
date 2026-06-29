@@ -20,10 +20,15 @@ pub mod render;
 mod wasm;
 
 pub use config::{
-    ConfigError, Copperlace, render_file, render_file_with_context, render_str,
-    render_str_with_context, ruleset_from_file, ruleset_from_str,
+    ConfigError, Copperlace, render_file, render_file_inferred, render_file_inferred_with_context,
+    render_file_structured, render_file_structured_with_context, render_file_with_context,
+    render_str, render_str_inferred, render_str_inferred_with_context, render_str_structured,
+    render_str_structured_with_context, render_str_with_context, ruleset_from_file,
+    ruleset_from_str,
 };
 pub use render::{
-    Processor, ProcessorRegistry, RenderContext, RenderError, RuleSet, processor,
-    render_config_rule, render_config_rule_with_context,
+    CopperlaceNumber, CopperlaceValue, Processor, ProcessorRegistry, RenderContext, RenderError,
+    RuleSet, StructuredNode, TextGeneratorNode, processor, render_config_rule,
+    render_config_rule_structured, render_config_rule_structured_with_context,
+    render_config_rule_with_context,
 };

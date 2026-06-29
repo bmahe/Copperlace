@@ -11,9 +11,14 @@ use copperlace::ffi::{
     copperlace_ruleset_from_string as raw_copperlace_ruleset_from_string,
     copperlace_ruleset_from_string_with_processors as raw_copperlace_ruleset_from_string_with_processors,
     copperlace_ruleset_render as raw_copperlace_ruleset_render,
+    copperlace_ruleset_render_inferred as raw_copperlace_ruleset_render_inferred,
+    copperlace_ruleset_render_inferred_with_context as raw_copperlace_ruleset_render_inferred_with_context,
+    copperlace_ruleset_render_structured_json as raw_copperlace_ruleset_render_structured_json,
+    copperlace_ruleset_render_structured_json_with_context as raw_copperlace_ruleset_render_structured_json_with_context,
     copperlace_ruleset_render_with_context as raw_copperlace_ruleset_render_with_context,
     copperlace_string_free as raw_copperlace_string_free,
 };
+use serde_json::json;
 
 fn copperlace_ruleset_from_string(
     config: *const c_char,
@@ -71,6 +76,79 @@ fn copperlace_ruleset_render_with_context(
             context_values,
             context_len,
             out_string,
+            out_error,
+        )
+    }
+}
+
+fn copperlace_ruleset_render_inferred(
+    handle: *const CopperlaceRuleSet,
+    rule: *const c_char,
+    out_string: *mut *mut c_char,
+    out_error: *mut *mut c_char,
+) -> c_int {
+    unsafe { raw_copperlace_ruleset_render_inferred(handle, rule, out_string, out_error) }
+}
+
+fn copperlace_ruleset_render_inferred_with_context(
+    handle: *const CopperlaceRuleSet,
+    rule: *const c_char,
+    context_keys: *const *const c_char,
+    context_values: *const *const c_char,
+    context_len: usize,
+    out_string: *mut *mut c_char,
+    out_error: *mut *mut c_char,
+) -> c_int {
+    unsafe {
+        raw_copperlace_ruleset_render_inferred_with_context(
+            handle,
+            rule,
+            context_keys,
+            context_values,
+            context_len,
+            out_string,
+            out_error,
+        )
+    }
+}
+
+fn copperlace_ruleset_render_structured_json(
+    handle: *const CopperlaceRuleSet,
+    rule: *const c_char,
+    format_json: bool,
+    out_json: *mut *mut c_char,
+    out_error: *mut *mut c_char,
+) -> c_int {
+    unsafe {
+        raw_copperlace_ruleset_render_structured_json(
+            handle,
+            rule,
+            format_json,
+            out_json,
+            out_error,
+        )
+    }
+}
+
+fn copperlace_ruleset_render_structured_json_with_context(
+    handle: *const CopperlaceRuleSet,
+    rule: *const c_char,
+    context_keys: *const *const c_char,
+    context_values: *const *const c_char,
+    context_len: usize,
+    format_json: bool,
+    out_json: *mut *mut c_char,
+    out_error: *mut *mut c_char,
+) -> c_int {
+    unsafe {
+        raw_copperlace_ruleset_render_structured_json_with_context(
+            handle,
+            rule,
+            context_keys,
+            context_values,
+            context_len,
+            format_json,
+            out_json,
             out_error,
         )
     }
@@ -395,6 +473,504 @@ fn rejects_null_processor_callback() {
     assert!(!error.is_null());
 
     copperlace_string_free(error);
+}
+
+#[test]
+fn renders_inferred_text_or_formatted_structured_json() {
+    let config = CString::new(
+        r#"
+        text = "Mia"
+        choice = ["Lina"]
+        origin {
+            greeting = "Hello {name}"
+        }
+        "#,
+    )
+    .unwrap();
+    let text_rule = CString::new("text").unwrap();
+    let choice_rule = CString::new("choice").unwrap();
+    let object_rule = CString::new("origin").unwrap();
+    let key = CString::new("name").unwrap();
+    let value = CString::new("Darcy").unwrap();
+    let keys = [key.as_ptr()];
+    let values = [value.as_ptr()];
+    let mut handle = ptr::null_mut();
+    let mut error = ptr::null_mut();
+    let mut output = ptr::null_mut();
+
+    assert_eq!(
+        copperlace_ruleset_from_string(config.as_ptr(), &mut handle, &mut error),
+        COPPERLACE_OK
+    );
+
+    assert_eq!(
+        copperlace_ruleset_render_inferred(handle, text_rule.as_ptr(), &mut output, &mut error),
+        COPPERLACE_OK
+    );
+    assert_eq!(unsafe { CStr::from_ptr(output) }.to_str().unwrap(), "Mia");
+    copperlace_string_free(output);
+    output = ptr::null_mut();
+
+    assert_eq!(
+        copperlace_ruleset_render_inferred(handle, choice_rule.as_ptr(), &mut output, &mut error),
+        COPPERLACE_OK
+    );
+    assert_eq!(unsafe { CStr::from_ptr(output) }.to_str().unwrap(), "Lina");
+    copperlace_string_free(output);
+    output = ptr::null_mut();
+
+    assert_eq!(
+        copperlace_ruleset_render_inferred_with_context(
+            handle,
+            object_rule.as_ptr(),
+            keys.as_ptr(),
+            values.as_ptr(),
+            keys.len(),
+            &mut output,
+            &mut error,
+        ),
+        COPPERLACE_OK
+    );
+    assert_eq!(
+        unsafe { CStr::from_ptr(output) }.to_str().unwrap(),
+        "{\n\t\"greeting\": \"Hello Darcy\"\n}"
+    );
+
+    copperlace_string_free(output);
+    copperlace_ruleset_free(handle);
+}
+
+#[test]
+fn renders_structured_json_compact() {
+    let config = CString::new(
+        r#"
+        name = ["Mia"]
+        origin {
+            title = "Hello {name}"
+            tags = ["generated", "{name | slug}"]
+            count = 3
+            active = true
+            missing = null
+            nested {
+                value = "ok"
+            }
+        }
+        "#,
+    )
+    .unwrap();
+    let rule = CString::new("origin").unwrap();
+    let mut handle = ptr::null_mut();
+    let mut error = ptr::null_mut();
+    let mut output = ptr::null_mut();
+
+    assert_eq!(
+        copperlace_ruleset_from_string(config.as_ptr(), &mut handle, &mut error),
+        COPPERLACE_OK
+    );
+
+    assert_eq!(
+        copperlace_ruleset_render_structured_json(
+            handle,
+            rule.as_ptr(),
+            false,
+            &mut output,
+            &mut error,
+        ),
+        COPPERLACE_OK
+    );
+    assert!(error.is_null());
+    let rendered = unsafe { CStr::from_ptr(output) }.to_str().unwrap();
+    assert!(!rendered.contains('\n'));
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(rendered).unwrap(),
+        json!({
+            "active": true,
+            "count": 3,
+            "missing": null,
+            "nested": {
+                "value": "ok"
+            },
+            "tags": ["generated", "mia"],
+            "title": "Hello Mia"
+        })
+    );
+
+    copperlace_string_free(output);
+    copperlace_ruleset_free(handle);
+}
+
+#[test]
+fn renders_structured_json_formatted_with_tabs() {
+    let config = CString::new(
+        r#"
+        origin {
+            title = "Hello"
+            items = ["one", "two"]
+        }
+        "#,
+    )
+    .unwrap();
+    let rule = CString::new("origin").unwrap();
+    let mut handle = ptr::null_mut();
+    let mut error = ptr::null_mut();
+    let mut output = ptr::null_mut();
+
+    assert_eq!(
+        copperlace_ruleset_from_string(config.as_ptr(), &mut handle, &mut error),
+        COPPERLACE_OK
+    );
+
+    assert_eq!(
+        copperlace_ruleset_render_structured_json(
+            handle,
+            rule.as_ptr(),
+            true,
+            &mut output,
+            &mut error,
+        ),
+        COPPERLACE_OK
+    );
+    assert!(error.is_null());
+    let rendered = unsafe { CStr::from_ptr(output) }.to_str().unwrap();
+    assert!(rendered.contains("\n\t"));
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(rendered).unwrap(),
+        json!({
+            "items": ["one", "two"],
+            "title": "Hello"
+        })
+    );
+
+    copperlace_string_free(output);
+    copperlace_ruleset_free(handle);
+}
+
+#[test]
+fn renders_structured_json_with_initial_context() {
+    let config = CString::new(
+        r#"
+        context {
+            name = "Mia"
+        }
+        origin {
+            greeting = "Hello {name}"
+        }
+        "#,
+    )
+    .unwrap();
+    let rule = CString::new("origin").unwrap();
+    let key = CString::new("name").unwrap();
+    let first_value = CString::new("Darcy").unwrap();
+    let second_value = CString::new("Lina").unwrap();
+    let keys = [key.as_ptr(), key.as_ptr()];
+    let values = [first_value.as_ptr(), second_value.as_ptr()];
+    let mut handle = ptr::null_mut();
+    let mut error = ptr::null_mut();
+    let mut output = ptr::null_mut();
+
+    assert_eq!(
+        copperlace_ruleset_from_string(config.as_ptr(), &mut handle, &mut error),
+        COPPERLACE_OK
+    );
+
+    assert_eq!(
+        copperlace_ruleset_render_structured_json_with_context(
+            handle,
+            rule.as_ptr(),
+            keys.as_ptr(),
+            values.as_ptr(),
+            keys.len(),
+            false,
+            &mut output,
+            &mut error,
+        ),
+        COPPERLACE_OK
+    );
+    assert!(error.is_null());
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(
+            unsafe { CStr::from_ptr(output) }.to_str().unwrap()
+        )
+        .unwrap(),
+        json!({
+            "greeting": "Hello Lina"
+        })
+    );
+
+    copperlace_string_free(output);
+    copperlace_ruleset_free(handle);
+}
+
+#[test]
+fn renders_structured_json_named_list_choices() {
+    let config = CString::new(
+        r#"
+        headline = ["Bright meadow", "Quiet harbor"]
+        origin {
+            headline = "{headline}"
+        }
+        "#,
+    )
+    .unwrap();
+    let rule = CString::new("origin").unwrap();
+    let mut handle = ptr::null_mut();
+    let mut error = ptr::null_mut();
+    let mut output = ptr::null_mut();
+
+    assert_eq!(
+        copperlace_ruleset_from_string(config.as_ptr(), &mut handle, &mut error),
+        COPPERLACE_OK
+    );
+
+    assert_eq!(
+        copperlace_ruleset_render_structured_json(
+            handle,
+            rule.as_ptr(),
+            false,
+            &mut output,
+            &mut error,
+        ),
+        COPPERLACE_OK
+    );
+    assert!(error.is_null());
+    assert!(
+        ["Bright meadow", "Quiet harbor"].contains(
+            &serde_json::from_str::<serde_json::Value>(
+                unsafe { CStr::from_ptr(output) }.to_str().unwrap()
+            )
+            .unwrap()["headline"]
+                .as_str()
+                .unwrap()
+        )
+    );
+
+    copperlace_string_free(output);
+    copperlace_ruleset_free(handle);
+}
+
+#[test]
+fn renders_structured_json_with_builtin_and_custom_processors() {
+    let config = CString::new(
+        r#"
+        name = "Mia"
+        origin {
+            builtin = "{name | uppercase}"
+            custom = "{name | quote_name}"
+        }
+        "#,
+    )
+    .unwrap();
+    let processor_name = CString::new("quote_name").unwrap();
+    let names = [processor_name.as_ptr()];
+    let callbacks: [Option<CopperlaceProcessorCallback>; 1] = [Some(quote_name)];
+    let mut suffix = CString::new("!").unwrap();
+    let user_data = [&mut suffix as *mut CString as *mut c_void];
+    let rule = CString::new("origin").unwrap();
+    let mut handle = ptr::null_mut();
+    let mut error = ptr::null_mut();
+    let mut output = ptr::null_mut();
+
+    assert_eq!(
+        copperlace_ruleset_from_string_with_processors(
+            config.as_ptr(),
+            names.as_ptr(),
+            callbacks.as_ptr(),
+            user_data.as_ptr(),
+            names.len(),
+            &mut handle,
+            &mut error,
+        ),
+        COPPERLACE_OK
+    );
+
+    assert_eq!(
+        copperlace_ruleset_render_structured_json(
+            handle,
+            rule.as_ptr(),
+            false,
+            &mut output,
+            &mut error,
+        ),
+        COPPERLACE_OK
+    );
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(
+            unsafe { CStr::from_ptr(output) }.to_str().unwrap()
+        )
+        .unwrap(),
+        json!({
+            "builtin": "MIA",
+            "custom": "'Mia!'"
+        })
+    );
+
+    copperlace_string_free(output);
+    copperlace_ruleset_free(handle);
+}
+
+#[test]
+fn structured_json_render_error_sets_error_string() {
+    let config = CString::new(r#"origin { value = "{missing}" }"#).unwrap();
+    let rule = CString::new("origin").unwrap();
+    let mut handle = ptr::null_mut();
+    let mut error = ptr::null_mut();
+    let mut output = ptr::null_mut();
+
+    assert_eq!(
+        copperlace_ruleset_from_string(config.as_ptr(), &mut handle, &mut error),
+        COPPERLACE_OK
+    );
+
+    assert_eq!(
+        copperlace_ruleset_render_structured_json(
+            handle,
+            rule.as_ptr(),
+            false,
+            &mut output,
+            &mut error,
+        ),
+        COPPERLACE_RENDER_ERROR
+    );
+    assert!(output.is_null());
+    assert!(!error.is_null());
+
+    copperlace_string_free(error);
+    copperlace_ruleset_free(handle);
+}
+
+#[test]
+fn structured_json_rejects_invalid_abi_inputs() {
+    let config = CString::new(r#"origin { value = "Mia" }"#).unwrap();
+    let rule = CString::new("origin").unwrap();
+    let key = CString::new("name").unwrap();
+    let value = CString::new("Mia").unwrap();
+    let invalid_rule = [0xffu8, 0];
+    let null_entry_keys = [ptr::null()];
+    let null_entry_values = [value.as_ptr()];
+    let mut handle = ptr::null_mut();
+    let mut error = ptr::null_mut();
+    let mut output = ptr::null_mut();
+
+    assert_eq!(
+        copperlace_ruleset_from_string(config.as_ptr(), &mut handle, &mut error),
+        COPPERLACE_OK
+    );
+
+    assert_eq!(
+        copperlace_ruleset_render_structured_json(
+            ptr::null(),
+            rule.as_ptr(),
+            false,
+            &mut output,
+            &mut error,
+        ),
+        COPPERLACE_INVALID_ARGUMENT
+    );
+    assert!(output.is_null());
+    assert!(!error.is_null());
+    copperlace_string_free(error);
+    error = ptr::null_mut();
+
+    assert_eq!(
+        copperlace_ruleset_render_structured_json(
+            handle,
+            ptr::null(),
+            false,
+            &mut output,
+            &mut error,
+        ),
+        COPPERLACE_INVALID_ARGUMENT
+    );
+    assert!(output.is_null());
+    assert!(!error.is_null());
+    copperlace_string_free(error);
+    error = ptr::null_mut();
+
+    assert_eq!(
+        copperlace_ruleset_render_structured_json(
+            handle,
+            rule.as_ptr(),
+            false,
+            ptr::null_mut(),
+            &mut error,
+        ),
+        COPPERLACE_INVALID_ARGUMENT
+    );
+    assert!(!error.is_null());
+    copperlace_string_free(error);
+    error = ptr::null_mut();
+
+    assert_eq!(
+        copperlace_ruleset_render_structured_json_with_context(
+            handle,
+            rule.as_ptr(),
+            ptr::null(),
+            ptr::null(),
+            1,
+            false,
+            &mut output,
+            &mut error,
+        ),
+        COPPERLACE_INVALID_ARGUMENT
+    );
+    assert!(output.is_null());
+    assert!(!error.is_null());
+    copperlace_string_free(error);
+    error = ptr::null_mut();
+
+    assert_eq!(
+        copperlace_ruleset_render_structured_json_with_context(
+            handle,
+            rule.as_ptr(),
+            null_entry_keys.as_ptr(),
+            null_entry_values.as_ptr(),
+            1,
+            false,
+            &mut output,
+            &mut error,
+        ),
+        COPPERLACE_INVALID_ARGUMENT
+    );
+    assert!(output.is_null());
+    assert!(!error.is_null());
+    copperlace_string_free(error);
+    error = ptr::null_mut();
+
+    let keys = [key.as_ptr()];
+    let invalid_values = [invalid_rule.as_ptr().cast::<c_char>()];
+    assert_eq!(
+        copperlace_ruleset_render_structured_json_with_context(
+            handle,
+            rule.as_ptr(),
+            keys.as_ptr(),
+            invalid_values.as_ptr(),
+            1,
+            false,
+            &mut output,
+            &mut error,
+        ),
+        COPPERLACE_INVALID_ARGUMENT
+    );
+    assert!(output.is_null());
+    assert!(!error.is_null());
+    copperlace_string_free(error);
+    error = ptr::null_mut();
+
+    assert_eq!(
+        copperlace_ruleset_render_structured_json(
+            handle,
+            invalid_rule.as_ptr().cast::<c_char>(),
+            false,
+            &mut output,
+            &mut error,
+        ),
+        COPPERLACE_INVALID_ARGUMENT
+    );
+    assert!(output.is_null());
+    assert!(!error.is_null());
+
+    copperlace_string_free(error);
+    copperlace_ruleset_free(handle);
 }
 
 unsafe extern "C" fn quote_name(

@@ -141,8 +141,42 @@ cat ../examples/character_scene.conf | cargo run --bin copperlace -- check -c -
 ----
 
 More runnable examples live in link:examples/README.adoc[examples/], covering
-story text, game item cards, gendered pronouns, JSON item data, product copy,
-release notes, and quest logs.
+story text, game item cards, gendered pronouns, JSON item data, structured item
+data, product copy, release notes, and quest logs.
+
+Object-valued rules render as structured JSON. The CLI formats structured JSON
+with tabs by default:
+
+[source,sh]
+----
+cargo run --bin copperlace -- render -c ../examples/structured_item.conf
+----
+
+Example output:
+
+[source,json]
+----
+{
+	"description": "A moonstone compass once saved a lost caravan. It still releases 3 sparks when its bearer is searching in the dark.",
+	"id": "rare-moonstone-compass-2nd",
+	"level": "2",
+	"name": "Rare Moonstone Compass",
+	"properties": {
+		"charges": "3",
+		"effect": "spark",
+		"material": "moonstone"
+	},
+	"rarity": "rare",
+	"tags": [
+		"rare",
+		"compass",
+		"spark"
+	],
+	"type": "compass"
+}
+----
+
+Use `--compact-json` when one-line JSON is more convenient.
 
 For development checks, run:
 

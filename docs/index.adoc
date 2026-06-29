@@ -10,6 +10,8 @@ the behavior currently implemented in `rust-core`.
   and how rendering resolves rules, choices, bindings, and context defaults.
 * link:configuration.adoc[Configuration] describes the accepted configuration shape and
   how each supported value type is interpreted.
+* link:structured-output.adoc[Structured output] describes object-valued
+  rendering, JSON output, CLI mode inference, and wrapper structured APIs.
 * link:errors.adoc[Errors and API behavior] describes public Rust entry points
   and render error conditions.
 * link:packaging.adoc[Packaging and language wrappers] describes build
@@ -24,7 +26,11 @@ The behavior documented here is exported by the Rust library in
 
 * `RuleSet::from_config`
 * `RuleSet::render_rule`
+* `RuleSet::render_rule_inferred`
+* `RuleSet::render_rule_structured`
 * `render_config_rule`
+* `render_str_inferred` / `render_file_inferred`
+* `render_config_rule_structured`
 * `RenderError`
 * configuration file and string helper APIs
 

@@ -4,6 +4,8 @@ use std::process::Command;
 use std::process::Stdio;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use serde_json::json;
+
 #[test]
 fn rejects_missing_arguments() {
     let output = Command::new(env!("CARGO_BIN_EXE_copperlace"))
@@ -202,6 +204,329 @@ fn renders_with_initial_context() {
         String::from_utf8_lossy(&output.stdout).trim(),
         "Hello Darcy"
     );
+
+    let _ = fs::remove_file(config_path);
+}
+
+#[test]
+fn renders_object_rule_as_formatted_json_by_default() {
+    let config_path = write_temp_config(
+        r#"
+        name = ["Mia"]
+        origin {
+            title = "Hello {name}"
+            items = ["one", "two"]
+            count = 3
+            active = true
+            missing = null
+            nested {
+                value = "ok"
+            }
+        }
+        "#,
+    );
+    let output = Command::new(env!("CARGO_BIN_EXE_copperlace"))
+        .args(["render", "--config", &config_path.to_string_lossy()])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("\n\t"));
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(stdout.trim()).unwrap(),
+        json!({
+            "active": true,
+            "count": 3,
+            "items": ["one", "two"],
+            "missing": null,
+            "nested": {
+                "value": "ok"
+            },
+            "title": "Hello Mia"
+        })
+    );
+
+    let _ = fs::remove_file(config_path);
+}
+
+#[test]
+fn renders_object_rule_as_compact_json() {
+    let config_path = write_temp_config(
+        r#"
+        origin {
+            title = "Hello"
+            items = ["one", "two"]
+        }
+        "#,
+    );
+    let output = Command::new(env!("CARGO_BIN_EXE_copperlace"))
+        .args([
+            "render",
+            "--config",
+            &config_path.to_string_lossy(),
+            "--compact-json",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    assert_eq!(
+        String::from_utf8_lossy(&output.stdout).trim(),
+        r#"{"items":["one","two"],"title":"Hello"}"#
+    );
+
+    let _ = fs::remove_file(config_path);
+}
+
+#[test]
+fn structured_item_example_renders_valid_json() {
+    let output = Command::new(env!("CARGO_BIN_EXE_copperlace"))
+        .args([
+            "render",
+            "--config",
+            "../examples/structured_item.conf",
+            "--set",
+            "itemType=compass",
+            "--set",
+            "itemRarity=rare",
+            "--set",
+            "itemMaterial=moonstone",
+            "--set",
+            "itemEffect=spark",
+            "--set",
+            "itemLevel=2",
+            "--set",
+            "itemCharges=3",
+            "--set",
+            "history=save",
+            "--set",
+            "use=search",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("\n\t"));
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(stdout.trim()).unwrap(),
+        json!({
+            "description": "A moonstone compass once saved a lost caravan. It still releases 3 sparks when its bearer is searching in the dark.",
+            "id": "rare-moonstone-compass-2nd",
+            "level": "2",
+            "name": "Rare Moonstone Compass",
+            "properties": {
+                "charges": "3",
+                "effect": "spark",
+                "material": "moonstone"
+            },
+            "rarity": "rare",
+            "tags": ["rare", "compass", "spark"],
+            "type": "compass"
+        })
+    );
+}
+
+#[test]
+fn structured_render_uses_initial_context() {
+    let config_path = write_temp_config(
+        r#"
+        context {
+            name = "Mia"
+        }
+        origin {
+            greeting = "Hello {name}"
+        }
+        "#,
+    );
+    let output = Command::new(env!("CARGO_BIN_EXE_copperlace"))
+        .args([
+            "render",
+            "--config",
+            &config_path.to_string_lossy(),
+            "--set",
+            "name=Lina",
+            "--compact-json",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    assert_eq!(
+        String::from_utf8_lossy(&output.stdout).trim(),
+        r#"{"greeting":"Hello Lina"}"#
+    );
+
+    let _ = fs::remove_file(config_path);
+}
+
+#[test]
+fn structured_render_from_stdin_infers_json_mode() {
+    let mut child = Command::new(env!("CARGO_BIN_EXE_copperlace"))
+        .args([
+            "render",
+            "--config",
+            "-",
+            "--rule",
+            "origin",
+            "--compact-json",
+        ])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .spawn()
+        .unwrap();
+
+    child
+        .stdin
+        .as_mut()
+        .unwrap()
+        .write_all(
+            br#"
+            origin {
+                title = "Hello"
+            }
+            "#,
+        )
+        .unwrap();
+
+    let output = child.wait_with_output().unwrap();
+
+    assert!(output.status.success());
+    assert_eq!(
+        String::from_utf8_lossy(&output.stdout).trim(),
+        r#"{"title":"Hello"}"#
+    );
+}
+
+#[test]
+fn count_with_formatted_structured_json_separates_values_with_single_newline() {
+    let config_path = write_temp_config(
+        r#"
+        origin {
+            title = "Hello"
+        }
+        "#,
+    );
+    let output = Command::new(env!("CARGO_BIN_EXE_copperlace"))
+        .args([
+            "render",
+            "--config",
+            &config_path.to_string_lossy(),
+            "--count",
+            "2",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert_eq!(
+        stdout.as_ref(),
+        "{\n\t\"title\": \"Hello\"\n}\n{\n\t\"title\": \"Hello\"\n}\n"
+    );
+
+    let _ = fs::remove_file(config_path);
+}
+
+#[test]
+fn count_with_compact_structured_json_outputs_json_lines() {
+    let config_path = write_temp_config(
+        r#"
+        origin {
+            title = "Hello"
+        }
+        "#,
+    );
+    let output = Command::new(env!("CARGO_BIN_EXE_copperlace"))
+        .args([
+            "render",
+            "--config",
+            &config_path.to_string_lossy(),
+            "--count",
+            "2",
+            "--compact-json",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    assert_eq!(
+        String::from_utf8_lossy(&output.stdout)
+            .lines()
+            .collect::<Vec<_>>(),
+        vec![r#"{"title":"Hello"}"#, r#"{"title":"Hello"}"#]
+    );
+
+    let _ = fs::remove_file(config_path);
+}
+
+#[test]
+fn compact_json_rejects_text_rules() {
+    let config_path = write_temp_config(
+        r#"
+        origin = "Mia"
+        "#,
+    );
+    let output = Command::new(env!("CARGO_BIN_EXE_copperlace"))
+        .args([
+            "render",
+            "--config",
+            &config_path.to_string_lossy(),
+            "--compact-json",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success());
+    assert!(
+        String::from_utf8_lossy(&output.stderr)
+            .contains("--compact-json can only be used with object-valued structured rules")
+    );
+
+    let _ = fs::remove_file(config_path);
+}
+
+#[test]
+fn compact_json_rejects_list_rules() {
+    let config_path = write_temp_config(
+        r#"
+        origin = ["Mia"]
+        "#,
+    );
+    let output = Command::new(env!("CARGO_BIN_EXE_copperlace"))
+        .args([
+            "render",
+            "--config",
+            &config_path.to_string_lossy(),
+            "--compact-json",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success());
+    assert!(
+        String::from_utf8_lossy(&output.stderr)
+            .contains("--compact-json can only be used with object-valued structured rules")
+    );
+
+    let _ = fs::remove_file(config_path);
+}
+
+#[test]
+fn default_list_rule_rendering_remains_text_choice() {
+    let config_path = write_temp_config(
+        r#"
+        origin = ["Mia"]
+        "#,
+    );
+    let output = Command::new(env!("CARGO_BIN_EXE_copperlace"))
+        .args(["render", "--config", &config_path.to_string_lossy()])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    assert_eq!(String::from_utf8_lossy(&output.stdout).trim(), "Mia");
 
     let _ = fs::remove_file(config_path);
 }

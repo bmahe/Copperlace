@@ -380,6 +380,208 @@ pub unsafe extern "C" fn copperlace_ruleset_render_with_context(
     }
 }
 
+/// Renders a named rule, inferring formatted structured JSON for object-valued rules.
+///
+/// String-valued and list-valued rules use existing text rendering. Object-valued
+/// rules return formatted JSON using tab indentation.
+///
+/// # Safety
+///
+/// `handle` must be a live ruleset handle returned by Copperlace. `rule` must
+/// point to a valid NUL-terminated UTF-8 string. `out_string` and `out_error`
+/// must be valid for writing when non-null. Any returned output or error string
+/// must be released with [`copperlace_string_free`].
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn copperlace_ruleset_render_inferred(
+    handle: *const CopperlaceRuleSet,
+    rule: *const c_char,
+    out_string: *mut *mut c_char,
+    out_error: *mut *mut c_char,
+) -> c_int {
+    unsafe {
+        copperlace_ruleset_render_inferred_with_context(
+            handle,
+            rule,
+            ptr::null(),
+            ptr::null(),
+            0,
+            out_string,
+            out_error,
+        )
+    }
+}
+
+/// Renders a named rule with initial context, inferring formatted structured JSON for object-valued rules.
+///
+/// # Safety
+///
+/// `handle` must be a live ruleset handle returned by Copperlace. `rule` must
+/// point to a valid NUL-terminated UTF-8 string. When `context_len` is nonzero,
+/// `context_keys` and `context_values` must each point to arrays with at least
+/// `context_len` entries, and every entry must point to a valid
+/// NUL-terminated UTF-8 string. `out_string` and `out_error` must be valid for
+/// writing when non-null. Any returned output or error string must be released
+/// with [`copperlace_string_free`].
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn copperlace_ruleset_render_inferred_with_context(
+    handle: *const CopperlaceRuleSet,
+    rule: *const c_char,
+    context_keys: *const *const c_char,
+    context_values: *const *const c_char,
+    context_len: usize,
+    out_string: *mut *mut c_char,
+    out_error: *mut *mut c_char,
+) -> c_int {
+    clear_out_error(out_error);
+    write_null_string(out_string);
+
+    if handle.is_null() {
+        write_out_string(out_error, "ruleset handle is null");
+        return COPPERLACE_INVALID_ARGUMENT;
+    }
+
+    let Some(rule) = read_c_string(rule, out_error) else {
+        return COPPERLACE_INVALID_ARGUMENT;
+    };
+    let Some(context) = read_context(context_keys, context_values, context_len, out_error) else {
+        return COPPERLACE_INVALID_ARGUMENT;
+    };
+
+    let ruleset = unsafe { &(*handle).ruleset };
+    match ruleset.render_rule_inferred_with_context(&rule, context) {
+        Ok(output) => {
+            if write_out_string(out_string, &output) {
+                COPPERLACE_OK
+            } else {
+                write_out_string(out_error, "output string contains an interior NUL byte");
+                COPPERLACE_RENDER_ERROR
+            }
+        }
+        Err(error) => {
+            write_out_string(out_error, &error.to_string());
+            COPPERLACE_RENDER_ERROR
+        }
+    }
+}
+
+/// Renders a named structured rule from a ruleset handle as JSON text.
+///
+/// On success, writes an owned UTF-8 JSON string to `out_json` and returns
+/// [`COPPERLACE_OK`]. When `format_json` is false, the JSON is compact. When
+/// true, it is formatted with tab indentation. On failure, writes null to
+/// `out_json`, writes an owned error string to `out_error` when provided, and
+/// returns a nonzero status code. Returned output and error strings must be
+/// released with `copperlace_string_free`.
+///
+/// # Safety
+///
+/// `handle` must be a live ruleset handle returned by Copperlace. `rule` must
+/// point to a valid NUL-terminated UTF-8 string. `out_json` must be a valid
+/// writable pointer. `out_error` must be valid for writing when non-null. Any
+/// returned output or error string must be released with
+/// [`copperlace_string_free`].
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn copperlace_ruleset_render_structured_json(
+    handle: *const CopperlaceRuleSet,
+    rule: *const c_char,
+    format_json: bool,
+    out_json: *mut *mut c_char,
+    out_error: *mut *mut c_char,
+) -> c_int {
+    unsafe {
+        copperlace_ruleset_render_structured_json_with_context(
+            handle,
+            rule,
+            ptr::null(),
+            ptr::null(),
+            0,
+            format_json,
+            out_json,
+            out_error,
+        )
+    }
+}
+
+/// Renders a named structured rule from a ruleset handle with initial context.
+///
+/// `context_keys` and `context_values` are parallel arrays of UTF-8 C strings.
+/// They may be null only when `context_len` is zero. Duplicate keys are allowed;
+/// later entries replace earlier entries.
+///
+/// On success, writes an owned UTF-8 JSON string to `out_json` and returns
+/// [`COPPERLACE_OK`]. When `format_json` is false, the JSON is compact. When
+/// true, it is formatted with tab indentation. On failure, writes null to
+/// `out_json`, writes an owned error string to `out_error` when provided, and
+/// returns a nonzero status code. Returned output and error strings must be
+/// released with `copperlace_string_free`.
+///
+/// # Safety
+///
+/// `handle` must be a live ruleset handle returned by Copperlace. `rule` must
+/// point to a valid NUL-terminated UTF-8 string. When `context_len` is nonzero,
+/// `context_keys` and `context_values` must each point to arrays with at least
+/// `context_len` entries, and every entry must point to a valid
+/// NUL-terminated UTF-8 string. `out_json` must be a valid writable pointer.
+/// `out_error` must be valid for writing when non-null. Any returned output or
+/// error string must be released with [`copperlace_string_free`].
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn copperlace_ruleset_render_structured_json_with_context(
+    handle: *const CopperlaceRuleSet,
+    rule: *const c_char,
+    context_keys: *const *const c_char,
+    context_values: *const *const c_char,
+    context_len: usize,
+    format_json: bool,
+    out_json: *mut *mut c_char,
+    out_error: *mut *mut c_char,
+) -> c_int {
+    clear_out_error(out_error);
+
+    if out_json.is_null() {
+        write_out_string(out_error, "out_json is null");
+        return COPPERLACE_INVALID_ARGUMENT;
+    }
+    write_null_string(out_json);
+
+    if handle.is_null() {
+        write_out_string(out_error, "ruleset handle is null");
+        return COPPERLACE_INVALID_ARGUMENT;
+    }
+
+    let Some(rule) = read_c_string(rule, out_error) else {
+        return COPPERLACE_INVALID_ARGUMENT;
+    };
+    let Some(context) = read_context(context_keys, context_values, context_len, out_error) else {
+        return COPPERLACE_INVALID_ARGUMENT;
+    };
+
+    let ruleset = unsafe { &(*handle).ruleset };
+    let json = ruleset
+        .render_rule_structured_with_context(&rule, context)
+        .and_then(|value| {
+            if format_json {
+                value.to_formatted_json()
+            } else {
+                value.to_compact_json()
+            }
+        });
+
+    match json {
+        Ok(output) => {
+            if write_out_string(out_json, &output) {
+                COPPERLACE_OK
+            } else {
+                write_out_string(out_error, "structured JSON contains an interior NUL byte");
+                COPPERLACE_RENDER_ERROR
+            }
+        }
+        Err(error) => {
+            write_out_string(out_error, &error.to_string());
+            COPPERLACE_RENDER_ERROR
+        }
+    }
+}
+
 fn read_context(
     keys: *const *const c_char,
     values: *const *const c_char,

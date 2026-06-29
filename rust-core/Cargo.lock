@@ -61,6 +61,7 @@ dependencies = [
  "hocon-rs",
  "js-sys",
  "rand",
+ "serde",
  "serde_json",
  "wasm-bindgen",
 ]

@@ -1,0 +1,214 @@
+= Structured Output
+
+Copperlace has two rendering modes:
+
+* Text rendering returns one string.
+* Structured rendering returns an object-shaped value tree.
+
+The same configuration can contain both text rules and structured rules. A
+top-level rule's value shape determines how it is rendered:
+
+* string-valued rules render as text;
+* list-valued rules keep the existing random text choice behavior;
+* map/object-valued rules render structurally;
+* lists inside structured objects render as arrays, not random choices.
+
+Top-level list structured rendering is not supported in v1. Render a top-level
+list rule as text, or put arrays inside an object-valued structured rule.
+
+== Example Configuration
+
+[source]
+----
+name = ["Mia"]
+title = ["moon garden"]
+
+context {
+  city = "Istanbul"
+  hero = "{name}"
+}
+
+origin {
+  kind = "scene"
+  title = "{title | titlecase}"
+  slug = "{title | slug}"
+  visitor = "{hero}"
+  summary = "{hero} visits {city}."
+  tags = ["structured", "{city | slug}"]
+  nested {
+    greeting = "Hello {hero}."
+  }
+}
+----
+
+Rendering `origin` structurally preserves the object and array shape. Text
+leaves such as `title`, `slug`, `visitor`, `summary`, and `nested.greeting`
+still use normal Copperlace text behavior:
+
+* rule calls like `{title}`;
+* builtin processors like `titlecase` and `slug`;
+* top-level `context` defaults like `{hero}` and `{city}`;
+* initial context values passed by the caller or by CLI `--set`.
+
+Named list rules referenced from text leaves remain random text choices. In the
+example above, `{name}` and `{title}` choose one list item when the text leaf
+renders. The `tags` field itself is an array because it is inside a structured
+object.
+
+Object fields are not an ordering mechanism. If multiple fields need the same
+generated value, put that value in `context` defaults or pass it as initial
+context instead of relying on one sibling field to bind a value before another
+sibling renders.
+
+== Rust Values and JSON
+
+Rust structured APIs return `CopperlaceValue` internally. `CopperlaceValue`
+preserves objects, arrays, strings, numbers, booleans, and null values, and can
+be serialized to JSON.
+
+JSON is the first public serialization target for wrappers and the CLI:
+
+* C ABI structured functions return JSON strings.
+* Python structured APIs parse compact FFI JSON into native Python values.
+* Java structured APIs return JSON strings.
+* CLI structured output writes JSON to stdout.
+
+== CLI Behavior
+
+The CLI does not need a `--structured` switch. It infers output mode from the
+selected rule:
+
+* `copperlace render --config story.conf --rule title` renders text when
+  `title` is string-valued or list-valued.
+* `copperlace render --config story.conf --rule origin` renders structured JSON
+  when `origin` is object-valued.
+
+Structured CLI JSON is formatted by default using tabs for indentation:
+
+[source,sh]
+----
+copperlace render --config story.conf --rule origin
+----
+
+[source,json]
+----
+{
+	"kind": "scene",
+	"nested": {
+		"greeting": "Hello Mia."
+	},
+	"slug": "moon-garden",
+	"summary": "Mia visits Istanbul.",
+	"tags": [
+		"structured",
+		"istanbul"
+	],
+	"title": "Moon Garden",
+	"visitor": "Mia"
+}
+----
+
+Use `--compact-json` for compact JSON:
+
+[source,sh]
+----
+copperlace render --config story.conf --rule origin --compact-json
+----
+
+[source,json]
+----
+{"kind":"scene","nested":{"greeting":"Hello Mia."},"slug":"moon-garden","summary":"Mia visits Istanbul.","tags":["structured","istanbul"],"title":"Moon Garden","visitor":"Mia"}
+----
+
+`--compact-json` is valid only for object-valued structured rules. Using it
+with a text or top-level list rule is an argument error.
+
+Initial context values affect structured text leaves:
+
+[source,sh]
+----
+copperlace render --config story.conf --rule origin --set city=Kyoto --compact-json
+----
+
+With `--count`, the CLI emits one JSON value per render. Formatted JSON values
+are separated by a single newline:
+
+[source,sh]
+----
+copperlace render --config story.conf --rule origin --count 2
+----
+
+With `--count --compact-json`, output is newline-delimited compact JSON:
+
+[source,sh]
+----
+copperlace render --config story.conf --rule origin --count 2 --compact-json
+----
+
+== Python API
+
+Python structured APIs return native Python values. They call the FFI compact
+JSON function internally and parse the JSON before returning.
+
+[source,python]
+----
+from copperlace import Copperlace, render_str_structured
+
+config = '''
+name = ["Mia"]
+origin {
+  title = "Hello {name}"
+  tags = ["structured", "{name | slug}"]
+}
+'''
+
+value = render_str_structured(config, "origin")
+assert value == {
+    "tags": ["structured", "mia"],
+    "title": "Hello Mia",
+}
+
+with Copperlace.from_string(config) as copperlace:
+    value = copperlace.render_structured("origin", {"name": "Lina"})
+----
+
+Python also exposes `RuleSet.render_structured`, `Copperlace.render_structured`,
+`render_str_structured`, and `render_file_structured`.
+
+For callers that want the same shape inference as the CLI, Python exposes
+`RuleSet.render_inferred`, `Copperlace.render_inferred`, `render_str_inferred`,
+and `render_file_inferred`. These return normal text for string-valued and
+list-valued rules, or a formatted JSON string for object-valued rules.
+
+== Java API
+
+Java structured APIs return JSON strings to avoid adding a JSON dependency.
+The no-argument structured JSON overloads return formatted JSON with tabs.
+Pass `false` to the overloads with `formatJson` for compact JSON.
+
+[source,java]
+----
+try (Copperlace copperlace = Copperlace.fromString("""
+        name = "Mia"
+        origin {
+          title = "Hello {name}"
+          tags = ["structured", "{name | slug}"]
+        }
+        """)) {
+    String formatted = copperlace.renderStructuredJson("origin");
+    String compact = copperlace.renderStructuredJson("origin", false);
+    String withContext = copperlace.renderStructuredJson(
+            "origin",
+            Map.of("name", "Lina"),
+            true);
+    String inferred = copperlace.renderInferred("origin");
+}
+----
+
+Java also exposes `RuleSet.renderStructuredJson`, `Copperlace.renderStructuredJson`,
+`Copperlace.renderStringStructuredJson`, and
+`Copperlace.renderFileStructuredJson`.
+The matching inferred entry points are `RuleSet.renderInferred`,
+`Copperlace.renderInferred`, `Copperlace.renderStringInferred`, and
+`Copperlace.renderFileInferred`; they return text or formatted JSON strings
+based on the selected rule shape.

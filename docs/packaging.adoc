@@ -72,12 +72,18 @@ The CLI supports:
 ----
 copperlace render --config <path>
 copperlace render -c <path> -r <name> --count <n> --set name=Mia
+copperlace render -c <path> -r <object-rule> --compact-json
 ----
 
 CLI rendering uses the builtin processor registry. If `--rule` is omitted, the
 CLI renders `origin`. `--count` renders multiple outputs from one loaded config.
 `--set key=value` provides initial context values for each render and may be
 repeated; duplicate keys use the last value.
+
+The CLI infers output mode from the selected rule shape. String-valued and
+list-valued rules render as text. Object-valued rules render as structured JSON,
+formatted with tabs by default. Use `--compact-json` for compact JSON; with
+`--count --compact-json`, the CLI writes one compact JSON value per line.
 
 == C ABI
 
@@ -89,6 +95,8 @@ The native dynamic library exposes an opaque ruleset handle API:
 * `copperlace_ruleset_from_string_with_processors`
 * `copperlace_ruleset_render`
 * `copperlace_ruleset_render_with_context`
+* `copperlace_ruleset_render_structured_json`
+* `copperlace_ruleset_render_structured_json_with_context`
 * `copperlace_processor_result_set_output`
 * `copperlace_processor_result_set_error`
 * `copperlace_ruleset_free`
@@ -107,11 +115,19 @@ points are:
 * `Copperlace.from_string(config, processors=None)`
 * `Copperlace.from_file(path, processors=None)`
 * `Copperlace.render(rule, context=None)`
+* `Copperlace.render_inferred(rule, context=None)`
+* `Copperlace.render_structured(rule, context=None)`
 * `RuleSet.from_string(config, processors=None)`
 * `RuleSet.from_file(path, processors=None)`
 * `RuleSet.render(rule, context=None)`
+* `RuleSet.render_inferred(rule, context=None)`
+* `RuleSet.render_structured(rule, context=None)`
 * `render_str(config, rule, context=None, processors=None)`
 * `render_file(path, rule, context=None, processors=None)`
+* `render_str_inferred(config, rule, context=None, processors=None)`
+* `render_file_inferred(path, rule, context=None, processors=None)`
+* `render_str_structured(config, rule, context=None, processors=None)`
+* `render_file_structured(path, rule, context=None, processors=None)`
 
 `Copperlace` is the recommended load-once API for repeated renders. `Copperlace`
 and `RuleSet` are context managers and release the native handle when closed.
@@ -131,6 +147,12 @@ PyPI releases publish:
 
 Python rendering uses the builtin processor registry plus any custom processor
 callbacks provided at construction time.
+
+Python structured rendering returns native Python `dict`, `list`, `str`,
+numeric, `bool`, and `None` values. The wrapper requests compact JSON from the
+C ABI internally and parses it before returning. Inferred rendering returns
+text for string-valued and list-valued rules, or a formatted JSON string for
+object-valued rules.
 
 == JS/TS WebAssembly Package
 
@@ -214,12 +236,30 @@ Public entry points are:
 * `Copperlace.fromFileWithProcessors(path, processors)`
 * `Copperlace.render(rule)`
 * `Copperlace.render(rule, context)`
+* `Copperlace.renderInferred(rule)`
+* `Copperlace.renderInferred(rule, context)`
+* `Copperlace.renderStructuredJson(rule)`
+* `Copperlace.renderStructuredJson(rule, formatJson)`
+* `Copperlace.renderStructuredJson(rule, context)`
+* `Copperlace.renderStructuredJson(rule, context, formatJson)`
 * `Copperlace.renderString(config, rule)`
 * `Copperlace.renderString(config, rule, context)`
+* `Copperlace.renderStringInferred(config, rule)`
+* `Copperlace.renderStringInferred(config, rule, context)`
+* `Copperlace.renderStringStructuredJson(config, rule)`
+* `Copperlace.renderStringStructuredJson(config, rule, formatJson)`
+* `Copperlace.renderStringStructuredJson(config, rule, context)`
+* `Copperlace.renderStringStructuredJson(config, rule, context, formatJson)`
 * `Copperlace.renderStringWithProcessors(config, rule, processors)`
 * `Copperlace.renderStringWithProcessors(config, rule, context, processors)`
 * `Copperlace.renderFile(path, rule)`
 * `Copperlace.renderFile(path, rule, context)`
+* `Copperlace.renderFileInferred(path, rule)`
+* `Copperlace.renderFileInferred(path, rule, context)`
+* `Copperlace.renderFileStructuredJson(path, rule)`
+* `Copperlace.renderFileStructuredJson(path, rule, formatJson)`
+* `Copperlace.renderFileStructuredJson(path, rule, context)`
+* `Copperlace.renderFileStructuredJson(path, rule, context, formatJson)`
 * `Copperlace.renderFileWithProcessors(path, rule, processors)`
 * `Copperlace.renderFileWithProcessors(path, rule, context, processors)`
 * `RuleSet.fromString(config)`
@@ -228,6 +268,12 @@ Public entry points are:
 * `RuleSet.fromFileWithProcessors(path, processors)`
 * `RuleSet.render(rule)`
 * `RuleSet.render(rule, context)`
+* `RuleSet.renderInferred(rule)`
+* `RuleSet.renderInferred(rule, context)`
+* `RuleSet.renderStructuredJson(rule)`
+* `RuleSet.renderStructuredJson(rule, formatJson)`
+* `RuleSet.renderStructuredJson(rule, context)`
+* `RuleSet.renderStructuredJson(rule, context, formatJson)`
 
 `Copperlace` is the recommended load-once API for repeated renders. `Copperlace`
 and `RuleSet` implement `AutoCloseable`; callers should use try-with-resources
@@ -252,3 +298,8 @@ At runtime, the Java wrapper loads the native library in this order:
 
 Java rendering uses the builtin processor registry plus any custom processor
 callbacks provided at construction time.
+
+Java structured rendering returns JSON strings to avoid adding a JSON
+dependency. No-argument structured JSON overloads return formatted JSON using
+tabs for indentation. The `formatJson` parameter controls serialization:
+`false` returns compact JSON and `true` returns formatted JSON.
