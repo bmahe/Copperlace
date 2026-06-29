@@ -211,6 +211,81 @@ public final class Copperlace implements AutoCloseable {
     }
 
     /**
+     * Renders one structured rule from a configuration string as compact JSON text.
+     *
+     * @param config configuration text containing Copperlace rules
+     * @param rule name of the structured rule to render
+     * @return compact JSON for {@code rule}
+     * @throws IllegalArgumentException if {@code config} or {@code rule} is blank
+     * @throws CopperlaceException if parsing, compilation, or rendering fails
+     */
+    public static String renderStringStructuredJson(final String config, final String rule) {
+        return renderStringStructuredJson(config, rule, false);
+    }
+
+    /**
+     * Renders one structured rule from a configuration string as JSON text.
+     *
+     * @param config configuration text containing Copperlace rules
+     * @param rule name of the structured rule to render
+     * @param formatJson true to format JSON with tabs, false for compact JSON
+     * @return JSON for {@code rule}
+     * @throws IllegalArgumentException if {@code config} or {@code rule} is blank
+     * @throws CopperlaceException if parsing, compilation, or rendering fails
+     */
+    public static String renderStringStructuredJson(
+            final String config, final String rule, final boolean formatJson) {
+        Validate.notBlank(config, "config must not be blank");
+        Validate.notBlank(rule, "rule must not be blank");
+
+        try (final Copperlace copperlace = Copperlace.fromString(config)) {
+            return copperlace.renderStructuredJson(rule, formatJson);
+        }
+    }
+
+    /**
+     * Renders one structured rule from a configuration string as compact JSON text with initial context values.
+     *
+     * @param config configuration text containing Copperlace rules
+     * @param rule name of the structured rule to render
+     * @param context initial render context values
+     * @return compact JSON for {@code rule}
+     * @throws NullPointerException if {@code context}, a context key, or a context value is null
+     * @throws IllegalArgumentException if {@code config} or {@code rule} is blank
+     * @throws CopperlaceException if parsing, compilation, or rendering fails
+     */
+    public static String renderStringStructuredJson(
+            final String config, final String rule, final Map<String, String> context) {
+        return renderStringStructuredJson(config, rule, context, false);
+    }
+
+    /**
+     * Renders one structured rule from a configuration string as JSON text with initial context values.
+     *
+     * @param config configuration text containing Copperlace rules
+     * @param rule name of the structured rule to render
+     * @param context initial render context values
+     * @param formatJson true to format JSON with tabs, false for compact JSON
+     * @return JSON for {@code rule}
+     * @throws NullPointerException if {@code context}, a context key, or a context value is null
+     * @throws IllegalArgumentException if {@code config} or {@code rule} is blank
+     * @throws CopperlaceException if parsing, compilation, or rendering fails
+     */
+    public static String renderStringStructuredJson(
+            final String config,
+            final String rule,
+            final Map<String, String> context,
+            final boolean formatJson) {
+        Validate.notBlank(config, "config must not be blank");
+        Validate.notBlank(rule, "rule must not be blank");
+        Objects.requireNonNull(context, "context");
+
+        try (final Copperlace copperlace = Copperlace.fromString(config)) {
+            return copperlace.renderStructuredJson(rule, context, formatJson);
+        }
+    }
+
+    /**
      * Renders one rule from a configuration file.
      *
      * <p>This convenience method loads and compiles the file, renders one rule,
@@ -308,6 +383,82 @@ public final class Copperlace implements AutoCloseable {
     }
 
     /**
+     * Renders one structured rule from a configuration file as compact JSON text.
+     *
+     * @param path path to the configuration file
+     * @param rule name of the structured rule to render
+     * @return compact JSON for {@code rule}
+     * @throws NullPointerException if {@code path} is null
+     * @throws IllegalArgumentException if {@code rule} is blank
+     * @throws CopperlaceException if loading, parsing, compilation, or rendering fails
+     */
+    public static String renderFileStructuredJson(final Path path, final String rule) {
+        return renderFileStructuredJson(path, rule, false);
+    }
+
+    /**
+     * Renders one structured rule from a configuration file as JSON text.
+     *
+     * @param path path to the configuration file
+     * @param rule name of the structured rule to render
+     * @param formatJson true to format JSON with tabs, false for compact JSON
+     * @return JSON for {@code rule}
+     * @throws NullPointerException if {@code path} is null
+     * @throws IllegalArgumentException if {@code rule} is blank
+     * @throws CopperlaceException if loading, parsing, compilation, or rendering fails
+     */
+    public static String renderFileStructuredJson(final Path path, final String rule, final boolean formatJson) {
+        Validate.notNull(path, "path must not be null");
+        Validate.notBlank(rule, "rule must not be blank");
+
+        try (final Copperlace copperlace = Copperlace.fromFile(path)) {
+            return copperlace.renderStructuredJson(rule, formatJson);
+        }
+    }
+
+    /**
+     * Renders one structured rule from a configuration file as compact JSON text with initial context values.
+     *
+     * @param path path to the configuration file
+     * @param rule name of the structured rule to render
+     * @param context initial render context values
+     * @return compact JSON for {@code rule}
+     * @throws NullPointerException if {@code path}, {@code context}, a context key, or a context value is null
+     * @throws IllegalArgumentException if {@code rule} is blank
+     * @throws CopperlaceException if loading, parsing, compilation, or rendering fails
+     */
+    public static String renderFileStructuredJson(
+            final Path path, final String rule, final Map<String, String> context) {
+        return renderFileStructuredJson(path, rule, context, false);
+    }
+
+    /**
+     * Renders one structured rule from a configuration file as JSON text with initial context values.
+     *
+     * @param path path to the configuration file
+     * @param rule name of the structured rule to render
+     * @param context initial render context values
+     * @param formatJson true to format JSON with tabs, false for compact JSON
+     * @return JSON for {@code rule}
+     * @throws NullPointerException if {@code path}, {@code context}, a context key, or a context value is null
+     * @throws IllegalArgumentException if {@code rule} is blank
+     * @throws CopperlaceException if loading, parsing, compilation, or rendering fails
+     */
+    public static String renderFileStructuredJson(
+            final Path path,
+            final String rule,
+            final Map<String, String> context,
+            final boolean formatJson) {
+        Validate.notNull(path, "path must not be null");
+        Validate.notBlank(rule, "rule must not be blank");
+        Objects.requireNonNull(context, "context");
+
+        try (final Copperlace copperlace = Copperlace.fromFile(path)) {
+            return copperlace.renderStructuredJson(rule, context, formatJson);
+        }
+    }
+
+    /**
      * Renders one rule from a configuration file.
      *
      * <p>This convenience method loads and compiles the file, renders one rule,
@@ -396,6 +547,79 @@ public final class Copperlace implements AutoCloseable {
     }
 
     /**
+     * Renders one structured rule from a configuration file as compact JSON text.
+     *
+     * @param path path to the configuration file
+     * @param rule name of the structured rule to render
+     * @return compact JSON for {@code rule}
+     * @throws IllegalArgumentException if {@code path} or {@code rule} is blank
+     * @throws CopperlaceException if loading, parsing, compilation, or rendering fails
+     */
+    public static String renderFileStructuredJson(final String path, final String rule) {
+        Validate.notBlank(path, "path must not be blank");
+        Validate.notBlank(rule, "rule must not be blank");
+
+        return renderFileStructuredJson(Path.of(path), rule);
+    }
+
+    /**
+     * Renders one structured rule from a configuration file as JSON text.
+     *
+     * @param path path to the configuration file
+     * @param rule name of the structured rule to render
+     * @param formatJson true to format JSON with tabs, false for compact JSON
+     * @return JSON for {@code rule}
+     * @throws IllegalArgumentException if {@code path} or {@code rule} is blank
+     * @throws CopperlaceException if loading, parsing, compilation, or rendering fails
+     */
+    public static String renderFileStructuredJson(final String path, final String rule, final boolean formatJson) {
+        Validate.notBlank(path, "path must not be blank");
+        Validate.notBlank(rule, "rule must not be blank");
+
+        return renderFileStructuredJson(Path.of(path), rule, formatJson);
+    }
+
+    /**
+     * Renders one structured rule from a configuration file as compact JSON text with initial context values.
+     *
+     * @param path path to the configuration file
+     * @param rule name of the structured rule to render
+     * @param context initial render context values
+     * @return compact JSON for {@code rule}
+     * @throws NullPointerException if {@code context}, a context key, or a context value is null
+     * @throws IllegalArgumentException if {@code path} or {@code rule} is blank
+     * @throws CopperlaceException if loading, parsing, compilation, or rendering fails
+     */
+    public static String renderFileStructuredJson(
+            final String path, final String rule, final Map<String, String> context) {
+        return renderFileStructuredJson(path, rule, context, false);
+    }
+
+    /**
+     * Renders one structured rule from a configuration file as JSON text with initial context values.
+     *
+     * @param path path to the configuration file
+     * @param rule name of the structured rule to render
+     * @param context initial render context values
+     * @param formatJson true to format JSON with tabs, false for compact JSON
+     * @return JSON for {@code rule}
+     * @throws NullPointerException if {@code context}, a context key, or a context value is null
+     * @throws IllegalArgumentException if {@code path} or {@code rule} is blank
+     * @throws CopperlaceException if loading, parsing, compilation, or rendering fails
+     */
+    public static String renderFileStructuredJson(
+            final String path,
+            final String rule,
+            final Map<String, String> context,
+            final boolean formatJson) {
+        Validate.notBlank(path, "path must not be blank");
+        Validate.notBlank(rule, "rule must not be blank");
+        Objects.requireNonNull(context, "context");
+
+        return renderFileStructuredJson(Path.of(path), rule, context, formatJson);
+    }
+
+    /**
      * Renders a named rule from the loaded config.
      *
      * <p>Each call uses a fresh render context, so per-render bindings are
@@ -428,6 +652,64 @@ public final class Copperlace implements AutoCloseable {
         Validate.notBlank(rule, "rule must not be blank");
         Objects.requireNonNull(context, "context");
         return ruleset.render(rule, context);
+    }
+
+    /**
+     * Renders a named structured rule from the loaded config as compact JSON text.
+     *
+     * @param rule name of the structured rule to render
+     * @return compact JSON for {@code rule}
+     * @throws IllegalArgumentException if {@code rule} is blank
+     * @throws CopperlaceException if this renderer is closed or rendering fails
+     */
+    public String renderStructuredJson(final String rule) {
+        return renderStructuredJson(rule, false);
+    }
+
+    /**
+     * Renders a named structured rule from the loaded config as JSON text.
+     *
+     * @param rule name of the structured rule to render
+     * @param formatJson true to format JSON with tabs, false for compact JSON
+     * @return JSON for {@code rule}
+     * @throws IllegalArgumentException if {@code rule} is blank
+     * @throws CopperlaceException if this renderer is closed or rendering fails
+     */
+    public String renderStructuredJson(final String rule, final boolean formatJson) {
+        Validate.notBlank(rule, "rule must not be blank");
+        return ruleset.renderStructuredJson(rule, formatJson);
+    }
+
+    /**
+     * Renders a named structured rule from the loaded config as compact JSON text with initial context values.
+     *
+     * @param rule name of the structured rule to render
+     * @param context initial render context values
+     * @return compact JSON for {@code rule}
+     * @throws NullPointerException if {@code context}, a context key, or a context value is null
+     * @throws IllegalArgumentException if {@code rule} is blank
+     * @throws CopperlaceException if this renderer is closed or rendering fails
+     */
+    public String renderStructuredJson(final String rule, final Map<String, String> context) {
+        return renderStructuredJson(rule, context, false);
+    }
+
+    /**
+     * Renders a named structured rule from the loaded config as JSON text with initial context values.
+     *
+     * @param rule name of the structured rule to render
+     * @param context initial render context values
+     * @param formatJson true to format JSON with tabs, false for compact JSON
+     * @return JSON for {@code rule}
+     * @throws NullPointerException if {@code context}, a context key, or a context value is null
+     * @throws IllegalArgumentException if {@code rule} is blank
+     * @throws CopperlaceException if this renderer is closed or rendering fails
+     */
+    public String renderStructuredJson(
+            final String rule, final Map<String, String> context, final boolean formatJson) {
+        Validate.notBlank(rule, "rule must not be blank");
+        Objects.requireNonNull(context, "context");
+        return ruleset.renderStructuredJson(rule, context, formatJson);
     }
 
     /**

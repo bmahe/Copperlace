@@ -37,6 +37,8 @@ final class NativeLibrary {
     private final MethodHandle rulesetFromStringWithProcessors;
     private final MethodHandle rulesetRender;
     private final MethodHandle rulesetRenderWithContext;
+    private final MethodHandle rulesetRenderStructuredJson;
+    private final MethodHandle rulesetRenderStructuredJsonWithContext;
     private final MethodHandle rulesetFree;
     private final MethodHandle stringFree;
     private final MethodHandle processorResultSetOutput;
@@ -112,6 +114,31 @@ final class NativeLibrary {
                         ValueLayout.ADDRESS,
                         ValueLayout.ADDRESS,
                         ValueLayout.JAVA_LONG,
+                        ValueLayout.ADDRESS,
+                        ValueLayout.ADDRESS));
+        rulesetRenderStructuredJson = downcall(
+                linker,
+                lookup,
+                "copperlace_ruleset_render_structured_json",
+                FunctionDescriptor.of(
+                        ValueLayout.JAVA_INT,
+                        ValueLayout.ADDRESS,
+                        ValueLayout.ADDRESS,
+                        ValueLayout.JAVA_BOOLEAN,
+                        ValueLayout.ADDRESS,
+                        ValueLayout.ADDRESS));
+        rulesetRenderStructuredJsonWithContext = downcall(
+                linker,
+                lookup,
+                "copperlace_ruleset_render_structured_json_with_context",
+                FunctionDescriptor.of(
+                        ValueLayout.JAVA_INT,
+                        ValueLayout.ADDRESS,
+                        ValueLayout.ADDRESS,
+                        ValueLayout.ADDRESS,
+                        ValueLayout.ADDRESS,
+                        ValueLayout.JAVA_LONG,
+                        ValueLayout.JAVA_BOOLEAN,
                         ValueLayout.ADDRESS,
                         ValueLayout.ADDRESS));
         rulesetFree = downcall(
@@ -231,6 +258,87 @@ final class NativeLibrary {
             throw exception;
         } catch (final Throwable throwable) {
             throw new CopperlaceException("Failed to render Copperlace rule", throwable);
+        }
+    }
+
+    String renderStructuredJson(final MemorySegment handle, final String rule, final boolean formatJson) {
+        Validate.isTrue(!isNull(handle), "handle must not be null");
+        Validate.notBlank(rule, "rule must not be blank");
+
+        try (Arena arena = Arena.ofConfined()) {
+            final MemorySegment outJson = arena.allocate(ValueLayout.ADDRESS);
+            final MemorySegment outError = arena.allocate(ValueLayout.ADDRESS);
+            final MemorySegment ruleString = arena.allocateFrom(rule);
+
+            final int status = (int) rulesetRenderStructuredJson.invokeExact(
+                    handle, ruleString, formatJson, outJson, outError);
+            checkStatus(status, outError);
+
+            final MemorySegment nativeString = outJson.get(ValueLayout.ADDRESS, 0);
+            try {
+                return readNativeString(nativeString);
+            } finally {
+                stringFree(nativeString);
+            }
+        } catch (final CopperlaceException exception) {
+            throw exception;
+        } catch (final Throwable throwable) {
+            throw new CopperlaceException("Failed to render Copperlace structured rule", throwable);
+        }
+    }
+
+    String renderStructuredJsonWithContext(
+            final MemorySegment handle,
+            final String rule,
+            final Map<String, String> context,
+            final boolean formatJson) {
+        Validate.isTrue(!isNull(handle), "handle must not be null");
+        Validate.notBlank(rule, "rule must not be blank");
+        Objects.requireNonNull(context, "context");
+
+        try (Arena arena = Arena.ofConfined()) {
+            final MemorySegment outJson = arena.allocate(ValueLayout.ADDRESS);
+            final MemorySegment outError = arena.allocate(ValueLayout.ADDRESS);
+            final MemorySegment ruleString = arena.allocateFrom(rule);
+            final long contextLength = context.size();
+            final long contextBytes = ValueLayout.ADDRESS.byteSize() * contextLength;
+            final MemorySegment contextKeys = contextLength == 0
+                    ? MemorySegment.NULL
+                    : arena.allocate(contextBytes, ValueLayout.ADDRESS.byteAlignment());
+            final MemorySegment contextValues = contextLength == 0
+                    ? MemorySegment.NULL
+                    : arena.allocate(contextBytes, ValueLayout.ADDRESS.byteAlignment());
+
+            long index = 0;
+            for (final Map.Entry<String, String> entry : context.entrySet()) {
+                final String key = Objects.requireNonNull(entry.getKey(), "context key");
+                final String value = Objects.requireNonNull(entry.getValue(), "context value");
+                contextKeys.setAtIndex(ValueLayout.ADDRESS, index, arena.allocateFrom(key));
+                contextValues.setAtIndex(ValueLayout.ADDRESS, index, arena.allocateFrom(value));
+                index++;
+            }
+
+            final int status = (int) rulesetRenderStructuredJsonWithContext.invokeExact(
+                    handle,
+                    ruleString,
+                    contextKeys,
+                    contextValues,
+                    contextLength,
+                    formatJson,
+                    outJson,
+                    outError);
+            checkStatus(status, outError);
+
+            final MemorySegment nativeString = outJson.get(ValueLayout.ADDRESS, 0);
+            try {
+                return readNativeString(nativeString);
+            } finally {
+                stringFree(nativeString);
+            }
+        } catch (final CopperlaceException exception) {
+            throw exception;
+        } catch (final Throwable throwable) {
+            throw new CopperlaceException("Failed to render Copperlace structured rule", throwable);
         }
     }
 

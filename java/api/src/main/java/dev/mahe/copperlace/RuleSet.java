@@ -131,6 +131,67 @@ public final class RuleSet implements AutoCloseable {
     }
 
     /**
+     * Renders a named structured rule from this ruleset as compact JSON text.
+     *
+     * @param rule name of the structured rule to render
+     * @return compact JSON for {@code rule}
+     * @throws IllegalArgumentException if {@code rule} is blank
+     * @throws CopperlaceException if this ruleset is closed or rendering fails
+     */
+    public String renderStructuredJson(final String rule) {
+        return renderStructuredJson(rule, false);
+    }
+
+    /**
+     * Renders a named structured rule from this ruleset as JSON text.
+     *
+     * @param rule name of the structured rule to render
+     * @param formatJson true to format JSON with tabs, false for compact JSON
+     * @return JSON for {@code rule}
+     * @throws IllegalArgumentException if {@code rule} is blank
+     * @throws CopperlaceException if this ruleset is closed or rendering fails
+     */
+    public String renderStructuredJson(final String rule, final boolean formatJson) {
+        ensureOpen();
+        Validate.notBlank(rule, "rule must not be blank");
+        return NativeLibrary.INSTANCE.renderStructuredJson(handle, rule, formatJson);
+    }
+
+    /**
+     * Renders a named structured rule from this ruleset as compact JSON text with initial context values.
+     *
+     * @param rule name of the structured rule to render
+     * @param context initial render context values
+     * @return compact JSON for {@code rule}
+     * @throws NullPointerException if {@code context}, a context key, or a context value is null
+     * @throws IllegalArgumentException if {@code rule} is blank
+     * @throws CopperlaceException if this ruleset is closed or rendering fails
+     */
+    public String renderStructuredJson(final String rule, final Map<String, String> context) {
+        return renderStructuredJson(rule, context, false);
+    }
+
+    /**
+     * Renders a named structured rule from this ruleset as JSON text with initial context values.
+     *
+     * @param rule name of the structured rule to render
+     * @param context initial render context values
+     * @param formatJson true to format JSON with tabs, false for compact JSON
+     * @return JSON for {@code rule}
+     * @throws NullPointerException if {@code context}, a context key, or a context value is null
+     * @throws IllegalArgumentException if {@code rule} is blank
+     * @throws CopperlaceException if this ruleset is closed or rendering fails
+     */
+    public String renderStructuredJson(
+            final String rule, final Map<String, String> context, final boolean formatJson) {
+        ensureOpen();
+        Validate.notBlank(rule, "rule must not be blank");
+        Objects.requireNonNull(context, "context");
+        validateContext(context);
+        return NativeLibrary.INSTANCE.renderStructuredJsonWithContext(handle, rule, context, formatJson);
+    }
+
+    /**
      * Releases this ruleset's native handle.
      *
      * <p>Calling {@code close} more than once is allowed.
