@@ -4,7 +4,15 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from copperlace import Copperlace, CopperlaceError, RuleSet, render_file, render_str
+from copperlace import (
+    Copperlace,
+    CopperlaceError,
+    RuleSet,
+    render_file,
+    render_file_structured,
+    render_str,
+    render_str_structured,
+)
 
 
 class CopperlaceTests(unittest.TestCase):
@@ -36,9 +44,94 @@ class CopperlaceTests(unittest.TestCase):
 
             self.assertEqual(render_file(path, "origin", {"name": "Lina"}), "Hello Lina")
 
+    def test_render_structured_from_config_string(self) -> None:
+        output = render_str_structured(
+            """
+            name = ["Mia"]
+            origin {
+                title = "Hello {name}"
+                items = ["one", "two"]
+                count = 3
+                ratio = 2.5
+                active = true
+                missing = null
+                nested {
+                    value = "ok"
+                }
+            }
+            """,
+            "origin",
+        )
+
+        self.assertEqual(
+            output,
+            {
+                "active": True,
+                "count": 3,
+                "items": ["one", "two"],
+                "missing": None,
+                "nested": {"value": "ok"},
+                "ratio": 2.5,
+                "title": "Hello Mia",
+            },
+        )
+
+    def test_render_structured_from_config_file(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "story.conf"
+            path.write_text(
+                """
+                origin {
+                    title = "Hello"
+                    items = ["one", "two"]
+                }
+                """,
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                render_file_structured(path, "origin"),
+                {"items": ["one", "two"], "title": "Hello"},
+            )
+
+    def test_render_structured_with_context(self) -> None:
+        output = render_str_structured(
+            """
+            context {
+                name = "Mia"
+            }
+            origin {
+                greeting = "Hello {name}"
+            }
+            """,
+            "origin",
+            {"name": "Lina"},
+        )
+
+        self.assertEqual(output, {"greeting": "Hello Lina"})
+
+    def test_render_structured_with_builtin_and_custom_processors(self) -> None:
+        output = render_str_structured(
+            """
+            name = "Mia"
+            origin {
+                builtin = "{name | uppercase}"
+                custom = "{name | surround}"
+            }
+            """,
+            "origin",
+            processors={"surround": lambda value: f"[{value}]"},
+        )
+
+        self.assertEqual(output, {"builtin": "MIA", "custom": "[Mia]"})
+
     def test_missing_rule_raises_error(self) -> None:
         with self.assertRaisesRegex(CopperlaceError, "unknown rule"):
             render_str('origin = "{missing}"', "origin")
+
+    def test_structured_render_error_raises_copperlace_error(self) -> None:
+        with self.assertRaisesRegex(CopperlaceError, "unknown rule"):
+            render_str_structured('origin { value = "{missing}" }', "origin")
 
     def test_builtin_processor_pipeline(self) -> None:
         output = render_str(
@@ -164,6 +257,23 @@ class CopperlaceTests(unittest.TestCase):
             self.assertEqual(ruleset.render("origin"), "[Mia]")
             self.assertEqual(ruleset.render("origin"), "[Mia]")
 
+    def test_ruleset_renders_structured(self) -> None:
+        with RuleSet.from_string(
+            """
+            name = ["Mia"]
+            plain = "{name}"
+            origin {
+                title = "{name}"
+                tags = ["generated", "{name | slug}"]
+            }
+            """
+        ) as ruleset:
+            self.assertEqual(
+                ruleset.render_structured("origin"),
+                {"tags": ["generated", "mia"], "title": "Mia"},
+            )
+            self.assertEqual(ruleset.render("plain"), "Mia")
+
     def test_repeated_renders_on_one_copperlace_instance(self) -> None:
         copperlace = Copperlace.from_string(
             'name = ["Mia"]\npet = ["owl"]\norigin = "{name}"\ncompanion = "{name} and {pet}"'
@@ -179,6 +289,13 @@ class CopperlaceTests(unittest.TestCase):
         with Copperlace.from_string('origin = "{name}"') as copperlace:
             self.assertEqual(copperlace.render("origin", {"name": "Mia"}), "Mia")
 
+    def test_copperlace_renders_structured_with_context(self) -> None:
+        with Copperlace.from_string('origin { greeting = "Hello {name}" }') as copperlace:
+            self.assertEqual(
+                copperlace.render_structured("origin", {"name": "Mia"}),
+                {"greeting": "Hello Mia"},
+            )
+
     def test_context_rejects_non_string_key(self) -> None:
         with RuleSet.from_string('origin = "{name}"') as ruleset:
             with self.assertRaisesRegex(TypeError, "context keys"):
@@ -188,6 +305,16 @@ class CopperlaceTests(unittest.TestCase):
         with RuleSet.from_string('origin = "{name}"') as ruleset:
             with self.assertRaisesRegex(TypeError, "context values"):
                 ruleset.render("origin", {"name": 1})  # type: ignore[dict-item]
+
+    def test_structured_context_rejects_non_string_key(self) -> None:
+        with RuleSet.from_string('origin { greeting = "Hello {name}" }') as ruleset:
+            with self.assertRaisesRegex(TypeError, "context keys"):
+                ruleset.render_structured("origin", {1: "Mia"})  # type: ignore[dict-item]
+
+    def test_structured_context_rejects_non_string_value(self) -> None:
+        with RuleSet.from_string('origin { greeting = "Hello {name}" }') as ruleset:
+            with self.assertRaisesRegex(TypeError, "context values"):
+                ruleset.render_structured("origin", {"name": 1})  # type: ignore[dict-item]
 
     def test_processors_reject_non_string_name(self) -> None:
         with self.assertRaisesRegex(TypeError, "processor names"):
@@ -219,12 +346,18 @@ class CopperlaceTests(unittest.TestCase):
         with self.assertRaisesRegex(CopperlaceError, "closed"):
             ruleset.render("origin")
 
+        with self.assertRaisesRegex(CopperlaceError, "closed"):
+            ruleset.render_structured("origin")
+
     def test_context_manager_closes_copperlace(self) -> None:
         with Copperlace.from_string('name = ["Mia"]\norigin = "{name}"') as copperlace:
             self.assertEqual(copperlace.render("origin"), "Mia")
 
         with self.assertRaisesRegex(CopperlaceError, "closed"):
             copperlace.render("origin")
+
+        with self.assertRaisesRegex(CopperlaceError, "closed"):
+            copperlace.render_structured("origin")
 
     def test_explicit_close_is_idempotent(self) -> None:
         ruleset = RuleSet.from_string('name = ["Mia"]\norigin = "{name}"')

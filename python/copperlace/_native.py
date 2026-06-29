@@ -138,6 +138,54 @@ class NativeLibrary:
         finally:
             self.string_free(output)
 
+    def ruleset_render_structured_json(
+        self, handle: ctypes.c_void_p, rule: str, format_json: bool = False
+    ) -> str:
+        output = ctypes.c_void_p()
+        error = ctypes.c_void_p()
+        status = self._library.copperlace_ruleset_render_structured_json(
+            handle,
+            rule.encode("utf-8"),
+            ctypes.c_bool(format_json),
+            ctypes.byref(output),
+            ctypes.byref(error),
+        )
+        self._raise_for_status(status, error)
+        try:
+            return ctypes.string_at(output).decode("utf-8")
+        finally:
+            self.string_free(output)
+
+    def ruleset_render_structured_json_with_context(
+        self,
+        handle: ctypes.c_void_p,
+        rule: str,
+        context: Mapping[str, str],
+        format_json: bool = False,
+    ) -> str:
+        encoded_keys = [key.encode("utf-8") for key in context.keys()]
+        encoded_values = [value.encode("utf-8") for value in context.values()]
+        keys = (ctypes.c_char_p * len(encoded_keys))(*encoded_keys)
+        values = (ctypes.c_char_p * len(encoded_values))(*encoded_values)
+
+        output = ctypes.c_void_p()
+        error = ctypes.c_void_p()
+        status = self._library.copperlace_ruleset_render_structured_json_with_context(
+            handle,
+            rule.encode("utf-8"),
+            keys,
+            values,
+            ctypes.c_size_t(len(encoded_keys)),
+            ctypes.c_bool(format_json),
+            ctypes.byref(output),
+            ctypes.byref(error),
+        )
+        self._raise_for_status(status, error)
+        try:
+            return ctypes.string_at(output).decode("utf-8")
+        finally:
+            self.string_free(output)
+
     def ruleset_free(self, handle: ctypes.c_void_p) -> None:
         self._library.copperlace_ruleset_free(handle)
 
@@ -213,6 +261,29 @@ class NativeLibrary:
             ctypes.POINTER(ctypes.c_void_p),
         ]
         self._library.copperlace_ruleset_render_with_context.restype = ctypes.c_int
+
+        self._library.copperlace_ruleset_render_structured_json.argtypes = [
+            ctypes.c_void_p,
+            ctypes.c_char_p,
+            ctypes.c_bool,
+            ctypes.POINTER(ctypes.c_void_p),
+            ctypes.POINTER(ctypes.c_void_p),
+        ]
+        self._library.copperlace_ruleset_render_structured_json.restype = ctypes.c_int
+
+        self._library.copperlace_ruleset_render_structured_json_with_context.argtypes = [
+            ctypes.c_void_p,
+            ctypes.c_char_p,
+            ctypes.POINTER(ctypes.c_char_p),
+            ctypes.POINTER(ctypes.c_char_p),
+            ctypes.c_size_t,
+            ctypes.c_bool,
+            ctypes.POINTER(ctypes.c_void_p),
+            ctypes.POINTER(ctypes.c_void_p),
+        ]
+        self._library.copperlace_ruleset_render_structured_json_with_context.restype = (
+            ctypes.c_int
+        )
 
         self._library.copperlace_ruleset_free.argtypes = [ctypes.c_void_p]
         self._library.copperlace_ruleset_free.restype = None
