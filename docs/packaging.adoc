@@ -148,15 +148,11 @@ PyPI releases publish:
 Python rendering uses the builtin processor registry plus any custom processor
 callbacks provided at construction time.
 
-Python structured rendering returns native Python `dict`, `list`, `str`,
-numeric, `bool`, and `None` values. The wrapper requests compact JSON from the
-C ABI internally and parses it before returning. Inferred rendering returns
-text for string-valued and list-valued rules, or a formatted JSON string for
-object-valued rules.
-
-These wrapper values follow the Rust `CopperlaceValue` contract: structured
-objects, arrays, strings, numbers, booleans, nulls, and large unsigned integers
-are preserved through the native JSON bridge.
+Python structured rendering is intentionally string-based. The wrapper keeps
+the Rust-to-Python boundary as rendering to text or structured JSON text instead
+of exposing a second structured value model. Inferred rendering also returns
+strings: normal text for string-valued and list-valued rules, or formatted JSON
+text for object-valued rules.
 
 == JS/TS WebAssembly Package
 
@@ -303,7 +299,11 @@ At runtime, the Java wrapper loads the native library in this order:
 Java rendering uses the builtin processor registry plus any custom processor
 callbacks provided at construction time.
 
-Java structured rendering returns JSON strings to avoid adding a JSON
-dependency. No-argument structured JSON overloads return formatted JSON using
-tabs for indentation. The `formatJson` parameter controls serialization:
-`false` returns compact JSON and `true` returns formatted JSON.
+Java structured rendering is intentionally string-based. The Java wrapper keeps
+the Rust-to-Java boundary as rendering to text or structured JSON text instead
+of exposing a second structured value model. No-argument structured JSON
+overloads return formatted JSON using tabs for indentation. The `formatJson`
+parameter controls serialization: `false` returns compact JSON and `true`
+returns formatted JSON. `renderInferred` also returns strings: normal text for
+string-valued and list-valued rules, or formatted JSON text for object-valued
+rules.

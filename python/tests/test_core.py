@@ -68,30 +68,10 @@ class CopperlaceTests(unittest.TestCase):
             "origin",
         )
 
-        self.assertIs(type(output), dict)
-        self.assertIs(type(output["active"]), bool)
-        self.assertIs(type(output["count"]), int)
-        self.assertIs(type(output["items"]), list)
-        self.assertIs(type(output["items"][0]), str)
-        self.assertIs(type(output["large"]), int)
-        self.assertIs(type(output["missing"]), type(None))
-        self.assertIs(type(output["nested"]), dict)
-        self.assertIs(type(output["nested"]["value"]), str)
-        self.assertIs(type(output["nested"]["values"]), list)
-        self.assertIs(type(output["ratio"]), float)
-        self.assertIs(type(output["title"]), str)
+        self.assertIs(type(output), str)
         self.assertEqual(
             output,
-            {
-                "active": True,
-                "count": 3,
-                "items": ["one", "two"],
-                "large": 18446744073709551615,
-                "missing": None,
-                "nested": {"value": "ok", "values": ["three", "four"]},
-                "ratio": 2.5,
-                "title": "Hello Mia",
-            },
+            '{\n\t"active": true,\n\t"count": 3,\n\t"items": [\n\t\t"one",\n\t\t"two"\n\t],\n\t"large": 18446744073709551615,\n\t"missing": null,\n\t"nested": {\n\t\t"value": "ok",\n\t\t"values": [\n\t\t\t"three",\n\t\t\t"four"\n\t\t]\n\t},\n\t"ratio": 2.5,\n\t"title": "Hello Mia"\n}',
         )
 
     def test_render_structured_from_config_file(self) -> None:
@@ -109,7 +89,7 @@ class CopperlaceTests(unittest.TestCase):
 
             self.assertEqual(
                 render_file_structured(path, "origin"),
-                {"items": ["one", "two"], "title": "Hello"},
+                '{\n\t"items": [\n\t\t"one",\n\t\t"two"\n\t],\n\t"title": "Hello"\n}',
             )
 
     def test_render_structured_with_context(self) -> None:
@@ -126,7 +106,7 @@ class CopperlaceTests(unittest.TestCase):
             {"name": "Lina"},
         )
 
-        self.assertEqual(output, {"greeting": "Hello Lina"})
+        self.assertEqual(output, '{\n\t"greeting": "Hello Lina"\n}')
 
     def test_render_structured_with_builtin_and_custom_processors(self) -> None:
         output = render_str_structured(
@@ -141,7 +121,7 @@ class CopperlaceTests(unittest.TestCase):
             processors={"surround": lambda value: f"[{value}]"},
         )
 
-        self.assertEqual(output, {"builtin": "MIA", "custom": "[Mia]"})
+        self.assertEqual(output, '{\n\t"builtin": "MIA",\n\t"custom": "[Mia]"\n}')
 
     def test_native_structured_json_defaults_to_formatted(self) -> None:
         with RuleSet.from_string('origin { greeting = "Hello Mia" }') as ruleset:
@@ -351,7 +331,7 @@ class CopperlaceTests(unittest.TestCase):
         ) as ruleset:
             self.assertEqual(
                 ruleset.render_structured("origin"),
-                {"tags": ["generated", "mia"], "title": "Mia"},
+                '{\n\t"tags": [\n\t\t"generated",\n\t\t"mia"\n\t],\n\t"title": "Mia"\n}',
             )
             self.assertEqual(ruleset.render("plain"), "Mia")
 
@@ -389,7 +369,7 @@ class CopperlaceTests(unittest.TestCase):
         with Copperlace.from_string('origin { greeting = "Hello {name}" }') as copperlace:
             self.assertEqual(
                 copperlace.render_structured("origin", {"name": "Mia"}),
-                {"greeting": "Hello Mia"},
+                '{\n\t"greeting": "Hello Mia"\n}',
             )
 
     def test_copperlace_renders_inferred_with_context(self) -> None:

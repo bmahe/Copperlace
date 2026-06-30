@@ -1,15 +1,12 @@
 from __future__ import annotations
 
 import ctypes
-import json
 from collections.abc import Callable, Mapping
 from pathlib import Path
 from types import TracebackType
-from typing import Any, Self
+from typing import Self
 
 from ._native import NativeError, native
-
-StructuredValue = dict[str, Any] | list[Any] | str | int | float | bool | None
 
 
 class CopperlaceError(RuntimeError):
@@ -152,19 +149,15 @@ class RuleSet:
 
     def render_structured(
         self, rule: str, context: Mapping[str, str] | None = None
-    ) -> StructuredValue:
-        """Render a named structured rule from this ruleset.
-
-        The native renderer returns JSON for the structured value tree; this
-        method parses that JSON into normal Python ``dict``, ``list``, scalar,
-        boolean, and ``None`` values.
+    ) -> str:
+        """Render a named structured rule from this ruleset as formatted JSON text.
 
         Args:
             rule: Name of the structured rule to render.
             context: Optional initial render context values.
 
         Returns:
-            Native Python values for the requested structured rule.
+            Formatted JSON text for the requested structured rule.
 
         Raises:
             CopperlaceError: If this ruleset is closed or rendering fails.
@@ -174,25 +167,16 @@ class RuleSet:
         if context is not None:
             validated_context = _validate_context(context)
             try:
-                output = native().ruleset_render_structured_json_with_context(
-                    self._handle, rule, validated_context, False
-                )
-            except NativeError as error:
-                raise CopperlaceError(str(error)) from error
-        else:
-            try:
-                output = native().ruleset_render_structured_json(
-                    self._handle, rule, False
+                return native().ruleset_render_structured_json_with_context(
+                    self._handle, rule, validated_context
                 )
             except NativeError as error:
                 raise CopperlaceError(str(error)) from error
 
         try:
-            return json.loads(output)
-        except json.JSONDecodeError as error:
-            raise CopperlaceError(
-                f"native structured renderer returned invalid JSON: {error}"
-            ) from error
+            return native().ruleset_render_structured_json(self._handle, rule)
+        except NativeError as error:
+            raise CopperlaceError(str(error)) from error
 
     def close(self) -> None:
         """Release this ruleset's native handle.
@@ -317,15 +301,15 @@ class Copperlace:
 
     def render_structured(
         self, rule: str, context: Mapping[str, str] | None = None
-    ) -> StructuredValue:
-        """Render a named structured rule from the loaded config.
+    ) -> str:
+        """Render a named structured rule from the loaded config as formatted JSON text.
 
         Args:
             rule: Name of the structured rule to render.
             context: Optional initial render context values.
 
         Returns:
-            Native Python values for the requested structured rule.
+            Formatted JSON text for the requested structured rule.
 
         Raises:
             CopperlaceError: If the renderer is closed or rendering fails.
@@ -447,11 +431,11 @@ def render_str_structured(
     context: Mapping[str, str] | None = None,
     *,
     processors: Mapping[str, Callable[[str], str]] | None = None,
-) -> StructuredValue:
-    """Render one structured rule from a configuration string.
+) -> str:
+    """Render one structured rule from a configuration string as formatted JSON text.
 
     This convenience helper compiles the config, renders one structured rule,
-    parses the result into Python values, and releases the native handle.
+    and releases the native handle.
 
     Args:
         config: configuration text containing Copperlace rules.
@@ -460,7 +444,7 @@ def render_str_structured(
         processors: Optional custom processor callbacks.
 
     Returns:
-        Native Python values for the requested structured rule.
+        Formatted JSON text for the requested structured rule.
 
     Raises:
         CopperlaceError: If parsing, compilation, or rendering fails.
@@ -476,11 +460,11 @@ def render_file_structured(
     context: Mapping[str, str] | None = None,
     *,
     processors: Mapping[str, Callable[[str], str]] | None = None,
-) -> StructuredValue:
-    """Render one structured rule from a configuration file.
+) -> str:
+    """Render one structured rule from a configuration file as formatted JSON text.
 
-    This convenience helper loads the file, renders one structured rule, parses
-    the result into Python values, and releases the native handle.
+    This convenience helper loads the file, renders one structured rule, and
+    releases the native handle.
 
     Args:
         path: Path to the configuration file.
@@ -489,7 +473,7 @@ def render_file_structured(
         processors: Optional custom processor callbacks.
 
     Returns:
-        Native Python values for the requested structured rule.
+        Formatted JSON text for the requested structured rule.
 
     Raises:
         CopperlaceError: If loading, parsing, compilation, or rendering fails.

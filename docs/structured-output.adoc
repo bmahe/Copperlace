@@ -95,10 +95,13 @@ rule returns `UnsupportedStructuredTarget(rule)`. Object parents and nested
 arrays remain valid structured data, but dotted text rendering can return
 `UnsupportedValue("object")` or `UnsupportedValue("array")` for those nodes.
 
-JSON is the first public serialization target for wrappers and the CLI:
+JSON is the public structured serialization target for the C ABI, wrappers, and
+the CLI. Rust owns the structured value tree; wrapper boundaries intentionally
+stay render-to-string unless a concrete caller need justifies a richer native
+value API.
 
 * C ABI structured functions return JSON strings.
-* Python structured APIs parse compact FFI JSON into native Python values.
+* Python structured APIs return JSON strings.
 * Java structured APIs return JSON strings.
 * CLI structured output writes JSON to stdout.
 
@@ -176,9 +179,9 @@ copperlace render --config story.conf --rule origin --count 2 --compact-json
 
 == Python API
 
-Python structured APIs return native Python values. They call the FFI compact
-JSON function internally and parse the JSON before returning `dict`, `list`,
-`str`, numeric, `bool`, and `None` values.
+Python structured APIs are string-based by design. They return JSON strings
+from Rust instead of reconstructing a Python object tree from serialized
+output.
 
 [source,python]
 ----
@@ -196,13 +199,16 @@ origin {
 '''
 
 value = render_str_structured(config, "origin")
-assert value == {
-    "active": True,
-    "count": 3,
-    "missing": None,
-    "tags": ["structured", "mia"],
-    "title": "Hello Mia",
-}
+assert value == '''{
+\t"active": true,
+\t"count": 3,
+\t"missing": null,
+\t"tags": [
+\t\t"structured",
+\t\t"mia"
+\t],
+\t"title": "Hello Mia"
+}'''
 
 with Copperlace.from_string(config) as copperlace:
     value = copperlace.render_structured("origin", {"name": "Lina"})
@@ -215,14 +221,16 @@ For callers that want the same shape inference as the CLI, Python exposes
 `RuleSet.render_inferred`, `Copperlace.render_inferred`, `render_str_inferred`,
 and `render_file_inferred`. These return normal text for string-valued and
 list-valued rules, or a formatted JSON string for object-valued rules. Inferred
-rendering always returns strings; it does not parse object-valued rules into
-native Python values.
+rendering always returns strings.
 
 == Java API
 
-Java structured APIs return JSON strings to avoid adding a JSON dependency.
-The no-argument structured JSON overloads return formatted JSON with tabs.
-Pass `false` to the overloads with `formatJson` for compact JSON.
+Java structured APIs are string-based by design. They return JSON strings from
+Rust instead of reconstructing a Java object tree from serialized output. This
+keeps the Java wrapper focused on rendering and avoids adding a second
+structured-value model outside the Rust core. The no-argument structured JSON
+overloads return formatted JSON with tabs. Pass `false` to the overloads with
+`formatJson` for compact JSON.
 
 [source,java]
 ----
@@ -249,4 +257,6 @@ Java also exposes `RuleSet.renderStructuredJson`, `Copperlace.renderStructuredJs
 The matching inferred entry points are `RuleSet.renderInferred`,
 `Copperlace.renderInferred`, `Copperlace.renderStringInferred`, and
 `Copperlace.renderFileInferred`; they return text or formatted JSON strings
-based on the selected rule shape.
+based on the selected rule shape. Copperlace does not expose a Java-native
+structured value tree; use `renderStructuredJson` when structured output is
+needed from Java.
