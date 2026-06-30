@@ -227,6 +227,16 @@ npm pack ./js/pkg --pack-destination /tmp
 python scripts/smoke_js_package.py /tmp/copperlace-${VERSION}.tgz
 ----
 
+Confirm the local npm client is authenticated as a package owner before
+publishing. If `npm whoami` fails, log in and verify again:
+
+[source,sh]
+----
+npm whoami
+npm login
+npm whoami
+----
+
 Inspect what npm will publish:
 
 [source,sh]
