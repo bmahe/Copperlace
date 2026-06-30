@@ -66,6 +66,35 @@ Rust structured APIs return `CopperlaceValue` internally. `CopperlaceValue`
 preserves objects, arrays, strings, numbers, booleans, and null values, and can
 be serialized to JSON.
 
+`CopperlaceValue` is the baseline structured output contract for Copperlace:
+
+* `Object` preserves object fields as a map keyed by field name. Rust stores
+  fields in `BTreeMap`, so JSON serialization uses deterministic key order.
+* `Array` preserves array elements in render order.
+* `String` is the rendered text for a structured text leaf. Text leaves use the
+  same rule calls, processors, context defaults, initial context values, and
+  error behavior as text rendering.
+* `Number` preserves integer, large unsigned integer, and finite floating-point
+  values through `CopperlaceNumber`.
+* `Boolean` preserves `true` and `false`.
+* `Null` preserves explicit null values.
+
+`CopperlaceValue::to_json_value` and `CopperlaceValue::into_json_value` convert
+the value tree to `serde_json::Value` without changing its shape. Numbers are
+converted as JSON numbers: signed integers stay signed, unsigned integers larger
+than `i64::MAX` stay unsigned when representable by JSON tooling, and floating
+point values must be finite.
+
+`CopperlaceValue::to_compact_json` serializes without extra whitespace.
+`CopperlaceValue::to_formatted_json` serializes with tab indentation. Both
+methods return `RenderError::JsonSerialization` if JSON serialization fails.
+
+Structured rendering is only supported for object-valued top-level rules.
+Requesting structured rendering for a string-valued or list-valued top-level
+rule returns `UnsupportedStructuredTarget(rule)`. Object parents and nested
+arrays remain valid structured data, but dotted text rendering can return
+`UnsupportedValue("object")` or `UnsupportedValue("array")` for those nodes.
+
 JSON is the first public serialization target for wrappers and the CLI:
 
 * C ABI structured functions return JSON strings.

@@ -166,6 +166,13 @@ fn structured_text_leaves_use_text_generator_nodes() {
 fn copperlace_value_converts_to_json_values() {
     let mut nested = BTreeMap::new();
     nested.insert(
+        "object".to_string(),
+        CopperlaceValue::Object(BTreeMap::from([
+            ("active".to_string(), CopperlaceValue::Boolean(false)),
+            ("missing".to_string(), CopperlaceValue::Null),
+        ])),
+    );
+    nested.insert(
         "array".to_string(),
         CopperlaceValue::Array(vec![
             CopperlaceValue::String("Mia".to_string()),
@@ -181,13 +188,29 @@ fn copperlace_value_converts_to_json_values() {
     assert_eq!(
         value.to_json_value(),
         serde_json::json!({
-            "array": ["Mia", 3, 18446744073709551615_u64, 2.5, true, null]
+            "array": ["Mia", 3, 18446744073709551615_u64, 2.5, true, null],
+            "object": {
+                "active": false,
+                "missing": null
+            }
         })
+    );
+    assert_eq!(
+        value.to_compact_json().unwrap(),
+        r#"{"array":["Mia",3,18446744073709551615,2.5,true,null],"object":{"active":false,"missing":null}}"#
+    );
+    assert_eq!(
+        value.to_formatted_json().unwrap(),
+        "{\n\t\"array\": [\n\t\t\"Mia\",\n\t\t3,\n\t\t18446744073709551615,\n\t\t2.5,\n\t\ttrue,\n\t\tnull\n\t],\n\t\"object\": {\n\t\t\"active\": false,\n\t\t\"missing\": null\n\t}\n}"
     );
     assert_eq!(
         value.into_json_value(),
         serde_json::json!({
-            "array": ["Mia", 3, 18446744073709551615_u64, 2.5, true, null]
+            "array": ["Mia", 3, 18446744073709551615_u64, 2.5, true, null],
+            "object": {
+                "active": false,
+                "missing": null
+            }
         })
     );
 }
