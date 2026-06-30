@@ -130,6 +130,7 @@ fn copperlace_ruleset_render_structured_json(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn copperlace_ruleset_render_structured_json_with_context(
     handle: *const CopperlaceRuleSet,
     rule: *const c_char,
