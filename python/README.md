@@ -30,21 +30,24 @@ name = ["Mia"]
 origin {
   title = "Hello {name}"
   tags = ["structured", "{name | slug}"]
+  count = 3
+  active = true
+  missing = null
 }
 """
 
 print(render_str_structured(config, "origin"))
-# {"tags": ["structured", "mia"], "title": "Hello Mia"}
+# {"active": True, "count": 3, "missing": None, "tags": ["structured", "mia"], "title": "Hello Mia"}
 ```
 
 `RuleSet.render_structured`, `Copperlace.render_structured`,
 `render_str_structured`, and `render_file_structured` use compact native JSON
-internally and parse it into `dict`, `list`, scalar, boolean, and `None` values
-before returning.
+internally and parse it into native Python `dict`, `list`, `str`, numeric,
+`bool`, and `None` values before returning.
 
 Use inferred rendering when callers want the CLI-style behavior from one method:
 text rules return text, list rules keep random text choice behavior, and
-object-valued rules return a formatted JSON string.
+object-valued rules return a formatted JSON string, not native Python values.
 
 ```python
 from copperlace import render_str_inferred

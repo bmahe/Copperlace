@@ -177,7 +177,8 @@ copperlace render --config story.conf --rule origin --count 2 --compact-json
 == Python API
 
 Python structured APIs return native Python values. They call the FFI compact
-JSON function internally and parse the JSON before returning.
+JSON function internally and parse the JSON before returning `dict`, `list`,
+`str`, numeric, `bool`, and `None` values.
 
 [source,python]
 ----
@@ -188,11 +189,17 @@ name = ["Mia"]
 origin {
   title = "Hello {name}"
   tags = ["structured", "{name | slug}"]
+  count = 3
+  active = true
+  missing = null
 }
 '''
 
 value = render_str_structured(config, "origin")
 assert value == {
+    "active": True,
+    "count": 3,
+    "missing": None,
     "tags": ["structured", "mia"],
     "title": "Hello Mia",
 }
@@ -207,7 +214,9 @@ Python also exposes `RuleSet.render_structured`, `Copperlace.render_structured`,
 For callers that want the same shape inference as the CLI, Python exposes
 `RuleSet.render_inferred`, `Copperlace.render_inferred`, `render_str_inferred`,
 and `render_file_inferred`. These return normal text for string-valued and
-list-valued rules, or a formatted JSON string for object-valued rules.
+list-valued rules, or a formatted JSON string for object-valued rules. Inferred
+rendering always returns strings; it does not parse object-valued rules into
+native Python values.
 
 == Java API
 

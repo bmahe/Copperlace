@@ -55,25 +55,40 @@ class CopperlaceTests(unittest.TestCase):
                 title = "Hello {name}"
                 items = ["one", "two"]
                 count = 3
+                large = 18446744073709551615
                 ratio = 2.5
                 active = true
                 missing = null
                 nested {
                     value = "ok"
+                    values = ["three", "four"]
                 }
             }
             """,
             "origin",
         )
 
+        self.assertIs(type(output), dict)
+        self.assertIs(type(output["active"]), bool)
+        self.assertIs(type(output["count"]), int)
+        self.assertIs(type(output["items"]), list)
+        self.assertIs(type(output["items"][0]), str)
+        self.assertIs(type(output["large"]), int)
+        self.assertIs(type(output["missing"]), type(None))
+        self.assertIs(type(output["nested"]), dict)
+        self.assertIs(type(output["nested"]["value"]), str)
+        self.assertIs(type(output["nested"]["values"]), list)
+        self.assertIs(type(output["ratio"]), float)
+        self.assertIs(type(output["title"]), str)
         self.assertEqual(
             output,
             {
                 "active": True,
                 "count": 3,
                 "items": ["one", "two"],
+                "large": 18446744073709551615,
                 "missing": None,
-                "nested": {"value": "ok"},
+                "nested": {"value": "ok", "values": ["three", "four"]},
                 "ratio": 2.5,
                 "title": "Hello Mia",
             },
@@ -169,6 +184,7 @@ class CopperlaceTests(unittest.TestCase):
 
         self.assertEqual(text, "Mia")
         self.assertEqual(choice, "Lina")
+        self.assertIs(type(structured), str)
         self.assertEqual(structured, '{\n\t"greeting": "Hello Darcy"\n}')
 
     def test_render_inferred_from_config_file(self) -> None:
