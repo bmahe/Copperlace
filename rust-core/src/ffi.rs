@@ -2,7 +2,7 @@ use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_int, c_void};
 use std::ptr;
 
-use crate::config::{ConfigError, ruleset_from_file, ruleset_from_str};
+use crate::config::{ConfigError, config_value_from_file, ruleset_from_file, ruleset_from_str};
 use crate::render::{Processor, ProcessorRegistry, RenderContext, RenderOptions, RuleSet};
 
 /// Status code for a successful C ABI call.
@@ -793,8 +793,7 @@ fn ruleset_from_file_with_processors(
     path: String,
     processors: ProcessorRegistry,
 ) -> Result<RuleSet, ConfigError> {
-    let value = hocon_rs::Config::load(&path, None)
-        .map_err(|error| ConfigError::Parse(format!("{error:?}")))?;
+    let value = config_value_from_file(path)?;
     RuleSet::from_config_with_processors(value, processors).map_err(ConfigError::Render)
 }
 

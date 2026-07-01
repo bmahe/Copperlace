@@ -193,11 +193,32 @@ pub fn ruleset_from_str(config: &str) -> Result<RuleSet, ConfigError> {
     RuleSet::from_config(value).map_err(ConfigError::Render)
 }
 
+pub(crate) fn config_value_from_file(
+    path: impl AsRef<Path>,
+) -> Result<hocon_rs::Value, ConfigError> {
+    let path = path.as_ref();
+    let value = hocon_rs::Config::load(path, Some(config_options_for_file(path)))
+        .map_err(|error| ConfigError::Parse(format!("{error:?}")))?;
+    Ok(value)
+}
+
+fn config_options_for_file(path: &Path) -> hocon_rs::ConfigOptions {
+    let mut locations = Vec::new();
+    if let Some(parent) = path.parent() {
+        locations.push(parent.to_string_lossy().to_string());
+    }
+    if let Ok(current_dir) = std::env::current_dir() {
+        let current_dir = current_dir.to_string_lossy().to_string();
+        if !locations.iter().any(|location| location == &current_dir) {
+            locations.push(current_dir);
+        }
+    }
+    hocon_rs::ConfigOptions::new(false, locations)
+}
+
 /// Loads a configuration file and compiles it into a reusable [`RuleSet`].
 pub fn ruleset_from_file(path: impl AsRef<Path>) -> Result<RuleSet, ConfigError> {
-    let path = path.as_ref().to_string_lossy();
-    let value = hocon_rs::Config::load(path.as_ref(), None)
-        .map_err(|error| ConfigError::Parse(format!("{error:?}")))?;
+    let value = config_value_from_file(path)?;
     RuleSet::from_config(value).map_err(ConfigError::Render)
 }
 

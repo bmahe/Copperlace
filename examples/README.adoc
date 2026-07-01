@@ -29,6 +29,14 @@ Game item card copy. Demonstrates reusable item bindings, `titlecase`,
 Character text with consistent pronouns. Demonstrates bindings and male,
 female, and neutral lizard pronouns, plus `present_participle`.
 
+`fish_report.conf`::
+Fish observation copy. Demonstrates importing a HOCON fragment with
+`include classpath("fragments/fish_facts.conf")`, object merging, dotted rules,
+bindings, `article`, `sentence`, and `titlecase`.
+
+`fragments/fish_facts.conf`::
+Reusable fish vocabulary imported by `fish_report.conf`.
+
 `item_json.conf`::
 JSON item data. Demonstrates JSON-safe quoted strings, bindings, scalar values,
 `slug`, `ordinal`, `article`, `past_tense`, `pluralize`, and
@@ -71,6 +79,7 @@ cargo run --bin copperlace -- render --config ../examples/proverbs.conf --rule s
 cargo run --bin copperlace -- render --config ../examples/recursive_path.conf --max-recursion-depth 3
 cargo run --bin copperlace -- render --config ../examples/gendered_pronouns.conf --rule origin
 cargo run --bin copperlace -- render --config ../examples/gendered_pronouns.conf --rule profile
+cargo run --bin copperlace -- render --config ../examples/fish_report.conf --rule origin
 cargo run --bin copperlace -- render --config ../examples/item_json.conf --rule origin
 cargo run --bin copperlace -- render --config ../examples/structured_item.conf --rule origin
 cargo run --bin copperlace -- render --config ../examples/quest_log.conf --rule objective
@@ -97,3 +106,8 @@ cargo run --bin copperlace -- render --config ../examples/structured_item.conf -
 without `--max-recursion-depth` fails with `CircularRuleReference`; rendering
 with `--max-recursion-depth 3` produces a finite route and cuts off the next
 recursive call with an empty string.
+
+`fish_report.conf` imports `fragments/fish_facts.conf` through HOCON classpath
+include syntax. File-loaded configs search the config file's parent directory
+first, then the process current directory, so the include works when rendering
+the example from outside `examples/`.
