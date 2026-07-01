@@ -22,6 +22,12 @@ What user, maintainer, packaging, or API problem does this solve?
 - Native library or packaging:
 - Documentation:
 
+## Test Coverage
+
+List the new or updated test flows and scenarios that cover this change.
+
+- 
+
 ## Verification
 
 - [ ] `make check`
