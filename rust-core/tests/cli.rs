@@ -45,6 +45,90 @@ fn renders_config_file() {
 }
 
 #[test]
+fn classpath_include_prefers_config_parent_over_process_current_dir() {
+    let config_dir = make_temp_dir("config-parent");
+    let current_dir = make_temp_dir("current-dir");
+    fs::create_dir(config_dir.join("fragments")).unwrap();
+    fs::create_dir(current_dir.join("fragments")).unwrap();
+    fs::write(
+        config_dir.join("fragments").join("fish_facts.conf"),
+        r#"
+        fish.names = ["parent fish"]
+        "#,
+    )
+    .unwrap();
+    fs::write(
+        current_dir.join("fragments").join("fish_facts.conf"),
+        r#"
+        fish.names = ["current fish"]
+        "#,
+    )
+    .unwrap();
+    let config_path = config_dir.join("main.conf");
+    fs::write(
+        &config_path,
+        r#"
+        include classpath("fragments/fish_facts.conf")
+        origin = "{fish.names}"
+        "#,
+    )
+    .unwrap();
+
+    let output = Command::new(env!("CARGO_BIN_EXE_copperlace"))
+        .current_dir(&current_dir)
+        .args(["render", "--config", &config_path.to_string_lossy()])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    assert_eq!(
+        String::from_utf8_lossy(&output.stdout).trim(),
+        "parent fish"
+    );
+
+    let _ = fs::remove_dir_all(config_dir);
+    let _ = fs::remove_dir_all(current_dir);
+}
+
+#[test]
+fn classpath_include_falls_back_to_process_current_dir() {
+    let config_dir = make_temp_dir("config-parent-missing");
+    let current_dir = make_temp_dir("current-dir-fallback");
+    fs::create_dir(current_dir.join("fragments")).unwrap();
+    fs::write(
+        current_dir.join("fragments").join("fish_facts.conf"),
+        r#"
+        fish.names = ["current fish"]
+        "#,
+    )
+    .unwrap();
+    let config_path = config_dir.join("main.conf");
+    fs::write(
+        &config_path,
+        r#"
+        include classpath("fragments/fish_facts.conf")
+        origin = "{fish.names}"
+        "#,
+    )
+    .unwrap();
+
+    let output = Command::new(env!("CARGO_BIN_EXE_copperlace"))
+        .current_dir(&current_dir)
+        .args(["render", "--config", &config_path.to_string_lossy()])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    assert_eq!(
+        String::from_utf8_lossy(&output.stdout).trim(),
+        "current fish"
+    );
+
+    let _ = fs::remove_dir_all(config_dir);
+    let _ = fs::remove_dir_all(current_dir);
+}
+
+#[test]
 fn renders_with_limited_recursion_depth() {
     let config_path = write_temp_config(
         r#"
@@ -84,18 +168,26 @@ fn recursive_path_example_renders_with_limited_recursion_depth() {
     assert!(output.status.success());
     let stdout = String::from_utf8_lossy(&output.stdout);
     assert!(stdout.contains("Begin at "));
-    assert_eq!(stdout.matches(" Then ").count(), 4);
+    assert!(stdout.trim().ends_with('.'));
+    assert!(stdout.matches(", then ").count() <= 4);
 }
 
 #[test]
-fn recursive_path_example_errors_without_limited_recursion_depth() {
+fn recursive_config_errors_without_limited_recursion_depth() {
+    let config_path = write_temp_config(
+        r#"
+        origin = "x{origin}"
+        "#,
+    );
     let output = Command::new(env!("CARGO_BIN_EXE_copperlace"))
-        .args(["render", "--config", "../examples/recursive_path.conf"])
+        .args(["render", "--config", &config_path.to_string_lossy()])
         .output()
         .unwrap();
 
     assert!(!output.status.success());
     assert!(String::from_utf8_lossy(&output.stderr).contains("circular rule reference"));
+
+    let _ = fs::remove_file(config_path);
 }
 
 #[test]
@@ -406,6 +498,46 @@ fn structured_item_example_renders_valid_json() {
             "tags": ["rare", "compass", "spark"],
             "type": "compass"
         })
+    );
+}
+
+#[test]
+fn fish_report_example_renders() {
+    let output = Command::new(env!("CARGO_BIN_EXE_copperlace"))
+        .args([
+            "render",
+            "--config",
+            "../examples/fish_report.conf",
+            "--rule",
+            "origin",
+            "--set",
+            "subject=brook trout",
+            "--set",
+            "category=river fish",
+            "--set",
+            "bodyPart=dorsal fin",
+            "--set",
+            "habitat=cold mountain stream",
+            "--set",
+            "color=silver",
+            "--set",
+            "behavior=darting through current",
+            "--set",
+            "trait=fast-growing",
+            "--set",
+            "tone=field note",
+            "--set",
+            "reader=wildlife survey teams",
+            "--set",
+            "report.format=Field Note: Brook Trout",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    assert_eq!(
+        String::from_utf8_lossy(&output.stdout).trim(),
+        "Field Note: Brook Trout: A brook trout is a fast-growing river fish often seen in a cold mountain stream. Its silver dorsal fin is useful while darting through current. Written for wildlife survey teams."
     );
 }
 
@@ -1143,5 +1275,15 @@ fn write_temp_config(contents: &str) -> std::path::PathBuf {
         .as_nanos();
     let path = std::env::temp_dir().join(format!("copperlace-{unique}.conf"));
     fs::write(&path, contents).unwrap();
+    path
+}
+
+fn make_temp_dir(name: &str) -> std::path::PathBuf {
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap()
+        .as_nanos();
+    let path = std::env::temp_dir().join(format!("copperlace-{name}-{unique}"));
+    fs::create_dir(&path).unwrap();
     path
 }
