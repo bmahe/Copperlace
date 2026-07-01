@@ -15,7 +15,9 @@ pub use nodes::{
 pub use processor::{Processor, ProcessorRegistry, processor};
 pub use ruleset::{
     RuleSet, render_config_rule, render_config_rule_structured,
-    render_config_rule_structured_with_context, render_config_rule_with_context,
+    render_config_rule_structured_with_context,
+    render_config_rule_structured_with_context_and_options, render_config_rule_with_context,
+    render_config_rule_with_context_and_options,
 };
-pub use state::{RenderContext, RenderState};
+pub use state::{RenderContext, RenderOptions, RenderState};
 pub use value::{CopperlaceNumber, CopperlaceValue, StructuredNode};

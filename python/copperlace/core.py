@@ -82,7 +82,13 @@ class RuleSet:
         except NativeError as error:
             raise CopperlaceError(str(error)) from error
 
-    def render(self, rule: str, context: Mapping[str, str] | None = None) -> str:
+    def render(
+        self,
+        rule: str,
+        context: Mapping[str, str] | None = None,
+        *,
+        max_recursion_depth: int = 0,
+    ) -> str:
         """Render a named rule from this ruleset.
 
         Each call uses a fresh render context, so per-render bindings are
@@ -92,6 +98,7 @@ class RuleSet:
         Args:
             rule: Name of the rule to render.
             context: Optional initial render context values.
+            max_recursion_depth: Recursive re-entries allowed per rule.
 
         Returns:
             Rendered text for the requested rule.
@@ -101,11 +108,12 @@ class RuleSet:
         """
 
         self._ensure_open()
-        if context is not None:
-            validated_context = _validate_context(context)
+        validated_context = _validate_context(context or {})
+        max_recursion_depth = _validate_max_recursion_depth(max_recursion_depth)
+        if context is not None or max_recursion_depth != 0:
             try:
-                return native().ruleset_render_with_context(
-                    self._handle, rule, validated_context
+                return native().ruleset_render_with_context_and_options(
+                    self._handle, rule, validated_context, max_recursion_depth
                 )
             except NativeError as error:
                 raise CopperlaceError(str(error)) from error
@@ -115,7 +123,13 @@ class RuleSet:
         except NativeError as error:
             raise CopperlaceError(str(error)) from error
 
-    def render_inferred(self, rule: str, context: Mapping[str, str] | None = None) -> str:
+    def render_inferred(
+        self,
+        rule: str,
+        context: Mapping[str, str] | None = None,
+        *,
+        max_recursion_depth: int = 0,
+    ) -> str:
         """Render a rule as text, returning formatted JSON for object-valued rules.
 
         String-valued and list-valued rules use normal text rendering. Object-valued
@@ -124,6 +138,7 @@ class RuleSet:
         Args:
             rule: Name of the rule to render.
             context: Optional initial render context values.
+            max_recursion_depth: Recursive re-entries allowed per rule.
 
         Returns:
             Rendered text, or formatted JSON for an object-valued rule.
@@ -133,11 +148,12 @@ class RuleSet:
         """
 
         self._ensure_open()
-        if context is not None:
-            validated_context = _validate_context(context)
+        validated_context = _validate_context(context or {})
+        max_recursion_depth = _validate_max_recursion_depth(max_recursion_depth)
+        if context is not None or max_recursion_depth != 0:
             try:
-                return native().ruleset_render_inferred_with_context(
-                    self._handle, rule, validated_context
+                return native().ruleset_render_inferred_with_context_and_options(
+                    self._handle, rule, validated_context, max_recursion_depth
                 )
             except NativeError as error:
                 raise CopperlaceError(str(error)) from error
@@ -148,13 +164,18 @@ class RuleSet:
             raise CopperlaceError(str(error)) from error
 
     def render_structured(
-        self, rule: str, context: Mapping[str, str] | None = None
+        self,
+        rule: str,
+        context: Mapping[str, str] | None = None,
+        *,
+        max_recursion_depth: int = 0,
     ) -> str:
         """Render a named structured rule from this ruleset as formatted JSON text.
 
         Args:
             rule: Name of the structured rule to render.
             context: Optional initial render context values.
+            max_recursion_depth: Recursive re-entries allowed per rule.
 
         Returns:
             Formatted JSON text for the requested structured rule.
@@ -164,11 +185,12 @@ class RuleSet:
         """
 
         self._ensure_open()
-        if context is not None:
-            validated_context = _validate_context(context)
+        validated_context = _validate_context(context or {})
+        max_recursion_depth = _validate_max_recursion_depth(max_recursion_depth)
+        if context is not None or max_recursion_depth != 0:
             try:
-                return native().ruleset_render_structured_json_with_context(
-                    self._handle, rule, validated_context
+                return native().ruleset_render_structured_json_with_context_and_options(
+                    self._handle, rule, validated_context, True, max_recursion_depth
                 )
             except NativeError as error:
                 raise CopperlaceError(str(error)) from error
@@ -267,12 +289,19 @@ class Copperlace:
 
         return cls(RuleSet.from_file(path, processors))
 
-    def render(self, rule: str, context: Mapping[str, str] | None = None) -> str:
+    def render(
+        self,
+        rule: str,
+        context: Mapping[str, str] | None = None,
+        *,
+        max_recursion_depth: int = 0,
+    ) -> str:
         """Render a named rule from the loaded config.
 
         Args:
             rule: Name of the rule to render.
             context: Optional initial render context values.
+            max_recursion_depth: Recursive re-entries allowed per rule.
 
         Returns:
             Rendered text for the requested rule.
@@ -281,14 +310,23 @@ class Copperlace:
             CopperlaceError: If the renderer is closed or rendering fails.
         """
 
-        return self._ruleset.render(rule, context)
+        return self._ruleset.render(
+            rule, context, max_recursion_depth=max_recursion_depth
+        )
 
-    def render_inferred(self, rule: str, context: Mapping[str, str] | None = None) -> str:
+    def render_inferred(
+        self,
+        rule: str,
+        context: Mapping[str, str] | None = None,
+        *,
+        max_recursion_depth: int = 0,
+    ) -> str:
         """Render a rule as text, returning formatted JSON for object-valued rules.
 
         Args:
             rule: Name of the rule to render.
             context: Optional initial render context values.
+            max_recursion_depth: Recursive re-entries allowed per rule.
 
         Returns:
             Rendered text, or formatted JSON for an object-valued rule.
@@ -297,16 +335,23 @@ class Copperlace:
             CopperlaceError: If the renderer is closed or rendering fails.
         """
 
-        return self._ruleset.render_inferred(rule, context)
+        return self._ruleset.render_inferred(
+            rule, context, max_recursion_depth=max_recursion_depth
+        )
 
     def render_structured(
-        self, rule: str, context: Mapping[str, str] | None = None
+        self,
+        rule: str,
+        context: Mapping[str, str] | None = None,
+        *,
+        max_recursion_depth: int = 0,
     ) -> str:
         """Render a named structured rule from the loaded config as formatted JSON text.
 
         Args:
             rule: Name of the structured rule to render.
             context: Optional initial render context values.
+            max_recursion_depth: Recursive re-entries allowed per rule.
 
         Returns:
             Formatted JSON text for the requested structured rule.
@@ -315,7 +360,9 @@ class Copperlace:
             CopperlaceError: If the renderer is closed or rendering fails.
         """
 
-        return self._ruleset.render_structured(rule, context)
+        return self._ruleset.render_structured(
+            rule, context, max_recursion_depth=max_recursion_depth
+        )
 
     def close(self) -> None:
         """Release the underlying native ruleset handle."""
@@ -346,6 +393,7 @@ def render_str(
     rule: str,
     context: Mapping[str, str] | None = None,
     *,
+    max_recursion_depth: int = 0,
     processors: Mapping[str, Callable[[str], str]] | None = None,
 ) -> str:
     """Render one rule from a configuration string.
@@ -357,6 +405,7 @@ def render_str(
         config: configuration text containing Copperlace rules.
         rule: Name of the rule to render.
         context: Optional initial render context values.
+        max_recursion_depth: Recursive re-entries allowed per rule.
         processors: Optional custom processor callbacks.
 
     Returns:
@@ -367,7 +416,7 @@ def render_str(
     """
 
     with RuleSet.from_string(config, processors) as ruleset:
-        return ruleset.render(rule, context)
+        return ruleset.render(rule, context, max_recursion_depth=max_recursion_depth)
 
 
 def render_file(
@@ -375,6 +424,7 @@ def render_file(
     rule: str,
     context: Mapping[str, str] | None = None,
     *,
+    max_recursion_depth: int = 0,
     processors: Mapping[str, Callable[[str], str]] | None = None,
 ) -> str:
     """Render one rule from a configuration file.
@@ -386,6 +436,7 @@ def render_file(
         path: Path to the configuration file.
         rule: Name of the rule to render.
         context: Optional initial render context values.
+        max_recursion_depth: Recursive re-entries allowed per rule.
         processors: Optional custom processor callbacks.
 
     Returns:
@@ -396,7 +447,7 @@ def render_file(
     """
 
     with RuleSet.from_file(path, processors) as ruleset:
-        return ruleset.render(rule, context)
+        return ruleset.render(rule, context, max_recursion_depth=max_recursion_depth)
 
 
 def render_str_inferred(
@@ -404,12 +455,15 @@ def render_str_inferred(
     rule: str,
     context: Mapping[str, str] | None = None,
     *,
+    max_recursion_depth: int = 0,
     processors: Mapping[str, Callable[[str], str]] | None = None,
 ) -> str:
     """Render one rule from a configuration string, returning formatted JSON for object-valued rules."""
 
     with RuleSet.from_string(config, processors) as ruleset:
-        return ruleset.render_inferred(rule, context)
+        return ruleset.render_inferred(
+            rule, context, max_recursion_depth=max_recursion_depth
+        )
 
 
 def render_file_inferred(
@@ -417,12 +471,15 @@ def render_file_inferred(
     rule: str,
     context: Mapping[str, str] | None = None,
     *,
+    max_recursion_depth: int = 0,
     processors: Mapping[str, Callable[[str], str]] | None = None,
 ) -> str:
     """Render one rule from a configuration file, returning formatted JSON for object-valued rules."""
 
     with RuleSet.from_file(path, processors) as ruleset:
-        return ruleset.render_inferred(rule, context)
+        return ruleset.render_inferred(
+            rule, context, max_recursion_depth=max_recursion_depth
+        )
 
 
 def render_str_structured(
@@ -430,6 +487,7 @@ def render_str_structured(
     rule: str,
     context: Mapping[str, str] | None = None,
     *,
+    max_recursion_depth: int = 0,
     processors: Mapping[str, Callable[[str], str]] | None = None,
 ) -> str:
     """Render one structured rule from a configuration string as formatted JSON text.
@@ -441,6 +499,7 @@ def render_str_structured(
         config: configuration text containing Copperlace rules.
         rule: Name of the structured rule to render.
         context: Optional initial render context values.
+        max_recursion_depth: Recursive re-entries allowed per rule.
         processors: Optional custom processor callbacks.
 
     Returns:
@@ -451,7 +510,9 @@ def render_str_structured(
     """
 
     with RuleSet.from_string(config, processors) as ruleset:
-        return ruleset.render_structured(rule, context)
+        return ruleset.render_structured(
+            rule, context, max_recursion_depth=max_recursion_depth
+        )
 
 
 def render_file_structured(
@@ -459,6 +520,7 @@ def render_file_structured(
     rule: str,
     context: Mapping[str, str] | None = None,
     *,
+    max_recursion_depth: int = 0,
     processors: Mapping[str, Callable[[str], str]] | None = None,
 ) -> str:
     """Render one structured rule from a configuration file as formatted JSON text.
@@ -470,6 +532,7 @@ def render_file_structured(
         path: Path to the configuration file.
         rule: Name of the structured rule to render.
         context: Optional initial render context values.
+        max_recursion_depth: Recursive re-entries allowed per rule.
         processors: Optional custom processor callbacks.
 
     Returns:
@@ -480,7 +543,9 @@ def render_file_structured(
     """
 
     with RuleSet.from_file(path, processors) as ruleset:
-        return ruleset.render_structured(rule, context)
+        return ruleset.render_structured(
+            rule, context, max_recursion_depth=max_recursion_depth
+        )
 
 
 def _validate_context(context: Mapping[str, str]) -> dict[str, str]:
@@ -492,6 +557,14 @@ def _validate_context(context: Mapping[str, str]) -> dict[str, str]:
             raise TypeError("context values must be strings")
         validated[key] = value
     return validated
+
+
+def _validate_max_recursion_depth(max_recursion_depth: int) -> int:
+    if not isinstance(max_recursion_depth, int):
+        raise TypeError("max_recursion_depth must be an integer")
+    if max_recursion_depth < 0:
+        raise ValueError("max_recursion_depth must be non-negative")
+    return max_recursion_depth
 
 
 def _validate_processors(

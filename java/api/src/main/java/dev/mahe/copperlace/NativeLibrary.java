@@ -37,10 +37,13 @@ final class NativeLibrary {
     private final MethodHandle rulesetFromStringWithProcessors;
     private final MethodHandle rulesetRender;
     private final MethodHandle rulesetRenderWithContext;
+    private final MethodHandle rulesetRenderWithContextAndOptions;
     private final MethodHandle rulesetRenderInferred;
     private final MethodHandle rulesetRenderInferredWithContext;
+    private final MethodHandle rulesetRenderInferredWithContextAndOptions;
     private final MethodHandle rulesetRenderStructuredJson;
     private final MethodHandle rulesetRenderStructuredJsonWithContext;
+    private final MethodHandle rulesetRenderStructuredJsonWithContextAndOptions;
     private final MethodHandle rulesetFree;
     private final MethodHandle stringFree;
     private final MethodHandle processorResultSetOutput;
@@ -118,6 +121,20 @@ final class NativeLibrary {
                         ValueLayout.JAVA_LONG,
                         ValueLayout.ADDRESS,
                         ValueLayout.ADDRESS));
+        rulesetRenderWithContextAndOptions = downcall(
+                linker,
+                lookup,
+                "copperlace_ruleset_render_with_context_and_options",
+                FunctionDescriptor.of(
+                        ValueLayout.JAVA_INT,
+                        ValueLayout.ADDRESS,
+                        ValueLayout.ADDRESS,
+                        ValueLayout.ADDRESS,
+                        ValueLayout.ADDRESS,
+                        ValueLayout.JAVA_LONG,
+                        ValueLayout.JAVA_LONG,
+                        ValueLayout.ADDRESS,
+                        ValueLayout.ADDRESS));
         rulesetRenderInferred = downcall(
                 linker,
                 lookup,
@@ -138,6 +155,20 @@ final class NativeLibrary {
                         ValueLayout.ADDRESS,
                         ValueLayout.ADDRESS,
                         ValueLayout.ADDRESS,
+                        ValueLayout.JAVA_LONG,
+                        ValueLayout.ADDRESS,
+                        ValueLayout.ADDRESS));
+        rulesetRenderInferredWithContextAndOptions = downcall(
+                linker,
+                lookup,
+                "copperlace_ruleset_render_inferred_with_context_and_options",
+                FunctionDescriptor.of(
+                        ValueLayout.JAVA_INT,
+                        ValueLayout.ADDRESS,
+                        ValueLayout.ADDRESS,
+                        ValueLayout.ADDRESS,
+                        ValueLayout.ADDRESS,
+                        ValueLayout.JAVA_LONG,
                         ValueLayout.JAVA_LONG,
                         ValueLayout.ADDRESS,
                         ValueLayout.ADDRESS));
@@ -164,6 +195,21 @@ final class NativeLibrary {
                         ValueLayout.ADDRESS,
                         ValueLayout.JAVA_LONG,
                         ValueLayout.JAVA_BOOLEAN,
+                        ValueLayout.ADDRESS,
+                        ValueLayout.ADDRESS));
+        rulesetRenderStructuredJsonWithContextAndOptions = downcall(
+                linker,
+                lookup,
+                "copperlace_ruleset_render_structured_json_with_context_and_options",
+                FunctionDescriptor.of(
+                        ValueLayout.JAVA_INT,
+                        ValueLayout.ADDRESS,
+                        ValueLayout.ADDRESS,
+                        ValueLayout.ADDRESS,
+                        ValueLayout.ADDRESS,
+                        ValueLayout.JAVA_LONG,
+                        ValueLayout.JAVA_BOOLEAN,
+                        ValueLayout.JAVA_LONG,
                         ValueLayout.ADDRESS,
                         ValueLayout.ADDRESS));
         rulesetFree = downcall(
@@ -237,9 +283,18 @@ final class NativeLibrary {
     }
 
     String renderWithContext(final MemorySegment handle, final String rule, final Map<String, String> context) {
+        return renderWithContext(handle, rule, context, 0);
+    }
+
+    String renderWithContext(
+            final MemorySegment handle,
+            final String rule,
+            final Map<String, String> context,
+            final int maxRecursionDepth) {
         Validate.isTrue(!isNull(handle), "handle must not be null");
         Validate.notBlank(rule, "rule must not be blank");
         Objects.requireNonNull(context, "context");
+        Validate.isTrue(maxRecursionDepth >= 0, "maxRecursionDepth must be non-negative");
 
         try (Arena arena = Arena.ofConfined()) {
             final MemorySegment outString = arena.allocate(ValueLayout.ADDRESS);
@@ -263,12 +318,13 @@ final class NativeLibrary {
                 index++;
             }
 
-            final int status = (int) rulesetRenderWithContext.invokeExact(
+            final int status = (int) rulesetRenderWithContextAndOptions.invokeExact(
                     handle,
                     ruleString,
                     contextKeys,
                     contextValues,
                     contextLength,
+                    (long) maxRecursionDepth,
                     outString,
                     outError);
             checkStatus(status, outError);
@@ -339,9 +395,18 @@ final class NativeLibrary {
 
     String renderInferredWithContext(
             final MemorySegment handle, final String rule, final Map<String, String> context) {
+        return renderInferredWithContext(handle, rule, context, 0);
+    }
+
+    String renderInferredWithContext(
+            final MemorySegment handle,
+            final String rule,
+            final Map<String, String> context,
+            final int maxRecursionDepth) {
         Validate.isTrue(!isNull(handle), "handle must not be null");
         Validate.notBlank(rule, "rule must not be blank");
         Objects.requireNonNull(context, "context");
+        Validate.isTrue(maxRecursionDepth >= 0, "maxRecursionDepth must be non-negative");
 
         try (Arena arena = Arena.ofConfined()) {
             final MemorySegment outString = arena.allocate(ValueLayout.ADDRESS);
@@ -365,12 +430,13 @@ final class NativeLibrary {
                 index++;
             }
 
-            final int status = (int) rulesetRenderInferredWithContext.invokeExact(
+            final int status = (int) rulesetRenderInferredWithContextAndOptions.invokeExact(
                     handle,
                     ruleString,
                     contextKeys,
                     contextValues,
                     contextLength,
+                    (long) maxRecursionDepth,
                     outString,
                     outError);
             checkStatus(status, outError);
@@ -393,9 +459,19 @@ final class NativeLibrary {
             final String rule,
             final Map<String, String> context,
             final boolean formatJson) {
+        return renderStructuredJsonWithContext(handle, rule, context, formatJson, 0);
+    }
+
+    String renderStructuredJsonWithContext(
+            final MemorySegment handle,
+            final String rule,
+            final Map<String, String> context,
+            final boolean formatJson,
+            final int maxRecursionDepth) {
         Validate.isTrue(!isNull(handle), "handle must not be null");
         Validate.notBlank(rule, "rule must not be blank");
         Objects.requireNonNull(context, "context");
+        Validate.isTrue(maxRecursionDepth >= 0, "maxRecursionDepth must be non-negative");
 
         try (Arena arena = Arena.ofConfined()) {
             final MemorySegment outJson = arena.allocate(ValueLayout.ADDRESS);
@@ -419,13 +495,14 @@ final class NativeLibrary {
                 index++;
             }
 
-            final int status = (int) rulesetRenderStructuredJsonWithContext.invokeExact(
+            final int status = (int) rulesetRenderStructuredJsonWithContextAndOptions.invokeExact(
                     handle,
                     ruleString,
                     contextKeys,
                     contextValues,
                     contextLength,
                     formatJson,
+                    (long) maxRecursionDepth,
                     outJson,
                     outError);
             checkStatus(status, outError);

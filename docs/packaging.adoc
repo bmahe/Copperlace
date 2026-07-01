@@ -72,6 +72,7 @@ The CLI supports:
 ----
 copperlace render --config <path>
 copperlace render -c <path> -r <name> --count <n> --set name=Mia
+copperlace render -c <path> -r <name> --max-recursion-depth <n>
 copperlace render -c <path> -r <object-rule> --compact-json
 ----
 
@@ -79,6 +80,10 @@ CLI rendering uses the builtin processor registry. If `--rule` is omitted, the
 CLI renders `origin`. `--count` renders multiple outputs from one loaded config.
 `--set key=value` provides initial context values for each render and may be
 repeated; duplicate keys use the last value.
+`--max-recursion-depth <n>` opts in to limited recursive rule expansion. The
+default `0` keeps recursive references as errors; values greater than zero cut
+off recursive calls with an empty string after the configured number of
+recursive re-entries.
 
 The CLI infers output mode from the selected rule shape. String-valued and
 list-valued rules render as text. Object-valued rules render as structured JSON,
@@ -95,8 +100,13 @@ The native dynamic library exposes an opaque ruleset handle API:
 * `copperlace_ruleset_from_string_with_processors`
 * `copperlace_ruleset_render`
 * `copperlace_ruleset_render_with_context`
+* `copperlace_ruleset_render_with_context_and_options`
+* `copperlace_ruleset_render_inferred`
+* `copperlace_ruleset_render_inferred_with_context`
+* `copperlace_ruleset_render_inferred_with_context_and_options`
 * `copperlace_ruleset_render_structured_json`
 * `copperlace_ruleset_render_structured_json_with_context`
+* `copperlace_ruleset_render_structured_json_with_context_and_options`
 * `copperlace_processor_result_set_output`
 * `copperlace_processor_result_set_error`
 * `copperlace_ruleset_free`
@@ -114,20 +124,20 @@ points are:
 
 * `Copperlace.from_string(config, processors=None)`
 * `Copperlace.from_file(path, processors=None)`
-* `Copperlace.render(rule, context=None)`
-* `Copperlace.render_inferred(rule, context=None)`
-* `Copperlace.render_structured(rule, context=None)`
+* `Copperlace.render(rule, context=None, max_recursion_depth=0)`
+* `Copperlace.render_inferred(rule, context=None, max_recursion_depth=0)`
+* `Copperlace.render_structured(rule, context=None, max_recursion_depth=0)`
 * `RuleSet.from_string(config, processors=None)`
 * `RuleSet.from_file(path, processors=None)`
-* `RuleSet.render(rule, context=None)`
-* `RuleSet.render_inferred(rule, context=None)`
-* `RuleSet.render_structured(rule, context=None)`
-* `render_str(config, rule, context=None, processors=None)`
-* `render_file(path, rule, context=None, processors=None)`
-* `render_str_inferred(config, rule, context=None, processors=None)`
-* `render_file_inferred(path, rule, context=None, processors=None)`
-* `render_str_structured(config, rule, context=None, processors=None)`
-* `render_file_structured(path, rule, context=None, processors=None)`
+* `RuleSet.render(rule, context=None, max_recursion_depth=0)`
+* `RuleSet.render_inferred(rule, context=None, max_recursion_depth=0)`
+* `RuleSet.render_structured(rule, context=None, max_recursion_depth=0)`
+* `render_str(config, rule, context=None, max_recursion_depth=0, processors=None)`
+* `render_file(path, rule, context=None, max_recursion_depth=0, processors=None)`
+* `render_str_inferred(config, rule, context=None, max_recursion_depth=0, processors=None)`
+* `render_file_inferred(path, rule, context=None, max_recursion_depth=0, processors=None)`
+* `render_str_structured(config, rule, context=None, max_recursion_depth=0, processors=None)`
+* `render_file_structured(path, rule, context=None, max_recursion_depth=0, processors=None)`
 
 `Copperlace` is the recommended load-once API for repeated renders. `Copperlace`
 and `RuleSet` are context managers and release the native handle when closed.
@@ -162,11 +172,16 @@ Public entry points are:
 * `new Copperlace(config)`
 * `Copperlace.withProcessors(config, processors)`
 * `Copperlace.render(rule)`
+* `Copperlace.renderWithOptions(rule, maxRecursionDepth)`
 * `Copperlace.renderWithContext(rule, context)`
+* `Copperlace.renderWithContextAndOptions(rule, context, maxRecursionDepth)`
 * `renderString(config, rule)`
+* `renderStringWithOptions(config, rule, maxRecursionDepth)`
 * `renderStringWithContext(config, rule, context)`
+* `renderStringWithContextAndOptions(config, rule, context, maxRecursionDepth)`
 * `renderStringWithProcessors(config, rule, processors)`
 * `renderStringWithProcessorsAndContext(config, rule, processors, context)`
+* `renderStringWithProcessorsContextAndOptions(config, rule, processors, context, maxRecursionDepth)`
 
 `Copperlace` is the recommended load-once API for repeated renders in browser
 apps. Browser callers should load rule text themselves, usually with `fetch`,
@@ -235,19 +250,28 @@ Public entry points are:
 * `Copperlace.fromFile(path)`
 * `Copperlace.fromFileWithProcessors(path, processors)`
 * `Copperlace.render(rule)`
+* `Copperlace.render(rule, maxRecursionDepth)`
 * `Copperlace.render(rule, context)`
+* `Copperlace.render(rule, context, maxRecursionDepth)`
 * `Copperlace.renderInferred(rule)`
+* `Copperlace.renderInferred(rule, maxRecursionDepth)`
 * `Copperlace.renderInferred(rule, context)`
+* `Copperlace.renderInferred(rule, context, maxRecursionDepth)`
 * `Copperlace.renderStructuredJson(rule)`
 * `Copperlace.renderStructuredJson(rule, formatJson)`
+* `Copperlace.renderStructuredJson(rule, formatJson, maxRecursionDepth)`
 * `Copperlace.renderStructuredJson(rule, context)`
 * `Copperlace.renderStructuredJson(rule, context, formatJson)`
+* `Copperlace.renderStructuredJson(rule, context, formatJson, maxRecursionDepth)`
 * `Copperlace.renderString(config, rule)`
+* `Copperlace.renderString(config, rule, maxRecursionDepth)`
 * `Copperlace.renderString(config, rule, context)`
 * `Copperlace.renderStringInferred(config, rule)`
+* `Copperlace.renderStringInferred(config, rule, maxRecursionDepth)`
 * `Copperlace.renderStringInferred(config, rule, context)`
 * `Copperlace.renderStringStructuredJson(config, rule)`
 * `Copperlace.renderStringStructuredJson(config, rule, formatJson)`
+* `Copperlace.renderStringStructuredJson(config, rule, formatJson, maxRecursionDepth)`
 * `Copperlace.renderStringStructuredJson(config, rule, context)`
 * `Copperlace.renderStringStructuredJson(config, rule, context, formatJson)`
 * `Copperlace.renderStringWithProcessors(config, rule, processors)`
@@ -267,13 +291,19 @@ Public entry points are:
 * `RuleSet.fromFile(path)`
 * `RuleSet.fromFileWithProcessors(path, processors)`
 * `RuleSet.render(rule)`
+* `RuleSet.render(rule, maxRecursionDepth)`
 * `RuleSet.render(rule, context)`
+* `RuleSet.render(rule, context, maxRecursionDepth)`
 * `RuleSet.renderInferred(rule)`
+* `RuleSet.renderInferred(rule, maxRecursionDepth)`
 * `RuleSet.renderInferred(rule, context)`
+* `RuleSet.renderInferred(rule, context, maxRecursionDepth)`
 * `RuleSet.renderStructuredJson(rule)`
 * `RuleSet.renderStructuredJson(rule, formatJson)`
+* `RuleSet.renderStructuredJson(rule, formatJson, maxRecursionDepth)`
 * `RuleSet.renderStructuredJson(rule, context)`
 * `RuleSet.renderStructuredJson(rule, context, formatJson)`
+* `RuleSet.renderStructuredJson(rule, context, formatJson, maxRecursionDepth)`
 
 `Copperlace` is the recommended load-once API for repeated renders. `Copperlace`
 and `RuleSet` implement `AutoCloseable`; callers should use try-with-resources

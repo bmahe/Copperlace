@@ -18,6 +18,10 @@ Starts a fresh render for `rule_name` using the previously loaded config.
 `Copperlace::render_with_context(&self, rule_name, context)`::
 Starts a fresh render with initial context values.
 
+`Copperlace::*_with_options` / `Copperlace::*_with_context_and_options`::
+Start the corresponding text, inferred, or structured render with render
+options such as `max_recursion_depth`.
+
 `Copperlace::render_inferred(&self, rule_name)`::
 Starts a fresh render and returns text for string-valued or list-valued rules,
 or formatted JSON for object-valued rules.
@@ -42,6 +46,10 @@ new thread-local random number generator.
 
 `RuleSet::render_rule_with_context(&self, rule_name, context)`::
 Starts a fresh render with initial context values.
+
+`RuleSet::*_with_options` / `RuleSet::*_with_context_and_options`::
+Start the corresponding text, inferred, or structured render with render
+options such as `max_recursion_depth`.
 
 `RuleSet::render_rule_inferred(&self, rule_name)`::
 Starts a fresh render and returns text for string-valued or list-valued rules,
@@ -92,6 +100,7 @@ The package builds a `copperlace` binary:
 copperlace render --config <path>
 copperlace render --config -
 copperlace render -c <path> -r <name> --count <n> --set name=Mia
+copperlace render -c <path> -r <name> --max-recursion-depth <n>
 copperlace render -c <path> -r <object-rule> --compact-json
 copperlace check --config -
 ----
@@ -105,6 +114,8 @@ For render commands, the CLI infers text versus structured JSON output from the
 selected rule shape. Object-valued rules render as formatted JSON with tab
 indentation by default. `--compact-json` selects compact JSON and is valid only
 for object-valued structured rules.
+`--max-recursion-depth <n>` enables limited recursive rule expansion for the
+render. The default `0` keeps recursive references as errors.
 
 == C ABI
 
@@ -116,10 +127,13 @@ The dynamic library exposes an opaque ruleset handle API:
 * `copperlace_ruleset_from_string_with_processors`
 * `copperlace_ruleset_render`
 * `copperlace_ruleset_render_with_context`
+* `copperlace_ruleset_render_with_context_and_options`
 * `copperlace_ruleset_render_inferred`
 * `copperlace_ruleset_render_inferred_with_context`
+* `copperlace_ruleset_render_inferred_with_context_and_options`
 * `copperlace_ruleset_render_structured_json`
 * `copperlace_ruleset_render_structured_json_with_context`
+* `copperlace_ruleset_render_structured_json_with_context_and_options`
 * `copperlace_processor_result_set_output`
 * `copperlace_processor_result_set_error`
 * `copperlace_ruleset_free`
@@ -178,7 +192,10 @@ malformed, has a missing or invalid weight, or has no positive-weight entries.
 
 `CircularRuleReference(Vec<String>)`::
 Returned when rule expansion re-enters a rule already on the call stack. The
-vector contains the detected path, including the repeated final rule name.
+vector contains the detected path, including the repeated final rule name. This
+is the default behavior when `max_recursion_depth` is `0`; when limited
+recursion is enabled, recursive calls that exceed the configured limit return
+an empty string instead.
 
 `UnsupportedValue(String)`::
 Returned when rendering a value type that compiled to an unsupported node. The

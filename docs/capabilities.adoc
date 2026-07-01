@@ -198,10 +198,14 @@ one render call.
 
 Copperlace tracks the rule call stack during a render. If a rule attempts to
 render a rule already on the stack, rendering fails with
-`CircularRuleReference`.
+`CircularRuleReference` by default.
 
 [source]
 ----
 a = "{b}"
 b = "{a}"
 ----
+
+Callers can opt in to limited recursion with `max_recursion_depth`, or CLI
+`--max-recursion-depth <n>`. Recursive calls beyond the configured per-rule
+limit return an empty string.

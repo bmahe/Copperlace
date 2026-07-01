@@ -2,7 +2,9 @@ use std::env;
 use std::io::{self, Read};
 use std::process;
 
-use copperlace::{RenderContext, RuleSet, StructuredNode, ruleset_from_file, ruleset_from_str};
+use copperlace::{
+    RenderContext, RenderOptions, RuleSet, StructuredNode, ruleset_from_file, ruleset_from_str,
+};
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -51,6 +53,7 @@ fn render(args: &[String], start_index: usize) -> Result<Option<String>, String>
     let mut context = RenderContext::new();
     let mut count = 1usize;
     let mut compact_json = false;
+    let mut max_recursion_depth = 0usize;
     let mut index = start_index;
 
     while index < args.len() {
@@ -77,6 +80,11 @@ fn render(args: &[String], start_index: usize) -> Result<Option<String>, String>
             "--compact-json" => {
                 compact_json = true;
             }
+            "--max-recursion-depth" => {
+                index += 1;
+                let value = required_raw_value(args, index, "--max-recursion-depth", render_help)?;
+                max_recursion_depth = parse_max_recursion_depth(&value)?;
+            }
             "--help" | "-h" => return Ok(Some(render_help())),
             "--version" | "-V" => {
                 return Ok(Some(format!("copperlace {}\n", env!("CARGO_PKG_VERSION"))));
@@ -98,6 +106,9 @@ fn render(args: &[String], start_index: usize) -> Result<Option<String>, String>
         ));
     }
 
+    let options = RenderOptions {
+        max_recursion_depth,
+    };
     let mut output = String::new();
     for render_index in 0..count {
         if render_index > 0 {
@@ -106,12 +117,16 @@ fn render(args: &[String], start_index: usize) -> Result<Option<String>, String>
         match render_mode {
             RenderMode::Text => output.push_str(
                 &ruleset
-                    .render_rule_with_context(&rule, context.clone())
+                    .render_rule_with_context_and_options(&rule, context.clone(), options)
                     .map_err(|error| error.to_string())?,
             ),
             RenderMode::StructuredJson => {
                 let value = ruleset
-                    .render_rule_structured_with_context(&rule, context.clone())
+                    .render_rule_structured_with_context_and_options(
+                        &rule,
+                        context.clone(),
+                        options,
+                    )
                     .map_err(|error| error.to_string())?;
                 let json = if compact_json {
                     value.to_compact_json()
@@ -267,6 +282,17 @@ fn required_config_value(
     Ok(value.clone())
 }
 
+fn required_raw_value(
+    args: &[String],
+    index: usize,
+    flag: &str,
+    help: fn() -> String,
+) -> Result<String, String> {
+    args.get(index)
+        .cloned()
+        .ok_or_else(|| format!("missing value for {flag}\n\n{}", help()))
+}
+
 fn parse_count(value: &str) -> Result<usize, String> {
     let count = value
         .parse::<usize>()
@@ -275,6 +301,12 @@ fn parse_count(value: &str) -> Result<usize, String> {
         return Err("--count must be greater than zero".to_string());
     }
     Ok(count)
+}
+
+fn parse_max_recursion_depth(value: &str) -> Result<usize, String> {
+    value
+        .parse::<usize>()
+        .map_err(|_| format!("--max-recursion-depth must be a non-negative integer: {value}"))
 }
 
 fn parse_context_binding(value: &str) -> Result<(String, String), String> {
@@ -297,7 +329,7 @@ fn help() -> String {
 
 fn top_level_help() -> String {
     "Usage:
-  copperlace [render] --config <path> [--rule <name>] [--count <n>] [--set <key=value>...]
+  copperlace [render] --config <path> [--rule <name>] [--count <n>] [--set <key=value>...] [--max-recursion-depth <n>]
   copperlace check --config <path>
   copperlace check --config -
   copperlace check --string <config>
@@ -315,8 +347,8 @@ Run `copperlace render --help` or `copperlace check --help` for command options.
 
 fn render_help() -> String {
     "Usage:
-  copperlace [render] --config <path> [--rule <name>] [--count <n>] [--set <key=value>...]
-  copperlace [render] -c <path> [-r <name>] [-n <n>] [--set <key=value>...]
+  copperlace [render] --config <path> [--rule <name>] [--count <n>] [--set <key=value>...] [--max-recursion-depth <n>]
+  copperlace [render] -c <path> [-r <name>] [-n <n>] [--set <key=value>...] [--max-recursion-depth <n>]
   copperlace --help
   copperlace --version
 
@@ -330,6 +362,8 @@ Render options:
   -n, --count <n>        Number of outputs to render from one loaded config
       --set <key=value>  Initial render context value; may be repeated
       --compact-json     Render object-valued structured rules as compact JSON
+      --max-recursion-depth <n>
+                          Recursive re-entries allowed per rule (default: 0)
   -h, --help             Show render help
   -V, --version          Show version"
         .to_string()

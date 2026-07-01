@@ -190,6 +190,38 @@ class CopperlaceTests(unittest.TestCase):
         with self.assertRaisesRegex(CopperlaceError, "unknown rule"):
             render_str('origin = "{missing}"', "origin")
 
+    def test_default_recursion_raises_error(self) -> None:
+        with self.assertRaisesRegex(CopperlaceError, "circular rule reference"):
+            render_str('origin = "x{origin}"', "origin")
+
+    def test_limited_recursion_returns_empty_at_cutoff(self) -> None:
+        self.assertEqual(
+            render_str('origin = "x{origin}"', "origin", max_recursion_depth=1),
+            "xx",
+        )
+
+    def test_limited_recursion_applies_to_inferred_and_structured(self) -> None:
+        self.assertEqual(
+            render_str_inferred(
+                'origin { value = "{part}" }\npart = "x{part}"',
+                "origin",
+                max_recursion_depth=1,
+            ),
+            '{\n\t"value": "xx"\n}',
+        )
+        self.assertEqual(
+            render_str_structured(
+                'origin { value = "{part}" }\npart = "x{part}"',
+                "origin",
+                max_recursion_depth=1,
+            ),
+            '{\n\t"value": "xx"\n}',
+        )
+
+    def test_limited_recursion_rejects_negative_depth(self) -> None:
+        with self.assertRaisesRegex(ValueError, "non-negative"):
+            render_str('origin = "x"', "origin", max_recursion_depth=-1)
+
     def test_structured_render_error_raises_copperlace_error(self) -> None:
         with self.assertRaisesRegex(CopperlaceError, "unknown rule"):
             render_str_structured('origin { value = "{missing}" }', "origin")

@@ -20,6 +20,17 @@ with Copperlace.from_string(
     print(copperlace.render("origin"))
 ```
 
+Recursive rule references are errors by default. Pass `max_recursion_depth` to
+allow limited recursive expansion; recursive calls beyond the limit return an
+empty string:
+
+```python
+from copperlace import render_str
+
+print(render_str('origin = "x{origin}"', "origin", max_recursion_depth=1))
+# xx
+```
+
 Structured rendering returns JSON strings for object-valued rules:
 
 ```python

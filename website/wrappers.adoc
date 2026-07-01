@@ -10,6 +10,9 @@ The Rust crate provides the renderer, C ABI, and CLI. Use `Copperlace` or
 `RuleSet` when rendering repeatedly from one config, and the one-shot helper
 functions for short scripts or tests.
 
+All surfaces preserve circular-reference errors by default and expose
+render-time `max_recursion_depth` options for limited recursive rule expansion.
+
 * link:api/rust/index.html[Rust API docs]
 * link:docs/packaging.html#_rust_artifacts[Rust artifacts and CLI packaging]
 

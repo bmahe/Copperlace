@@ -116,6 +116,15 @@ class NativeLibrary:
     def ruleset_render_with_context(
         self, handle: ctypes.c_void_p, rule: str, context: Mapping[str, str]
     ) -> str:
+        return self.ruleset_render_with_context_and_options(handle, rule, context, 0)
+
+    def ruleset_render_with_context_and_options(
+        self,
+        handle: ctypes.c_void_p,
+        rule: str,
+        context: Mapping[str, str],
+        max_recursion_depth: int,
+    ) -> str:
         encoded_keys = [key.encode("utf-8") for key in context.keys()]
         encoded_values = [value.encode("utf-8") for value in context.values()]
         keys = (ctypes.c_char_p * len(encoded_keys))(*encoded_keys)
@@ -123,12 +132,13 @@ class NativeLibrary:
 
         output = ctypes.c_void_p()
         error = ctypes.c_void_p()
-        status = self._library.copperlace_ruleset_render_with_context(
+        status = self._library.copperlace_ruleset_render_with_context_and_options(
             handle,
             rule.encode("utf-8"),
             keys,
             values,
             ctypes.c_size_t(len(encoded_keys)),
+            ctypes.c_size_t(max_recursion_depth),
             ctypes.byref(output),
             ctypes.byref(error),
         )
@@ -156,6 +166,17 @@ class NativeLibrary:
     def ruleset_render_inferred_with_context(
         self, handle: ctypes.c_void_p, rule: str, context: Mapping[str, str]
     ) -> str:
+        return self.ruleset_render_inferred_with_context_and_options(
+            handle, rule, context, 0
+        )
+
+    def ruleset_render_inferred_with_context_and_options(
+        self,
+        handle: ctypes.c_void_p,
+        rule: str,
+        context: Mapping[str, str],
+        max_recursion_depth: int,
+    ) -> str:
         encoded_keys = [key.encode("utf-8") for key in context.keys()]
         encoded_values = [value.encode("utf-8") for value in context.values()]
         keys = (ctypes.c_char_p * len(encoded_keys))(*encoded_keys)
@@ -163,12 +184,13 @@ class NativeLibrary:
 
         output = ctypes.c_void_p()
         error = ctypes.c_void_p()
-        status = self._library.copperlace_ruleset_render_inferred_with_context(
+        status = self._library.copperlace_ruleset_render_inferred_with_context_and_options(
             handle,
             rule.encode("utf-8"),
             keys,
             values,
             ctypes.c_size_t(len(encoded_keys)),
+            ctypes.c_size_t(max_recursion_depth),
             ctypes.byref(output),
             ctypes.byref(error),
         )
@@ -203,6 +225,18 @@ class NativeLibrary:
         context: Mapping[str, str],
         format_json: bool = True,
     ) -> str:
+        return self.ruleset_render_structured_json_with_context_and_options(
+            handle, rule, context, format_json, 0
+        )
+
+    def ruleset_render_structured_json_with_context_and_options(
+        self,
+        handle: ctypes.c_void_p,
+        rule: str,
+        context: Mapping[str, str],
+        format_json: bool,
+        max_recursion_depth: int,
+    ) -> str:
         encoded_keys = [key.encode("utf-8") for key in context.keys()]
         encoded_values = [value.encode("utf-8") for value in context.values()]
         keys = (ctypes.c_char_p * len(encoded_keys))(*encoded_keys)
@@ -210,13 +244,14 @@ class NativeLibrary:
 
         output = ctypes.c_void_p()
         error = ctypes.c_void_p()
-        status = self._library.copperlace_ruleset_render_structured_json_with_context(
+        status = self._library.copperlace_ruleset_render_structured_json_with_context_and_options(
             handle,
             rule.encode("utf-8"),
             keys,
             values,
             ctypes.c_size_t(len(encoded_keys)),
             ctypes.c_bool(format_json),
+            ctypes.c_size_t(max_recursion_depth),
             ctypes.byref(output),
             ctypes.byref(error),
         )
@@ -302,6 +337,20 @@ class NativeLibrary:
         ]
         self._library.copperlace_ruleset_render_with_context.restype = ctypes.c_int
 
+        self._library.copperlace_ruleset_render_with_context_and_options.argtypes = [
+            ctypes.c_void_p,
+            ctypes.c_char_p,
+            ctypes.POINTER(ctypes.c_char_p),
+            ctypes.POINTER(ctypes.c_char_p),
+            ctypes.c_size_t,
+            ctypes.c_size_t,
+            ctypes.POINTER(ctypes.c_void_p),
+            ctypes.POINTER(ctypes.c_void_p),
+        ]
+        self._library.copperlace_ruleset_render_with_context_and_options.restype = (
+            ctypes.c_int
+        )
+
         self._library.copperlace_ruleset_render_inferred.argtypes = [
             ctypes.c_void_p,
             ctypes.c_char_p,
@@ -320,6 +369,20 @@ class NativeLibrary:
             ctypes.POINTER(ctypes.c_void_p),
         ]
         self._library.copperlace_ruleset_render_inferred_with_context.restype = ctypes.c_int
+
+        self._library.copperlace_ruleset_render_inferred_with_context_and_options.argtypes = [
+            ctypes.c_void_p,
+            ctypes.c_char_p,
+            ctypes.POINTER(ctypes.c_char_p),
+            ctypes.POINTER(ctypes.c_char_p),
+            ctypes.c_size_t,
+            ctypes.c_size_t,
+            ctypes.POINTER(ctypes.c_void_p),
+            ctypes.POINTER(ctypes.c_void_p),
+        ]
+        self._library.copperlace_ruleset_render_inferred_with_context_and_options.restype = (
+            ctypes.c_int
+        )
 
         self._library.copperlace_ruleset_render_structured_json.argtypes = [
             ctypes.c_void_p,
@@ -341,6 +404,21 @@ class NativeLibrary:
             ctypes.POINTER(ctypes.c_void_p),
         ]
         self._library.copperlace_ruleset_render_structured_json_with_context.restype = (
+            ctypes.c_int
+        )
+
+        self._library.copperlace_ruleset_render_structured_json_with_context_and_options.argtypes = [
+            ctypes.c_void_p,
+            ctypes.c_char_p,
+            ctypes.POINTER(ctypes.c_char_p),
+            ctypes.POINTER(ctypes.c_char_p),
+            ctypes.c_size_t,
+            ctypes.c_bool,
+            ctypes.c_size_t,
+            ctypes.POINTER(ctypes.c_void_p),
+            ctypes.POINTER(ctypes.c_void_p),
+        ]
+        self._library.copperlace_ruleset_render_structured_json_with_context_and_options.restype = (
             ctypes.c_int
         )
 

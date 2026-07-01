@@ -97,6 +97,30 @@ Supported expressions:
 * `{rule | processor}` renders `rule` and passes the result through one or more
   processors from left to right.
 
+== Limited Recursion
+
+Recursive rule references are disabled by default. If rule expansion re-enters
+a rule already on the current call stack, rendering fails with
+`CircularRuleReference`.
+
+Callers may opt in to limited recursion with the render-time
+`max_recursion_depth` option, or CLI `--max-recursion-depth <n>`. A value of
+`0` keeps recursion disabled. Values greater than zero allow that many
+recursive re-entries for each rule name. When another recursive call would
+exceed the limit, that call returns an empty string.
+
+[source]
+----
+origin = "x{origin}"
+----
+
+Rendering `origin` with `max_recursion_depth = 1` produces `xx`: the first
+recursive re-entry is rendered, and the next recursive call is cut off.
+
+The limit applies to named rules and lazy `context` defaults. Initial context
+values and values bound earlier in the render still resolve before rules and do
+not consume recursion depth.
+
 Supported statements:
 
 * `{% alias:rule %}` binds the rendered `rule` value to `alias` if `alias` is not

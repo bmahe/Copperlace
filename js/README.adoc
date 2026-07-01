@@ -101,8 +101,15 @@ names override builtin names.
 `Copperlace.render(rule: string): string`::
 Renders a named text rule. Each call uses a fresh render context.
 
+`Copperlace.renderWithOptions(rule: string, maxRecursionDepth: number): string`::
+Renders a named text rule with limited recursive rule expansion enabled.
+
 `Copperlace.renderWithContext(rule: string, context: Record<string, string>): string`::
 Renders a named text rule with initial context values for this render only.
+
+`Copperlace.renderWithContextAndOptions(rule: string, context: Record<string, string>, maxRecursionDepth: number): string`::
+Renders a named text rule with initial context values and limited recursive
+rule expansion enabled.
 
 `Copperlace.renderInferred(rule: string): string`::
 Renders a named rule, inferring the output mode. Text rules return text, and
@@ -115,9 +122,17 @@ structured JSON output for this render only.
 `renderString(config: string, rule: string): string`::
 Compiles config, renders one text rule, and releases the compiled ruleset.
 
+`renderStringWithOptions(config: string, rule: string, maxRecursionDepth: number): string`::
+Compiles config, renders one text rule with limited recursive rule expansion,
+and releases the compiled ruleset.
+
 `renderStringWithContext(config: string, rule: string, context: Record<string, string>): string`::
 Compiles config, renders one text rule with initial context values, and releases
 the compiled ruleset.
+
+`renderStringWithContextAndOptions(config: string, rule: string, context: Record<string, string>, maxRecursionDepth: number): string`::
+Compiles config, renders one text rule with initial context values and limited
+recursive rule expansion, and releases the compiled ruleset.
 
 `renderStringInferred(config: string, rule: string): string`::
 Compiles config, renders one rule with inferred text or formatted structured
@@ -134,6 +149,11 @@ the compiled ruleset.
 `renderStringWithProcessorsAndContext(config: string, rule: string, processors: Record<string, (value: string) => string>, context: Record<string, string>): string`::
 Compiles config with custom processor functions, renders one rule with initial
 context values, and releases the compiled ruleset.
+
+`renderStringWithProcessorsContextAndOptions(config: string, rule: string, processors: Record<string, (value: string) => string>, context: Record<string, string>, maxRecursionDepth: number): string`::
+Compiles config with custom processor functions, renders one rule with initial
+context values and limited recursive rule expansion, and releases the compiled
+ruleset.
 
 Parsing and rendering failures are thrown as JavaScript exceptions with the
 same messages returned by the Rust renderer.

@@ -2,7 +2,7 @@ use std::fmt;
 use std::path::Path;
 use std::str::FromStr;
 
-use crate::render::{CopperlaceValue, RenderContext, RenderError, RuleSet};
+use crate::render::{CopperlaceValue, RenderContext, RenderError, RenderOptions, RuleSet};
 
 /// Error returned while loading, parsing, compiling, or rendering configuration.
 #[derive(Debug, PartialEq, Eq)]
@@ -71,6 +71,15 @@ impl Copperlace {
         self.ruleset.render_rule(rule_name)
     }
 
+    /// Renders a named rule from the compiled config with render options.
+    pub fn render_with_options(
+        &self,
+        rule_name: &str,
+        options: RenderOptions,
+    ) -> Result<String, RenderError> {
+        self.ruleset.render_rule_with_options(rule_name, options)
+    }
+
     /// Renders a named rule from the compiled config with initial context.
     ///
     /// Initial context values are scoped to this render call. They resolve
@@ -83,9 +92,30 @@ impl Copperlace {
         self.ruleset.render_rule_with_context(rule_name, context)
     }
 
+    /// Renders a named rule from the compiled config with initial context and render options.
+    pub fn render_with_context_and_options(
+        &self,
+        rule_name: &str,
+        context: RenderContext,
+        options: RenderOptions,
+    ) -> Result<String, RenderError> {
+        self.ruleset
+            .render_rule_with_context_and_options(rule_name, context, options)
+    }
+
     /// Renders a rule as text, inferring formatted structured JSON for object-valued rules.
     pub fn render_inferred(&self, rule_name: &str) -> Result<String, RenderError> {
         self.ruleset.render_rule_inferred(rule_name)
+    }
+
+    /// Renders a rule with render options, inferring formatted structured JSON for object-valued rules.
+    pub fn render_inferred_with_options(
+        &self,
+        rule_name: &str,
+        options: RenderOptions,
+    ) -> Result<String, RenderError> {
+        self.ruleset
+            .render_rule_inferred_with_options(rule_name, options)
     }
 
     /// Renders a rule with initial context, inferring formatted structured JSON for object-valued rules.
@@ -98,9 +128,30 @@ impl Copperlace {
             .render_rule_inferred_with_context(rule_name, context)
     }
 
+    /// Renders a rule with initial context and render options, inferring formatted structured JSON for object-valued rules.
+    pub fn render_inferred_with_context_and_options(
+        &self,
+        rule_name: &str,
+        context: RenderContext,
+        options: RenderOptions,
+    ) -> Result<String, RenderError> {
+        self.ruleset
+            .render_rule_inferred_with_context_and_options(rule_name, context, options)
+    }
+
     /// Renders an object-valued rule from the compiled config as a structured value.
     pub fn render_structured(&self, rule_name: &str) -> Result<CopperlaceValue, RenderError> {
         self.ruleset.render_rule_structured(rule_name)
+    }
+
+    /// Renders an object-valued rule from the compiled config as a structured value with render options.
+    pub fn render_structured_with_options(
+        &self,
+        rule_name: &str,
+        options: RenderOptions,
+    ) -> Result<CopperlaceValue, RenderError> {
+        self.ruleset
+            .render_rule_structured_with_options(rule_name, options)
     }
 
     /// Renders an object-valued rule from the compiled config as a structured value with initial context.
@@ -111,6 +162,17 @@ impl Copperlace {
     ) -> Result<CopperlaceValue, RenderError> {
         self.ruleset
             .render_rule_structured_with_context(rule_name, context)
+    }
+
+    /// Renders an object-valued rule from the compiled config as a structured value with initial context and render options.
+    pub fn render_structured_with_context_and_options(
+        &self,
+        rule_name: &str,
+        context: RenderContext,
+        options: RenderOptions,
+    ) -> Result<CopperlaceValue, RenderError> {
+        self.ruleset
+            .render_rule_structured_with_context_and_options(rule_name, context, options)
     }
 }
 
@@ -154,8 +216,18 @@ pub fn render_str_with_context(
     rule_name: &str,
     context: RenderContext,
 ) -> Result<String, ConfigError> {
+    render_str_with_context_and_options(config, rule_name, context, RenderOptions::default())
+}
+
+/// Renders one rule from a configuration string with initial context and render options.
+pub fn render_str_with_context_and_options(
+    config: &str,
+    rule_name: &str,
+    context: RenderContext,
+    options: RenderOptions,
+) -> Result<String, ConfigError> {
     ruleset_from_str(config)?
-        .render_rule_with_context(rule_name, context)
+        .render_rule_with_context_and_options(rule_name, context, options)
         .map_err(ConfigError::Render)
 }
 
@@ -170,8 +242,23 @@ pub fn render_str_inferred_with_context(
     rule_name: &str,
     context: RenderContext,
 ) -> Result<String, ConfigError> {
+    render_str_inferred_with_context_and_options(
+        config,
+        rule_name,
+        context,
+        RenderOptions::default(),
+    )
+}
+
+/// Renders one rule from a configuration string with initial context and render options, inferring formatted structured JSON for object-valued rules.
+pub fn render_str_inferred_with_context_and_options(
+    config: &str,
+    rule_name: &str,
+    context: RenderContext,
+    options: RenderOptions,
+) -> Result<String, ConfigError> {
     ruleset_from_str(config)?
-        .render_rule_inferred_with_context(rule_name, context)
+        .render_rule_inferred_with_context_and_options(rule_name, context, options)
         .map_err(ConfigError::Render)
 }
 
@@ -189,8 +276,23 @@ pub fn render_str_structured_with_context(
     rule_name: &str,
     context: RenderContext,
 ) -> Result<CopperlaceValue, ConfigError> {
+    render_str_structured_with_context_and_options(
+        config,
+        rule_name,
+        context,
+        RenderOptions::default(),
+    )
+}
+
+/// Renders one object-valued rule from a configuration string as a structured value with initial context and render options.
+pub fn render_str_structured_with_context_and_options(
+    config: &str,
+    rule_name: &str,
+    context: RenderContext,
+    options: RenderOptions,
+) -> Result<CopperlaceValue, ConfigError> {
     ruleset_from_str(config)?
-        .render_rule_structured_with_context(rule_name, context)
+        .render_rule_structured_with_context_and_options(rule_name, context, options)
         .map_err(ConfigError::Render)
 }
 
@@ -209,8 +311,18 @@ pub fn render_file_with_context(
     rule_name: &str,
     context: RenderContext,
 ) -> Result<String, ConfigError> {
+    render_file_with_context_and_options(path, rule_name, context, RenderOptions::default())
+}
+
+/// Renders one rule from a configuration file with initial context and render options.
+pub fn render_file_with_context_and_options(
+    path: impl AsRef<Path>,
+    rule_name: &str,
+    context: RenderContext,
+    options: RenderOptions,
+) -> Result<String, ConfigError> {
     ruleset_from_file(path)?
-        .render_rule_with_context(rule_name, context)
+        .render_rule_with_context_and_options(rule_name, context, options)
         .map_err(ConfigError::Render)
 }
 
@@ -228,8 +340,23 @@ pub fn render_file_inferred_with_context(
     rule_name: &str,
     context: RenderContext,
 ) -> Result<String, ConfigError> {
+    render_file_inferred_with_context_and_options(
+        path,
+        rule_name,
+        context,
+        RenderOptions::default(),
+    )
+}
+
+/// Renders one rule from a configuration file with initial context and render options, inferring formatted structured JSON for object-valued rules.
+pub fn render_file_inferred_with_context_and_options(
+    path: impl AsRef<Path>,
+    rule_name: &str,
+    context: RenderContext,
+    options: RenderOptions,
+) -> Result<String, ConfigError> {
     ruleset_from_file(path)?
-        .render_rule_inferred_with_context(rule_name, context)
+        .render_rule_inferred_with_context_and_options(rule_name, context, options)
         .map_err(ConfigError::Render)
 }
 
@@ -247,7 +374,22 @@ pub fn render_file_structured_with_context(
     rule_name: &str,
     context: RenderContext,
 ) -> Result<CopperlaceValue, ConfigError> {
+    render_file_structured_with_context_and_options(
+        path,
+        rule_name,
+        context,
+        RenderOptions::default(),
+    )
+}
+
+/// Renders one object-valued rule from a configuration file as a structured value with initial context and render options.
+pub fn render_file_structured_with_context_and_options(
+    path: impl AsRef<Path>,
+    rule_name: &str,
+    context: RenderContext,
+    options: RenderOptions,
+) -> Result<CopperlaceValue, ConfigError> {
     ruleset_from_file(path)?
-        .render_rule_structured_with_context(rule_name, context)
+        .render_rule_structured_with_context_and_options(rule_name, context, options)
         .map_err(ConfigError::Render)
 }

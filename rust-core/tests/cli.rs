@@ -45,6 +45,57 @@ fn renders_config_file() {
 }
 
 #[test]
+fn renders_with_limited_recursion_depth() {
+    let config_path = write_temp_config(
+        r#"
+        origin = "x{origin}"
+        "#,
+    );
+    let output = Command::new(env!("CARGO_BIN_EXE_copperlace"))
+        .args([
+            "render",
+            "--config",
+            &config_path.to_string_lossy(),
+            "--max-recursion-depth",
+            "1",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    assert_eq!(String::from_utf8_lossy(&output.stdout).trim(), "xx");
+
+    let _ = fs::remove_file(config_path);
+}
+
+#[test]
+fn rejects_invalid_max_recursion_depth() {
+    let config_path = write_temp_config(
+        r#"
+        origin = "Mia"
+        "#,
+    );
+    let output = Command::new(env!("CARGO_BIN_EXE_copperlace"))
+        .args([
+            "render",
+            "--config",
+            &config_path.to_string_lossy(),
+            "--max-recursion-depth",
+            "-1",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success());
+    assert!(
+        String::from_utf8_lossy(&output.stderr)
+            .contains("--max-recursion-depth must be a non-negative integer")
+    );
+
+    let _ = fs::remove_file(config_path);
+}
+
+#[test]
 fn defaults_to_origin_rule() {
     let config_path = write_temp_config(
         r#"

@@ -35,8 +35,8 @@ origin = "{% snack:treat %}{note}"</textarea>
 == Why Copperlace
 
 * Readable rules instead of embedding generation logic in application code.
-* Random choices, rule references, reusable bindings, context defaults, and
-  processor pipelines.
+* Random choices, rule references, limited recursion, reusable bindings,
+  context defaults, and processor pipelines.
 * One Rust core exposed through CLI, C ABI, Python, Java, and JS/TS WebAssembly
   wrappers.
 * Runnable examples for stories, game items, JSON-like output, release notes,
