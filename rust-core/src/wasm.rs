@@ -48,11 +48,47 @@ impl Copperlace {
         self.inner.render_rule(rule).map_err(to_js_error)
     }
 
+    /// Renders a named rule from the loaded config with limited recursion enabled.
+    #[wasm_bindgen(js_name = renderWithOptions)]
+    pub fn render_with_options(
+        &self,
+        rule: &str,
+        max_recursion_depth: usize,
+    ) -> Result<String, JsError> {
+        self.inner
+            .render_rule_with_options(
+                rule,
+                crate::RenderOptions {
+                    max_recursion_depth,
+                },
+            )
+            .map_err(to_js_error)
+    }
+
     /// Renders a named rule with initial context values.
     #[wasm_bindgen(js_name = renderWithContext)]
     pub fn render_with_context(&self, rule: &str, context: JsValue) -> Result<String, JsError> {
         self.inner
             .render_rule_with_context(rule, read_context(context)?)
+            .map_err(to_js_error)
+    }
+
+    /// Renders a named rule with initial context values and limited recursion enabled.
+    #[wasm_bindgen(js_name = renderWithContextAndOptions)]
+    pub fn render_with_context_and_options(
+        &self,
+        rule: &str,
+        context: JsValue,
+        max_recursion_depth: usize,
+    ) -> Result<String, JsError> {
+        self.inner
+            .render_rule_with_context_and_options(
+                rule,
+                read_context(context)?,
+                crate::RenderOptions {
+                    max_recursion_depth,
+                },
+            )
             .map_err(to_js_error)
     }
 }
@@ -61,6 +97,24 @@ impl Copperlace {
 #[wasm_bindgen(js_name = renderString)]
 pub fn render_string(config: &str, rule: &str) -> Result<String, JsError> {
     crate::render_str(config, rule).map_err(to_js_error)
+}
+
+/// Renders one rule from a configuration string with limited recursion enabled.
+#[wasm_bindgen(js_name = renderStringWithOptions)]
+pub fn render_string_with_options(
+    config: &str,
+    rule: &str,
+    max_recursion_depth: usize,
+) -> Result<String, JsError> {
+    crate::render_str_with_context_and_options(
+        config,
+        rule,
+        crate::RenderContext::new(),
+        crate::RenderOptions {
+            max_recursion_depth,
+        },
+    )
+    .map_err(to_js_error)
 }
 
 /// Renders one rule from a configuration string with custom processor functions.
@@ -85,6 +139,25 @@ pub fn render_string_with_context(
     crate::render_str_with_context(config, rule, read_context(context)?).map_err(to_js_error)
 }
 
+/// Renders one rule from a configuration string with initial context values and limited recursion enabled.
+#[wasm_bindgen(js_name = renderStringWithContextAndOptions)]
+pub fn render_string_with_context_and_options(
+    config: &str,
+    rule: &str,
+    context: JsValue,
+    max_recursion_depth: usize,
+) -> Result<String, JsError> {
+    crate::render_str_with_context_and_options(
+        config,
+        rule,
+        read_context(context)?,
+        crate::RenderOptions {
+            max_recursion_depth,
+        },
+    )
+    .map_err(to_js_error)
+}
+
 /// Renders one rule from a configuration string with custom processors and initial context.
 #[wasm_bindgen(js_name = renderStringWithProcessorsAndContext)]
 pub fn render_string_with_processors_and_context(
@@ -95,6 +168,26 @@ pub fn render_string_with_processors_and_context(
 ) -> Result<String, JsError> {
     ruleset_from_string_with_processors(config, processors)?
         .render_rule_with_context(rule, read_context(context)?)
+        .map_err(to_js_error)
+}
+
+/// Renders one rule from a configuration string with custom processors, initial context, and limited recursion enabled.
+#[wasm_bindgen(js_name = renderStringWithProcessorsContextAndOptions)]
+pub fn render_string_with_processors_context_and_options(
+    config: &str,
+    rule: &str,
+    processors: JsValue,
+    context: JsValue,
+    max_recursion_depth: usize,
+) -> Result<String, JsError> {
+    ruleset_from_string_with_processors(config, processors)?
+        .render_rule_with_context_and_options(
+            rule,
+            read_context(context)?,
+            crate::RenderOptions {
+                max_recursion_depth,
+            },
+        )
         .map_err(to_js_error)
 }
 

@@ -273,6 +273,38 @@ final class CopperlaceTest {
     }
 
     @Test
+    void defaultRecursionRaisesException() {
+        final CopperlaceException exception = assertThrows(
+                CopperlaceException.class,
+                () -> Copperlace.renderString("""
+                        origin = "x{origin}"
+                        """, "origin"));
+
+        assertTrue(exception.getMessage().contains("circular rule reference"));
+    }
+
+    @Test
+    void rendersWithLimitedRecursion() {
+        assertEquals(
+                "xx",
+                Copperlace.renderString("""
+                        origin = "x{origin}"
+                        """, "origin", 1));
+    }
+
+    @Test
+    void rulesetRendersStructuredJsonWithLimitedRecursion() {
+        try (final RuleSet rules = RuleSet.fromString("""
+                origin {
+                    value = "{part}"
+                }
+                part = "x{part}"
+                """)) {
+            assertEquals("{\"value\":\"xx\"}", rules.renderStructuredJson("origin", false, 1));
+        }
+    }
+
+    @Test
     void rendersBuiltinProcessorPipeline() {
         assertEquals(
                 "Mia",

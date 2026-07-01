@@ -1,7 +1,7 @@
 use copperlace::render::{ProcessorRegistry, processor};
 use copperlace::{
-    Copperlace, RenderContext, RenderError, RuleSet, render_config_rule_with_context,
-    render_file_with_context, render_str_with_context,
+    Copperlace, RenderContext, RenderError, RenderOptions, RuleSet,
+    render_config_rule_with_context, render_file_with_context, render_str_with_context,
 };
 
 fn ruleset(config: &str) -> RuleSet {
@@ -375,6 +375,97 @@ fn circular_rule_reference_returns_error() {
             "b".to_string(),
             "a".to_string(),
         ]))
+    );
+}
+
+#[test]
+fn limited_self_recursion_returns_empty_at_cutoff() {
+    let rules = ruleset(
+        r#"
+        origin = "x{origin}"
+        "#,
+    );
+
+    assert_eq!(
+        rules
+            .render_rule_with_options(
+                "origin",
+                RenderOptions {
+                    max_recursion_depth: 1,
+                },
+            )
+            .unwrap(),
+        "xx"
+    );
+}
+
+#[test]
+fn limited_mutual_recursion_returns_empty_at_cutoff() {
+    let rules = ruleset(
+        r#"
+        a = "a{b}"
+        b = "b{a}"
+        "#,
+    );
+
+    assert_eq!(
+        rules
+            .render_rule_with_options(
+                "a",
+                RenderOptions {
+                    max_recursion_depth: 1,
+                },
+            )
+            .unwrap(),
+        "abab"
+    );
+}
+
+#[test]
+fn initial_context_shadows_recursive_rule_without_consuming_depth() {
+    let mut context = RenderContext::new();
+    context.insert("origin".to_string(), "bound".to_string());
+    let rules = ruleset(
+        r#"
+        origin = "x{origin}"
+        "#,
+    );
+
+    assert_eq!(
+        rules
+            .render_rule_with_context_and_options(
+                "origin",
+                context,
+                RenderOptions {
+                    max_recursion_depth: 1,
+                },
+            )
+            .unwrap(),
+        "xbound"
+    );
+}
+
+#[test]
+fn limited_context_default_recursion_returns_empty_at_cutoff() {
+    let rules = ruleset(
+        r#"
+        origin = "{hero}"
+        context {
+            hero = "h{hero}"
+        }
+        "#,
+    );
+
+    assert_eq!(
+        rules
+            .render_rule_with_options(
+                "origin",
+                RenderOptions {
+                    max_recursion_depth: 1,
+                },
+            )
+            .unwrap(),
+        "hh"
     );
 }
 

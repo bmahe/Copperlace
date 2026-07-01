@@ -3,7 +3,7 @@ use std::os::raw::{c_char, c_int, c_void};
 use std::ptr;
 
 use crate::config::{ConfigError, ruleset_from_file, ruleset_from_str};
-use crate::render::{Processor, ProcessorRegistry, RenderContext, RuleSet};
+use crate::render::{Processor, ProcessorRegistry, RenderContext, RenderOptions, RuleSet};
 
 /// Status code for a successful C ABI call.
 pub const COPPERLACE_OK: c_int = 0;
@@ -348,6 +348,46 @@ pub unsafe extern "C" fn copperlace_ruleset_render_with_context(
     out_string: *mut *mut c_char,
     out_error: *mut *mut c_char,
 ) -> c_int {
+    unsafe {
+        copperlace_ruleset_render_with_context_and_options(
+            handle,
+            rule,
+            context_keys,
+            context_values,
+            context_len,
+            0,
+            out_string,
+            out_error,
+        )
+    }
+}
+
+/// Renders a named rule from a ruleset handle with initial context values and render options.
+///
+/// `max_recursion_depth` controls recursive rule expansion. A value of zero
+/// preserves default circular-reference errors. Values greater than zero allow
+/// that many recursive re-entries before recursive calls return an empty string.
+///
+/// # Safety
+///
+/// `handle` must be a live ruleset handle returned by Copperlace. `rule` must
+/// point to a valid NUL-terminated UTF-8 string. When `context_len` is nonzero,
+/// `context_keys` and `context_values` must each point to arrays with at least
+/// `context_len` entries, and every entry must point to a valid
+/// NUL-terminated UTF-8 string. `out_string` and `out_error` must be valid for
+/// writing when non-null. Any returned output or error string must be released
+/// with [`copperlace_string_free`].
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn copperlace_ruleset_render_with_context_and_options(
+    handle: *const CopperlaceRuleSet,
+    rule: *const c_char,
+    context_keys: *const *const c_char,
+    context_values: *const *const c_char,
+    context_len: usize,
+    max_recursion_depth: usize,
+    out_string: *mut *mut c_char,
+    out_error: *mut *mut c_char,
+) -> c_int {
     clear_out_error(out_error);
     write_null_string(out_string);
 
@@ -364,7 +404,10 @@ pub unsafe extern "C" fn copperlace_ruleset_render_with_context(
     };
 
     let ruleset = unsafe { &(*handle).ruleset };
-    match ruleset.render_rule_with_context(&rule, context) {
+    let options = RenderOptions {
+        max_recursion_depth,
+    };
+    match ruleset.render_rule_with_context_and_options(&rule, context, options) {
         Ok(output) => {
             if write_out_string(out_string, &output) {
                 COPPERLACE_OK
@@ -432,6 +475,42 @@ pub unsafe extern "C" fn copperlace_ruleset_render_inferred_with_context(
     out_string: *mut *mut c_char,
     out_error: *mut *mut c_char,
 ) -> c_int {
+    unsafe {
+        copperlace_ruleset_render_inferred_with_context_and_options(
+            handle,
+            rule,
+            context_keys,
+            context_values,
+            context_len,
+            0,
+            out_string,
+            out_error,
+        )
+    }
+}
+
+/// Renders a named rule with initial context and render options, inferring formatted structured JSON for object-valued rules.
+///
+/// # Safety
+///
+/// `handle` must be a live ruleset handle returned by Copperlace. `rule` must
+/// point to a valid NUL-terminated UTF-8 string. When `context_len` is nonzero,
+/// `context_keys` and `context_values` must each point to arrays with at least
+/// `context_len` entries, and every entry must point to a valid
+/// NUL-terminated UTF-8 string. `out_string` and `out_error` must be valid for
+/// writing when non-null. Any returned output or error string must be released
+/// with [`copperlace_string_free`].
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn copperlace_ruleset_render_inferred_with_context_and_options(
+    handle: *const CopperlaceRuleSet,
+    rule: *const c_char,
+    context_keys: *const *const c_char,
+    context_values: *const *const c_char,
+    context_len: usize,
+    max_recursion_depth: usize,
+    out_string: *mut *mut c_char,
+    out_error: *mut *mut c_char,
+) -> c_int {
     clear_out_error(out_error);
     write_null_string(out_string);
 
@@ -448,7 +527,10 @@ pub unsafe extern "C" fn copperlace_ruleset_render_inferred_with_context(
     };
 
     let ruleset = unsafe { &(*handle).ruleset };
-    match ruleset.render_rule_inferred_with_context(&rule, context) {
+    let options = RenderOptions {
+        max_recursion_depth,
+    };
+    match ruleset.render_rule_inferred_with_context_and_options(&rule, context, options) {
         Ok(output) => {
             if write_out_string(out_string, &output) {
                 COPPERLACE_OK
@@ -535,6 +617,44 @@ pub unsafe extern "C" fn copperlace_ruleset_render_structured_json_with_context(
     out_json: *mut *mut c_char,
     out_error: *mut *mut c_char,
 ) -> c_int {
+    unsafe {
+        copperlace_ruleset_render_structured_json_with_context_and_options(
+            handle,
+            rule,
+            context_keys,
+            context_values,
+            context_len,
+            format_json,
+            0,
+            out_json,
+            out_error,
+        )
+    }
+}
+
+/// Renders a named structured rule from a ruleset handle with initial context and render options.
+///
+/// # Safety
+///
+/// `handle` must be a live ruleset handle returned by Copperlace. `rule` must
+/// point to a valid NUL-terminated UTF-8 string. When `context_len` is nonzero,
+/// `context_keys` and `context_values` must each point to arrays with at least
+/// `context_len` entries, and every entry must point to a valid
+/// NUL-terminated UTF-8 string. `out_json` must be a valid writable pointer.
+/// `out_error` must be valid for writing when non-null. Any returned output or
+/// error string must be released with [`copperlace_string_free`].
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn copperlace_ruleset_render_structured_json_with_context_and_options(
+    handle: *const CopperlaceRuleSet,
+    rule: *const c_char,
+    context_keys: *const *const c_char,
+    context_values: *const *const c_char,
+    context_len: usize,
+    format_json: bool,
+    max_recursion_depth: usize,
+    out_json: *mut *mut c_char,
+    out_error: *mut *mut c_char,
+) -> c_int {
     clear_out_error(out_error);
 
     if out_json.is_null() {
@@ -556,8 +676,11 @@ pub unsafe extern "C" fn copperlace_ruleset_render_structured_json_with_context(
     };
 
     let ruleset = unsafe { &(*handle).ruleset };
+    let options = RenderOptions {
+        max_recursion_depth,
+    };
     let json = ruleset
-        .render_rule_structured_with_context(&rule, context)
+        .render_rule_structured_with_context_and_options(&rule, context, options)
         .and_then(|value| {
             if format_json {
                 value.to_formatted_json()

@@ -16,6 +16,7 @@ use copperlace::ffi::{
     copperlace_ruleset_render_structured_json as raw_copperlace_ruleset_render_structured_json,
     copperlace_ruleset_render_structured_json_with_context as raw_copperlace_ruleset_render_structured_json_with_context,
     copperlace_ruleset_render_with_context as raw_copperlace_ruleset_render_with_context,
+    copperlace_ruleset_render_with_context_and_options as raw_copperlace_ruleset_render_with_context_and_options,
     copperlace_string_free as raw_copperlace_string_free,
 };
 use serde_json::json;
@@ -75,6 +76,30 @@ fn copperlace_ruleset_render_with_context(
             context_keys,
             context_values,
             context_len,
+            out_string,
+            out_error,
+        )
+    }
+}
+
+fn copperlace_ruleset_render_with_context_and_options(
+    handle: *const CopperlaceRuleSet,
+    rule: *const c_char,
+    context_keys: *const *const c_char,
+    context_values: *const *const c_char,
+    context_len: usize,
+    max_recursion_depth: usize,
+    out_string: *mut *mut c_char,
+    out_error: *mut *mut c_char,
+) -> c_int {
+    unsafe {
+        raw_copperlace_ruleset_render_with_context_and_options(
+            handle,
+            rule,
+            context_keys,
+            context_values,
+            context_len,
+            max_recursion_depth,
             out_string,
             out_error,
         )
@@ -252,6 +277,44 @@ fn renders_rule_with_initial_context() {
         unsafe { CStr::from_ptr(output) }.to_str().unwrap(),
         "Hello Lina"
     );
+
+    copperlace_string_free(output);
+    copperlace_ruleset_free(handle);
+}
+
+#[test]
+fn renders_rule_with_limited_recursion_options() {
+    let config = CString::new(
+        r#"
+        origin = "x{origin}"
+        "#,
+    )
+    .unwrap();
+    let rule = CString::new("origin").unwrap();
+    let mut handle = ptr::null_mut();
+    let mut error = ptr::null_mut();
+    let mut output = ptr::null_mut();
+
+    assert_eq!(
+        copperlace_ruleset_from_string(config.as_ptr(), &mut handle, &mut error),
+        COPPERLACE_OK
+    );
+
+    assert_eq!(
+        copperlace_ruleset_render_with_context_and_options(
+            handle,
+            rule.as_ptr(),
+            ptr::null(),
+            ptr::null(),
+            0,
+            1,
+            &mut output,
+            &mut error,
+        ),
+        COPPERLACE_OK
+    );
+    assert!(error.is_null());
+    assert_eq!(unsafe { CStr::from_ptr(output) }.to_str().unwrap(), "xx");
 
     copperlace_string_free(output);
     copperlace_ruleset_free(handle);

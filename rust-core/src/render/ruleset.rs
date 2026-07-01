@@ -8,7 +8,7 @@ use super::compile::{
 use super::error::RenderError;
 use super::nodes::TextGeneratorNode;
 use super::processor::ProcessorRegistry;
-use super::state::{RenderContext, RenderState};
+use super::state::{RenderContext, RenderOptions, RenderState};
 use super::value::{CopperlaceValue, StructuredNode};
 
 /// Compiled collection of named rules from the config.
@@ -94,6 +94,15 @@ impl RuleSet {
         self.render_rule_with_context(rule_name, RenderContext::new())
     }
 
+    /// Renders a named rule using render options.
+    pub fn render_rule_with_options(
+        &self,
+        rule_name: &str,
+        options: RenderOptions,
+    ) -> Result<String, RenderError> {
+        self.render_rule_with_context_and_options(rule_name, RenderContext::new(), options)
+    }
+
     /// Renders a named rule with initial render context values.
     ///
     /// Initial context values resolve before lazy `context` defaults and named
@@ -104,7 +113,17 @@ impl RuleSet {
         rule_name: &str,
         context: RenderContext,
     ) -> Result<String, RenderError> {
-        let mut state = RenderState::with_context(self, context);
+        self.render_rule_with_context_and_options(rule_name, context, RenderOptions::default())
+    }
+
+    /// Renders a named rule with initial render context values and render options.
+    pub fn render_rule_with_context_and_options(
+        &self,
+        rule_name: &str,
+        context: RenderContext,
+        options: RenderOptions,
+    ) -> Result<String, RenderError> {
+        let mut state = RenderState::with_context_and_options(self, context, options);
         self.render_rule_with_state(rule_name, &mut state)
     }
 
@@ -116,21 +135,44 @@ impl RuleSet {
         self.render_rule_inferred_with_context(rule_name, RenderContext::new())
     }
 
+    /// Renders a named rule with render options, inferring structured JSON for object-valued rules.
+    pub fn render_rule_inferred_with_options(
+        &self,
+        rule_name: &str,
+        options: RenderOptions,
+    ) -> Result<String, RenderError> {
+        self.render_rule_inferred_with_context_and_options(rule_name, RenderContext::new(), options)
+    }
+
     /// Renders a named rule with initial context, inferring structured JSON for object-valued rules.
     pub fn render_rule_inferred_with_context(
         &self,
         rule_name: &str,
         context: RenderContext,
     ) -> Result<String, RenderError> {
+        self.render_rule_inferred_with_context_and_options(
+            rule_name,
+            context,
+            RenderOptions::default(),
+        )
+    }
+
+    /// Renders a named rule with initial context and render options, inferring structured JSON for object-valued rules.
+    pub fn render_rule_inferred_with_context_and_options(
+        &self,
+        rule_name: &str,
+        context: RenderContext,
+        options: RenderOptions,
+    ) -> Result<String, RenderError> {
         if matches!(
             self.structured_node(rule_name),
             Ok(StructuredNode::Object(_))
         ) {
             return self
-                .render_rule_structured_with_context(rule_name, context)
+                .render_rule_structured_with_context_and_options(rule_name, context, options)
                 .and_then(|value| value.to_formatted_json());
         }
-        self.render_rule_with_context(rule_name, context)
+        self.render_rule_with_context_and_options(rule_name, context, options)
     }
 
     /// Renders an object-valued rule as a native structured value.
@@ -142,11 +184,38 @@ impl RuleSet {
         self.render_rule_structured_with_context(rule_name, RenderContext::new())
     }
 
+    /// Renders an object-valued rule as a native structured value using render options.
+    pub fn render_rule_structured_with_options(
+        &self,
+        rule_name: &str,
+        options: RenderOptions,
+    ) -> Result<CopperlaceValue, RenderError> {
+        self.render_rule_structured_with_context_and_options(
+            rule_name,
+            RenderContext::new(),
+            options,
+        )
+    }
+
     /// Renders an object-valued rule as a native structured value with initial context.
     pub fn render_rule_structured_with_context(
         &self,
         rule_name: &str,
         context: RenderContext,
+    ) -> Result<CopperlaceValue, RenderError> {
+        self.render_rule_structured_with_context_and_options(
+            rule_name,
+            context,
+            RenderOptions::default(),
+        )
+    }
+
+    /// Renders an object-valued rule as a native structured value with initial context and render options.
+    pub fn render_rule_structured_with_context_and_options(
+        &self,
+        rule_name: &str,
+        context: RenderContext,
+        options: RenderOptions,
     ) -> Result<CopperlaceValue, RenderError> {
         let node = self.structured_node(rule_name)?;
         if !matches!(node, StructuredNode::Object(_)) {
@@ -154,7 +223,7 @@ impl RuleSet {
                 rule_name.to_string(),
             ));
         }
-        let mut state = RenderState::with_context(self, context);
+        let mut state = RenderState::with_context_and_options(self, context, options);
         node.generate_value(&mut state)
     }
 
@@ -193,10 +262,18 @@ impl RuleSet {
             return Err(RenderError::UnknownRule(rule_name.to_string()));
         };
 
-        if state.call_stack.iter().any(|name| name == rule_name) {
+        let existing_calls = state
+            .call_stack
+            .iter()
+            .filter(|name| name.as_str() == rule_name)
+            .count();
+        if state.options.max_recursion_depth == 0 && existing_calls > 0 {
             let mut cycle = state.call_stack.clone();
             cycle.push(rule_name.to_string());
             return Err(RenderError::CircularRuleReference(cycle));
+        }
+        if existing_calls > state.options.max_recursion_depth {
+            return Ok(String::new());
         }
 
         state.call_stack.push(rule_name.to_string());
@@ -214,10 +291,18 @@ impl RuleSet {
             return Ok(None);
         };
 
-        if state.call_stack.iter().any(|rule_name| rule_name == name) {
+        let existing_calls = state
+            .call_stack
+            .iter()
+            .filter(|rule_name| rule_name.as_str() == name)
+            .count();
+        if state.options.max_recursion_depth == 0 && existing_calls > 0 {
             let mut cycle = state.call_stack.clone();
             cycle.push(name.to_string());
             return Err(RenderError::CircularRuleReference(cycle));
+        }
+        if existing_calls > state.options.max_recursion_depth {
+            return Ok(Some(String::new()));
         }
 
         state.call_stack.push(name.to_string());
@@ -254,8 +339,23 @@ pub fn render_config_rule_with_context(
     rule_name: &str,
     context: RenderContext,
 ) -> Result<String, RenderError> {
+    render_config_rule_with_context_and_options(
+        config,
+        rule_name,
+        context,
+        RenderOptions::default(),
+    )
+}
+
+/// Compiles a parsed configuration root value and renders one rule with initial context and render options.
+pub fn render_config_rule_with_context_and_options(
+    config: hocon_rs::Value,
+    rule_name: &str,
+    context: RenderContext,
+    options: RenderOptions,
+) -> Result<String, RenderError> {
     let ruleset = RuleSet::from_config(config)?;
-    ruleset.render_rule_with_context(rule_name, context)
+    ruleset.render_rule_with_context_and_options(rule_name, context, options)
 }
 
 /// Compiles a parsed configuration root value and renders one object-valued rule.
@@ -272,6 +372,21 @@ pub fn render_config_rule_structured_with_context(
     rule_name: &str,
     context: RenderContext,
 ) -> Result<CopperlaceValue, RenderError> {
+    render_config_rule_structured_with_context_and_options(
+        config,
+        rule_name,
+        context,
+        RenderOptions::default(),
+    )
+}
+
+/// Compiles a parsed configuration root value and renders one object-valued rule with initial context and render options.
+pub fn render_config_rule_structured_with_context_and_options(
+    config: hocon_rs::Value,
+    rule_name: &str,
+    context: RenderContext,
+    options: RenderOptions,
+) -> Result<CopperlaceValue, RenderError> {
     let ruleset = RuleSet::from_config(config)?;
-    ruleset.render_rule_structured_with_context(rule_name, context)
+    ruleset.render_rule_structured_with_context_and_options(rule_name, context, options)
 }

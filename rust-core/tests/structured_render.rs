@@ -2,10 +2,10 @@ use std::collections::BTreeMap;
 
 use copperlace::{
     ConfigError, Copperlace, CopperlaceNumber, CopperlaceValue, RenderContext, RenderError,
-    RuleSet, processor, render_config_rule_structured_with_context, render_file_inferred,
-    render_file_inferred_with_context, render_file_structured, render_file_structured_with_context,
-    render_str_inferred, render_str_inferred_with_context, render_str_structured,
-    render_str_structured_with_context,
+    RenderOptions, RuleSet, processor, render_config_rule_structured_with_context,
+    render_file_inferred, render_file_inferred_with_context, render_file_structured,
+    render_file_structured_with_context, render_str_inferred, render_str_inferred_with_context,
+    render_str_structured, render_str_structured_with_context,
 };
 
 fn ruleset(config: &str) -> RuleSet {
@@ -672,6 +672,32 @@ fn structured_render_surfaces_processor_failures_and_cycles() {
             "b".to_string(),
             "a".to_string(),
         ]))
+    );
+}
+
+#[test]
+fn structured_render_uses_limited_recursion_options() {
+    let rules = ruleset(
+        r#"
+        origin {
+            value = "{part}"
+        }
+        part = "x{part}"
+        "#,
+    );
+
+    assert_eq!(
+        rules
+            .render_rule_structured_with_options(
+                "origin",
+                RenderOptions {
+                    max_recursion_depth: 1,
+                },
+            )
+            .unwrap()
+            .to_compact_json()
+            .unwrap(),
+        r#"{"value":"xx"}"#
     );
 }
 

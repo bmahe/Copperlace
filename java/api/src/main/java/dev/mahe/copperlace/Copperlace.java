@@ -136,6 +136,26 @@ public final class Copperlace implements AutoCloseable {
     }
 
     /**
+     * Renders one rule from a configuration string with limited recursion enabled.
+     *
+     * @param config configuration text containing Copperlace rules
+     * @param rule name of the rule to render
+     * @param maxRecursionDepth recursive re-entries allowed per rule
+     * @return rendered text for {@code rule}
+     * @throws IllegalArgumentException if {@code config} or {@code rule} is blank, or {@code maxRecursionDepth} is negative
+     * @throws CopperlaceException if parsing, compilation, or rendering fails
+     */
+    public static String renderString(final String config, final String rule, final int maxRecursionDepth) {
+        Validate.notBlank(config, "config must not be blank");
+        Validate.notBlank(rule, "rule must not be blank");
+        Validate.isTrue(maxRecursionDepth >= 0, "maxRecursionDepth must be non-negative");
+
+        try (final Copperlace copperlace = Copperlace.fromString(config)) {
+            return copperlace.render(rule, maxRecursionDepth);
+        }
+    }
+
+    /**
      * Renders one rule from a configuration string with custom processors.
      *
      * @param config configuration text containing Copperlace rules
@@ -229,6 +249,26 @@ public final class Copperlace implements AutoCloseable {
     }
 
     /**
+     * Renders one rule from a configuration string with limited recursion enabled, returning formatted JSON for object-valued rules.
+     *
+     * @param config configuration text containing Copperlace rules
+     * @param rule name of the rule to render
+     * @param maxRecursionDepth recursive re-entries allowed per rule
+     * @return rendered text, or formatted JSON for an object-valued rule
+     * @throws IllegalArgumentException if {@code config} or {@code rule} is blank, or {@code maxRecursionDepth} is negative
+     * @throws CopperlaceException if parsing, compilation, or rendering fails
+     */
+    public static String renderStringInferred(final String config, final String rule, final int maxRecursionDepth) {
+        Validate.notBlank(config, "config must not be blank");
+        Validate.notBlank(rule, "rule must not be blank");
+        Validate.isTrue(maxRecursionDepth >= 0, "maxRecursionDepth must be non-negative");
+
+        try (final Copperlace copperlace = Copperlace.fromString(config)) {
+            return copperlace.renderInferred(rule, maxRecursionDepth);
+        }
+    }
+
+    /**
      * Renders one rule from a configuration string with initial context, returning formatted JSON for object-valued rules.
      *
      * @param config configuration text containing Copperlace rules
@@ -280,6 +320,28 @@ public final class Copperlace implements AutoCloseable {
 
         try (final Copperlace copperlace = Copperlace.fromString(config)) {
             return copperlace.renderStructuredJson(rule, formatJson);
+        }
+    }
+
+    /**
+     * Renders one structured rule from a configuration string as JSON text with limited recursion enabled.
+     *
+     * @param config configuration text containing Copperlace rules
+     * @param rule name of the structured rule to render
+     * @param formatJson true to format JSON with tabs, false for compact JSON
+     * @param maxRecursionDepth recursive re-entries allowed per rule
+     * @return JSON for {@code rule}
+     * @throws IllegalArgumentException if {@code config} or {@code rule} is blank, or {@code maxRecursionDepth} is negative
+     * @throws CopperlaceException if parsing, compilation, or rendering fails
+     */
+    public static String renderStringStructuredJson(
+            final String config, final String rule, final boolean formatJson, final int maxRecursionDepth) {
+        Validate.notBlank(config, "config must not be blank");
+        Validate.notBlank(rule, "rule must not be blank");
+        Validate.isTrue(maxRecursionDepth >= 0, "maxRecursionDepth must be non-negative");
+
+        try (final Copperlace copperlace = Copperlace.fromString(config)) {
+            return copperlace.renderStructuredJson(rule, formatJson, maxRecursionDepth);
         }
     }
 
@@ -753,6 +815,21 @@ public final class Copperlace implements AutoCloseable {
     }
 
     /**
+     * Renders a named rule from the loaded config with limited recursion enabled.
+     *
+     * @param rule name of the rule to render
+     * @param maxRecursionDepth recursive re-entries allowed per rule
+     * @return rendered text for {@code rule}
+     * @throws IllegalArgumentException if {@code rule} is blank or {@code maxRecursionDepth} is negative
+     * @throws CopperlaceException if this renderer is closed or rendering fails
+     */
+    public String render(final String rule, final int maxRecursionDepth) {
+        Validate.notBlank(rule, "rule must not be blank");
+        Validate.isTrue(maxRecursionDepth >= 0, "maxRecursionDepth must be non-negative");
+        return ruleset.render(rule, maxRecursionDepth);
+    }
+
+    /**
      * Renders a named rule from the loaded config with initial context values.
      *
      * <p>The provided context is scoped to this render only. Values resolve
@@ -772,6 +849,24 @@ public final class Copperlace implements AutoCloseable {
     }
 
     /**
+     * Renders a named rule from the loaded config with initial context values and limited recursion enabled.
+     *
+     * @param rule name of the rule to render
+     * @param context initial render context values
+     * @param maxRecursionDepth recursive re-entries allowed per rule
+     * @return rendered text for {@code rule}
+     * @throws NullPointerException if {@code context}, a context key, or a context value is null
+     * @throws IllegalArgumentException if {@code rule} is blank or {@code maxRecursionDepth} is negative
+     * @throws CopperlaceException if this renderer is closed or rendering fails
+     */
+    public String render(final String rule, final Map<String, String> context, final int maxRecursionDepth) {
+        Validate.notBlank(rule, "rule must not be blank");
+        Objects.requireNonNull(context, "context");
+        Validate.isTrue(maxRecursionDepth >= 0, "maxRecursionDepth must be non-negative");
+        return ruleset.render(rule, context, maxRecursionDepth);
+    }
+
+    /**
      * Renders a named rule as text, returning formatted JSON for object-valued rules.
      *
      * @param rule name of the rule to render
@@ -782,6 +877,21 @@ public final class Copperlace implements AutoCloseable {
     public String renderInferred(final String rule) {
         Validate.notBlank(rule, "rule must not be blank");
         return ruleset.renderInferred(rule);
+    }
+
+    /**
+     * Renders a named rule as text with limited recursion enabled, returning formatted JSON for object-valued rules.
+     *
+     * @param rule name of the rule to render
+     * @param maxRecursionDepth recursive re-entries allowed per rule
+     * @return rendered text, or formatted JSON for an object-valued rule
+     * @throws IllegalArgumentException if {@code rule} is blank or {@code maxRecursionDepth} is negative
+     * @throws CopperlaceException if this renderer is closed or rendering fails
+     */
+    public String renderInferred(final String rule, final int maxRecursionDepth) {
+        Validate.notBlank(rule, "rule must not be blank");
+        Validate.isTrue(maxRecursionDepth >= 0, "maxRecursionDepth must be non-negative");
+        return ruleset.renderInferred(rule, maxRecursionDepth);
     }
 
     /**
@@ -798,6 +908,24 @@ public final class Copperlace implements AutoCloseable {
         Validate.notBlank(rule, "rule must not be blank");
         Objects.requireNonNull(context, "context");
         return ruleset.renderInferred(rule, context);
+    }
+
+    /**
+     * Renders a named rule with initial context and limited recursion enabled, returning formatted JSON for object-valued rules.
+     *
+     * @param rule name of the rule to render
+     * @param context initial render context values
+     * @param maxRecursionDepth recursive re-entries allowed per rule
+     * @return rendered text, or formatted JSON for an object-valued rule
+     * @throws NullPointerException if {@code context}, a context key, or a context value is null
+     * @throws IllegalArgumentException if {@code rule} is blank or {@code maxRecursionDepth} is negative
+     * @throws CopperlaceException if this renderer is closed or rendering fails
+     */
+    public String renderInferred(final String rule, final Map<String, String> context, final int maxRecursionDepth) {
+        Validate.notBlank(rule, "rule must not be blank");
+        Objects.requireNonNull(context, "context");
+        Validate.isTrue(maxRecursionDepth >= 0, "maxRecursionDepth must be non-negative");
+        return ruleset.renderInferred(rule, context, maxRecursionDepth);
     }
 
     /**
@@ -824,6 +952,22 @@ public final class Copperlace implements AutoCloseable {
     public String renderStructuredJson(final String rule, final boolean formatJson) {
         Validate.notBlank(rule, "rule must not be blank");
         return ruleset.renderStructuredJson(rule, formatJson);
+    }
+
+    /**
+     * Renders a named structured rule from the loaded config as JSON text with limited recursion enabled.
+     *
+     * @param rule name of the structured rule to render
+     * @param formatJson true to format JSON with tabs, false for compact JSON
+     * @param maxRecursionDepth recursive re-entries allowed per rule
+     * @return JSON for {@code rule}
+     * @throws IllegalArgumentException if {@code rule} is blank or {@code maxRecursionDepth} is negative
+     * @throws CopperlaceException if this renderer is closed or rendering fails
+     */
+    public String renderStructuredJson(final String rule, final boolean formatJson, final int maxRecursionDepth) {
+        Validate.notBlank(rule, "rule must not be blank");
+        Validate.isTrue(maxRecursionDepth >= 0, "maxRecursionDepth must be non-negative");
+        return ruleset.renderStructuredJson(rule, formatJson, maxRecursionDepth);
     }
 
     /**
@@ -856,6 +1000,29 @@ public final class Copperlace implements AutoCloseable {
         Validate.notBlank(rule, "rule must not be blank");
         Objects.requireNonNull(context, "context");
         return ruleset.renderStructuredJson(rule, context, formatJson);
+    }
+
+    /**
+     * Renders a named structured rule from the loaded config as JSON text with initial context values and limited recursion enabled.
+     *
+     * @param rule name of the structured rule to render
+     * @param context initial render context values
+     * @param formatJson true to format JSON with tabs, false for compact JSON
+     * @param maxRecursionDepth recursive re-entries allowed per rule
+     * @return JSON for {@code rule}
+     * @throws NullPointerException if {@code context}, a context key, or a context value is null
+     * @throws IllegalArgumentException if {@code rule} is blank or {@code maxRecursionDepth} is negative
+     * @throws CopperlaceException if this renderer is closed or rendering fails
+     */
+    public String renderStructuredJson(
+            final String rule,
+            final Map<String, String> context,
+            final boolean formatJson,
+            final int maxRecursionDepth) {
+        Validate.notBlank(rule, "rule must not be blank");
+        Objects.requireNonNull(context, "context");
+        Validate.isTrue(maxRecursionDepth >= 0, "maxRecursionDepth must be non-negative");
+        return ruleset.renderStructuredJson(rule, context, formatJson, maxRecursionDepth);
     }
 
     /**

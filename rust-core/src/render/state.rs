@@ -9,6 +9,18 @@ use super::ruleset::RuleSet;
 /// `{alias:=rule}`.
 pub type RenderContext = HashMap<String, String>;
 
+/// Render-time options that affect rule expansion behavior.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct RenderOptions {
+    /// Maximum recursive re-entries allowed for one rule name.
+    ///
+    /// A value of `0` preserves the default behavior: re-entering a rule that is
+    /// already on the call stack returns `CircularRuleReference`. Values greater
+    /// than zero allow that many recursive re-entries before recursive calls
+    /// return an empty string.
+    pub max_recursion_depth: usize,
+}
+
 /// Mutable state for one render operation.
 ///
 /// `RuleSet::render_rule` creates a fresh state for each call. The state tracks
@@ -17,6 +29,7 @@ pub type RenderContext = HashMap<String, String>;
 pub struct RenderState<'a> {
     pub(crate) ruleset: &'a RuleSet,
     pub(crate) context: RenderContext,
+    pub(crate) options: RenderOptions,
     pub(crate) call_stack: Vec<String>,
     pub(crate) rng: rand::rngs::ThreadRng,
 }
@@ -29,9 +42,19 @@ impl<'a> RenderState<'a> {
 
     /// Creates a render state with initial variable bindings.
     pub fn with_context(ruleset: &'a RuleSet, context: RenderContext) -> Self {
+        Self::with_context_and_options(ruleset, context, RenderOptions::default())
+    }
+
+    /// Creates a render state with initial variable bindings and render options.
+    pub fn with_context_and_options(
+        ruleset: &'a RuleSet,
+        context: RenderContext,
+        options: RenderOptions,
+    ) -> Self {
         RenderState {
             ruleset,
             context,
+            options,
             call_stack: Vec::new(),
             rng: rand::rngs::ThreadRng::default(),
         }
