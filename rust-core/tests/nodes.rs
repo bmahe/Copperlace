@@ -140,6 +140,22 @@ fn choice_node_returns_empty_choice_for_no_children() {
 }
 
 #[test]
+fn choice_node_unique_selection_uses_each_child_once() {
+    let rules = empty_ruleset();
+    let mut state = RenderState::new(&rules);
+    let node = ChoiceNode::new(vec![Box::new("Mia".to_string())]);
+
+    assert_eq!(
+        node.generate_unique_text("hero", &mut state).unwrap(),
+        "Mia"
+    );
+    assert_eq!(
+        node.generate_unique_text("hero", &mut state),
+        Err(RenderError::ExhaustedUniqueChoice("hero".to_string()))
+    );
+}
+
+#[test]
 fn weighted_choice_node_renders_positive_weight_child() {
     let rules = empty_ruleset();
     let mut state = RenderState::new(&rules);
@@ -156,6 +172,32 @@ fn weighted_choice_node_renders_positive_weight_child() {
     .unwrap();
 
     assert_eq!(node.generate_text(&mut state).unwrap(), "Darcy");
+}
+
+#[test]
+fn weighted_choice_node_unique_selection_uses_positive_unused_children() {
+    let rules = empty_ruleset();
+    let mut state = RenderState::new(&rules);
+    let node = WeightedChoiceNode::new(vec![
+        (
+            Box::new("Mia".to_string()) as Box<dyn TextGeneratorNode>,
+            1.0,
+        ),
+        (
+            Box::new("Darcy".to_string()) as Box<dyn TextGeneratorNode>,
+            0.0,
+        ),
+    ])
+    .unwrap();
+
+    assert_eq!(
+        node.generate_unique_text("hero", &mut state).unwrap(),
+        "Mia"
+    );
+    assert_eq!(
+        node.generate_unique_text("hero", &mut state),
+        Err(RenderError::ExhaustedUniqueChoice("hero".to_string()))
+    );
 }
 
 #[test]

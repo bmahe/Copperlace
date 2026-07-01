@@ -252,6 +252,29 @@ fn structured_render_keeps_context_array_defaults_as_text_choices() {
 }
 
 #[test]
+fn structured_text_leaves_share_unique_choice_state() {
+    let rules = ruleset(
+        r#"
+        hero = [Mia, Lina]
+        origin {
+            first = "{hero!}"
+            second = "{hero!}"
+        }
+        "#,
+    );
+
+    let value = rules.render_rule_structured("origin").unwrap();
+    let CopperlaceValue::String(first) = object_field(&value, "first") else {
+        panic!("expected string");
+    };
+    let CopperlaceValue::String(second) = object_field(&value, "second") else {
+        panic!("expected string");
+    };
+
+    assert_ne!(first, second);
+}
+
+#[test]
 fn structured_object_fields_use_context_defaults_without_order_dependency() {
     let rules = ruleset(
         r#"

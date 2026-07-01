@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use super::ruleset::RuleSet;
 
@@ -31,6 +31,7 @@ pub struct RenderState<'a> {
     pub(crate) context: RenderContext,
     pub(crate) options: RenderOptions,
     pub(crate) call_stack: Vec<String>,
+    pub(crate) unique_choices: HashMap<String, HashSet<usize>>,
     pub(crate) rng: rand::rngs::ThreadRng,
 }
 
@@ -56,7 +57,19 @@ impl<'a> RenderState<'a> {
             context,
             options,
             call_stack: Vec::new(),
+            unique_choices: HashMap::new(),
             rng: rand::rngs::ThreadRng::default(),
         }
+    }
+
+    pub(crate) fn used_unique_choice_indices(&self, rule_name: &str) -> Option<&HashSet<usize>> {
+        self.unique_choices.get(rule_name)
+    }
+
+    pub(crate) fn mark_unique_choice_index(&mut self, rule_name: &str, index: usize) {
+        self.unique_choices
+            .entry(rule_name.to_string())
+            .or_default()
+            .insert(index);
     }
 }

@@ -59,6 +59,10 @@ context defaults, `sentence`, and `article`.
 Recursive route text. Demonstrates opt-in limited recursion with
 `--max-recursion-depth`.
 
+`rival_duel.conf`::
+Duel prompt text. Demonstrates strict unique choice calls with `{rule!}` so two
+fighters draw distinct entries from one choice rule.
+
 `release_note.conf`::
 Changelog-style output. Demonstrates `past_tense`, `article`, `ordinal`,
 `pluralize`, `possessive`, and binding reuse.
@@ -77,6 +81,7 @@ cargo run --bin copperlace -- render --config ../examples/product_blurb.conf --r
 cargo run --bin copperlace -- render --config ../examples/proverbs.conf --rule origin
 cargo run --bin copperlace -- render --config ../examples/proverbs.conf --rule short
 cargo run --bin copperlace -- render --config ../examples/recursive_path.conf --max-recursion-depth 3
+cargo run --bin copperlace -- render --config ../examples/rival_duel.conf --rule origin
 cargo run --bin copperlace -- render --config ../examples/gendered_pronouns.conf --rule origin
 cargo run --bin copperlace -- render --config ../examples/gendered_pronouns.conf --rule profile
 cargo run --bin copperlace -- render --config ../examples/fish_report.conf --rule origin
