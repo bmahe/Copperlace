@@ -30,14 +30,6 @@ jobs:
         include:
           - target: linux-x86_64
             runner: ubuntu-24.04
-          - target: linux-aarch64
-            runner: ubuntu-24.04-arm
-          - target: macos-x86_64
-            runner: macos-15-intel
-          - target: macos-aarch64
-            runner: macos-15
-          - target: windows-x86_64
-            runner: windows-2022
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

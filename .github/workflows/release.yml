@@ -188,6 +188,28 @@ jobs:
           name: js-package
           path: dist/*.tgz
 
+  pypi-publish:
+    name: Publish Python package to PyPI
+    needs:
+      - python-wheel
+      - python-sdist
+    runs-on: ubuntu-24.04
+    environment:
+      name: pypi
+      url: https://pypi.org/p/copperlace
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: python-*
+          path: python-release-artifacts
+          merge-multiple: true
+      - name: Publish distributions to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: python-release-artifacts
+
   publish:
     name: Publish GitHub Release
     needs:
