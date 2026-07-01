@@ -6,7 +6,11 @@ Use `Fixes #<issue>`, `Closes #<issue>`, or `Resolves #<issue>` when this PR
 should close an issue on merge. Use `Related to #<issue>` when it should only
 link the issue.
 
-## Summary
+## Problem
+
+What user, maintainer, packaging, or API problem does this solve?
+
+## Changes
 
 - 
 
