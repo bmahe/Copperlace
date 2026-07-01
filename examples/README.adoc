@@ -47,6 +47,10 @@ Product or marketing microcopy. Demonstrates multiple render rules plus
 Short proverb-style sayings. Demonstrates weighted templates, bindings,
 context defaults, `sentence`, and `article`.
 
+`recursive_path.conf`::
+Recursive route text. Demonstrates opt-in limited recursion with
+`--max-recursion-depth`.
+
 `release_note.conf`::
 Changelog-style output. Demonstrates `past_tense`, `article`, `ordinal`,
 `pluralize`, `possessive`, and binding reuse.
@@ -64,6 +68,7 @@ cargo run --bin copperlace -- render --config ../examples/product_blurb.conf --r
 cargo run --bin copperlace -- render --config ../examples/product_blurb.conf --rule slug
 cargo run --bin copperlace -- render --config ../examples/proverbs.conf --rule origin
 cargo run --bin copperlace -- render --config ../examples/proverbs.conf --rule short
+cargo run --bin copperlace -- render --config ../examples/recursive_path.conf --max-recursion-depth 3
 cargo run --bin copperlace -- render --config ../examples/gendered_pronouns.conf --rule origin
 cargo run --bin copperlace -- render --config ../examples/gendered_pronouns.conf --rule profile
 cargo run --bin copperlace -- render --config ../examples/item_json.conf --rule origin
@@ -87,3 +92,8 @@ cargo run --bin copperlace -- render --config ../examples/structured_item.conf -
 cargo run --bin copperlace -- render --config ../examples/structured_item.conf --count 2
 cargo run --bin copperlace -- render --config ../examples/structured_item.conf --set itemRarity=mythic
 ----
+
+`recursive_path.conf` intentionally calls `path_tail` from itself. Rendering it
+without `--max-recursion-depth` fails with `CircularRuleReference`; rendering
+with `--max-recursion-depth 3` produces a finite route and cuts off the next
+recursive call with an empty string.

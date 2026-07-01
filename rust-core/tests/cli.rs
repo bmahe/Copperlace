@@ -69,6 +69,36 @@ fn renders_with_limited_recursion_depth() {
 }
 
 #[test]
+fn recursive_path_example_renders_with_limited_recursion_depth() {
+    let output = Command::new(env!("CARGO_BIN_EXE_copperlace"))
+        .args([
+            "render",
+            "--config",
+            "../examples/recursive_path.conf",
+            "--max-recursion-depth",
+            "3",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(stdout.contains("Begin at "));
+    assert_eq!(stdout.matches(" Then ").count(), 4);
+}
+
+#[test]
+fn recursive_path_example_errors_without_limited_recursion_depth() {
+    let output = Command::new(env!("CARGO_BIN_EXE_copperlace"))
+        .args(["render", "--config", "../examples/recursive_path.conf"])
+        .output()
+        .unwrap();
+
+    assert!(!output.status.success());
+    assert!(String::from_utf8_lossy(&output.stderr).contains("circular rule reference"));
+}
+
+#[test]
 fn rejects_invalid_max_recursion_depth() {
     let config_path = write_temp_config(
         r#"

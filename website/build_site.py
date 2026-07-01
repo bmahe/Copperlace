@@ -315,7 +315,11 @@ def examples_scripts() -> str:
       try {{
         await ready;
         const copperlace = new Copperlace(example.config);
-        output.textContent = copperlace.render("origin");
+        if (example.maxRecursionDepth > 0) {{
+          output.textContent = copperlace.renderWithOptions("origin", example.maxRecursionDepth);
+        }} else {{
+          output.textContent = copperlace.render("origin");
+        }}
       }} catch (error) {{
         output.textContent = error instanceof Error ? error.message : String(error);
         output.classList.add("is-error");
@@ -418,16 +422,38 @@ def examples_section() -> str:
 def examples_data() -> list[dict[str, str]]:
     examples = []
     for config in sorted((ROOT / "examples").glob("*.conf")):
+        text = config.read_text(encoding="utf-8")
         examples.append(
             {
                 "file": config.name,
                 "name": config.stem.replace("_", " ").title(),
-                "config": config.read_text(encoding="utf-8"),
+                "config": text,
+                "maxRecursionDepth": example_max_recursion_depth(text),
                 "sourceUrl": f"conf/{config.name}.html",
                 "downloadUrl": f"conf/{config.name}",
             }
         )
     return examples
+
+
+def example_max_recursion_depth(config: str) -> int:
+    prefix = "# copperlace-example-max-recursion-depth:"
+    for line in config.splitlines():
+        stripped = line.strip()
+        if not stripped:
+            continue
+        if not stripped.startswith("#"):
+            return 0
+        if stripped.startswith(prefix):
+            value = stripped.removeprefix(prefix).strip()
+            try:
+                depth = int(value)
+            except ValueError as exception:
+                raise ValueError(f"invalid example max recursion depth: {value}") from exception
+            if depth < 0:
+                raise ValueError(f"invalid example max recursion depth: {value}")
+            return depth
+    return 0
 
 
 def build_example_sources() -> None:
