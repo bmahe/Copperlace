@@ -94,6 +94,21 @@ mood = [
 ]
 ----
 
+Strict unique choice calls use `{rule!}` to draw without replacement from an
+array-backed rule during one render operation.
+
+[source]
+----
+hero = [Mia, Lina]
+origin = "{hero!} faces {hero!}"
+----
+
+Existing bindings and initial context values still resolve before the unique
+choice rule. Lazy `context` defaults are rendered and cached normally; place the
+`!` inside the default when the nested choice should be unique. Unique weighted
+choices keep the original weights for unused entries and fail when no positive
+unused weight remains.
+
 Arrays inside structured object-valued rules are different from top-level list
 rules: they render as arrays and preserve their children in order. Top-level
 list rules remain random text choices in v1.

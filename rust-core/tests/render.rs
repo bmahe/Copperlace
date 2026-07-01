@@ -14,6 +14,17 @@ fn ruleset_result(config: &str) -> Result<RuleSet, RenderError> {
     RuleSet::from_config(value)
 }
 
+fn assert_ruleset_error(config: &str, expected: RenderError) {
+    match ruleset_result(config) {
+        Ok(_) => panic!("expected ruleset construction to fail"),
+        Err(error) => assert_eq!(error, expected),
+    }
+}
+
+fn slash_pair(value: &str) -> (&str, &str) {
+    value.split_once('/').unwrap()
+}
+
 #[test]
 fn renders_from_multiple_named_rules() {
     let rules = ruleset(
@@ -736,6 +747,233 @@ fn weighted_choice_rejects_malformed_object_in_weighted_array() {
         ),
         Err(RenderError::InvalidWeightedChoice(_))
     ));
+}
+
+#[test]
+fn unique_choice_draws_distinct_entries() {
+    let rules = ruleset(
+        r#"
+        hero = [Mia, Lina]
+        origin = "{hero!}/{hero!}"
+        "#,
+    );
+
+    let output = rules.render_rule("origin").unwrap();
+    let (first, second) = slash_pair(&output);
+
+    assert_ne!(first, second);
+    assert!(["Mia", "Lina"].contains(&first));
+    assert!(["Mia", "Lina"].contains(&second));
+}
+
+#[test]
+fn normal_repeated_choice_call_is_backward_compatible() {
+    let rules = ruleset(
+        r#"
+        hero = [Mia]
+        origin = "{hero}/{hero}"
+        "#,
+    );
+
+    assert_eq!(rules.render_rule("origin").unwrap(), "Mia/Mia");
+}
+
+#[test]
+fn unique_choice_state_resets_between_render_calls() {
+    let rules = ruleset(
+        r#"
+        hero = [Mia]
+        origin = "{hero!}"
+        "#,
+    );
+
+    assert_eq!(rules.render_rule("origin").unwrap(), "Mia");
+    assert_eq!(rules.render_rule("origin").unwrap(), "Mia");
+}
+
+#[test]
+fn unique_choice_returns_exhausted_when_entries_are_used() {
+    let rules = ruleset(
+        r#"
+        hero = [Mia, Lina]
+        origin = "{hero!}, {hero!}, {hero!}"
+        "#,
+    );
+
+    assert_eq!(
+        rules.render_rule("origin"),
+        Err(RenderError::ExhaustedUniqueChoice("hero".to_string()))
+    );
+}
+
+#[test]
+fn unique_choice_returns_unsupported_for_non_choice_rule() {
+    let rules = ruleset(
+        r#"
+        title = "The {hero}"
+        hero = [Mia]
+        origin = "{title!}"
+        "#,
+    );
+
+    assert_eq!(
+        rules.render_rule("origin"),
+        Err(RenderError::UnsupportedUniqueChoice("title".to_string()))
+    );
+}
+
+#[test]
+fn unique_empty_choice_preserves_empty_choice_error() {
+    let rules = ruleset(
+        r#"
+        empty = []
+        origin = "{empty!}"
+        "#,
+    );
+
+    assert_eq!(rules.render_rule("origin"), Err(RenderError::EmptyChoice));
+}
+
+#[test]
+fn binding_value_wins_before_unique_choice() {
+    let rules = ruleset(
+        r#"
+        name = [Mia]
+        origin = "{% hero:name %}{hero!}/{hero!}"
+        "#,
+    );
+
+    assert_eq!(rules.render_rule("origin").unwrap(), "Mia/Mia");
+}
+
+#[test]
+fn initial_context_value_wins_before_unique_choice() {
+    let rules = ruleset(
+        r#"
+        hero = [Mia]
+        origin = "{hero!}/{hero!}"
+        "#,
+    );
+    let mut context = RenderContext::new();
+    context.insert("hero".to_string(), "Lina".to_string());
+
+    assert_eq!(
+        rules.render_rule_with_context("origin", context).unwrap(),
+        "Lina/Lina"
+    );
+}
+
+#[test]
+fn context_default_is_rendered_and_cached_before_unique_named_rule() {
+    let rules = ruleset(
+        r#"
+        name = [Mia, Lina]
+        origin = "{hero!}/{hero!}"
+        context = {
+            hero = "{name}"
+        }
+        "#,
+    );
+
+    let output = rules.render_rule("origin").unwrap();
+    let (first, second) = slash_pair(&output);
+    assert_eq!(first, second);
+    assert!(["Mia", "Lina"].contains(&first));
+}
+
+#[test]
+fn unique_marker_inside_context_default_applies_to_nested_choice() {
+    let rules = ruleset(
+        r#"
+        name = [Mia, Lina]
+        origin = "{hero}/{rival}"
+        context = {
+            hero = "{name!}"
+            rival = "{name!}"
+        }
+        "#,
+    );
+
+    let output = rules.render_rule("origin").unwrap();
+    let (first, second) = slash_pair(&output);
+    assert_ne!(first, second);
+}
+
+#[test]
+fn weighted_unique_choice_uses_only_positive_unused_entries() {
+    let rules = ruleset(
+        r#"
+        hero = [
+            { value = Mia, weight = 1 },
+            { value = Lina, weight = 0 }
+        ]
+        origin = "{hero!}/{hero!}"
+        "#,
+    );
+
+    assert_eq!(
+        rules.render_rule("origin"),
+        Err(RenderError::ExhaustedUniqueChoice("hero".to_string()))
+    );
+}
+
+#[test]
+fn unique_choice_supports_processors_and_bindings() {
+    let rules = ruleset(
+        r#"
+        hero = [mia]
+        origin = "{hero! | uppercase}/{% first:hero! %}{first}"
+        "#,
+    );
+
+    assert_eq!(
+        rules.render_rule("origin"),
+        Err(RenderError::ExhaustedUniqueChoice("hero".to_string()))
+    );
+}
+
+#[test]
+fn unique_choice_binding_source_renders_and_reuses_bound_value() {
+    let rules = ruleset(
+        r#"
+        hero = [Mia]
+        origin = "{% first:hero! %}{first}/{first}"
+        "#,
+    );
+
+    assert_eq!(rules.render_rule("origin").unwrap(), "Mia/Mia");
+}
+
+#[test]
+fn unique_choice_processor_pipeline_applies_after_selection() {
+    let rules = ruleset(
+        r#"
+        hero = [mia]
+        origin = "{hero! | uppercase}"
+        "#,
+    );
+
+    assert_eq!(rules.render_rule("origin").unwrap(), "MIA");
+}
+
+#[test]
+fn malformed_unique_expressions_fail_during_ruleset_construction() {
+    assert_ruleset_error(
+        r#"origin = "{!}""#,
+        RenderError::InvalidExpression("!".to_string()),
+    );
+    assert_ruleset_error(
+        r#"origin = "{% alias:! %}""#,
+        RenderError::InvalidExpression("alias:!".to_string()),
+    );
+}
+
+#[test]
+fn unique_expression_preserves_processor_validation() {
+    assert_ruleset_error(
+        r#"origin = "{hero! | missing_processor}""#,
+        RenderError::UnknownProcessor("missing_processor".to_string()),
+    );
 }
 
 #[test]

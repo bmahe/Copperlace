@@ -13,6 +13,10 @@ pub enum RenderError {
     InvalidExpression(String),
     /// An array-backed choice rule had no alternatives.
     EmptyChoice,
+    /// A strict unique choice call used every usable alternative.
+    ExhaustedUniqueChoice(String),
+    /// A strict unique choice call reached a rule that is not an array-backed choice.
+    UnsupportedUniqueChoice(String),
     /// A weighted choice config entry is malformed.
     InvalidWeightedChoice(String),
     /// Rendering detected a recursive rule cycle.
@@ -41,6 +45,12 @@ impl fmt::Display for RenderError {
                 write!(formatter, "invalid template expression: {expression}")
             }
             RenderError::EmptyChoice => write!(formatter, "cannot render an empty choice"),
+            RenderError::ExhaustedUniqueChoice(rule) => {
+                write!(formatter, "exhausted unique choice: {rule}")
+            }
+            RenderError::UnsupportedUniqueChoice(rule) => {
+                write!(formatter, "unique choice target is not a choice: {rule}")
+            }
             RenderError::InvalidWeightedChoice(message) => {
                 write!(formatter, "invalid weighted choice: {message}")
             }

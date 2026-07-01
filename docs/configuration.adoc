@@ -96,6 +96,30 @@ Supported expressions:
 * `{rule}` resolves a bound value, context default, or named rule.
 * `{rule | processor}` renders `rule` and passes the result through one or more
   processors from left to right.
+* `{rule!}` is a strict unique choice call. It resolves existing bound values
+  and `context` defaults normally. If no value exists, `rule` must be an
+  array-backed choice rule, and Copperlace selects an unused array entry for
+  that rule within the current render.
+
+Strict unique calls can use processors and binding statements:
+
+[source]
+----
+hero = [Mia, Lina]
+origin = "{hero! | uppercase} faces {% rival:hero! %}{rival}"
+----
+
+Repeated `{rule!}` calls share one used-entry set per rule name for the current
+render operation. The set resets for the next render. Exhaustion fails with
+`ExhaustedUniqueChoice(rule)`, and using `!` with a non-choice rule fails with
+`UnsupportedUniqueChoice(rule)`. Uniqueness is by array entry index, not by the
+rendered text. Weighted unique choices sample only among unused entries using
+their original weights; if the remaining unused entries have no positive total
+weight, rendering fails.
+
+The `!` marker does not propagate through lazy `context` defaults. If `{hero!}`
+resolves `context.hero = "{name}"`, the default is rendered and cached normally.
+Use `context.hero = "{name!}"` when the nested `name` draw should be unique.
 
 == Limited Recursion
 
@@ -283,6 +307,10 @@ one entry with a positive weight. Invalid weighted choices fail during
 
 An empty array is accepted during `RuleSet` construction, but rendering it fails
 with `EmptyChoice`.
+
+Strict unique calls such as `{mood!}` select without replacement from the
+top-level array-backed `mood` rule for one render operation. Empty arrays still
+fail with `EmptyChoice`.
 
 Inside an object-valued structured rule, arrays preserve their shape instead of
 acting as random choices. Top-level list structured rendering is not supported

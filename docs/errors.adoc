@@ -186,6 +186,15 @@ an unmatched raw `{`, `}`, `{%`, or `%}`.
 `EmptyChoice`::
 Returned when rendering an array value with no elements.
 
+`ExhaustedUniqueChoice(String)`::
+Returned when a strict unique choice call such as `{hero!}` has no unused,
+usable entry left for the named array-backed rule in the current render.
+
+`UnsupportedUniqueChoice(String)`::
+Returned when a strict unique choice call reaches a named rule that is not an
+array-backed choice. Existing context values and lazy `context` defaults can
+still satisfy `{rule!}` before this error is considered.
+
 `InvalidWeightedChoice(String)`::
 Returned during `RuleSet` construction when a weighted choice entry is
 malformed, has a missing or invalid weight, or has no positive-weight entries.

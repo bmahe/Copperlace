@@ -42,6 +42,15 @@ Lina traveled with a raven. Lina stayed restless.
 The important detail is consistency inside one result: `{% hero:name %}` chooses a
 name once, and later `{hero}` references reuse that same name.
 
+When you need different entries from the same choice rule, add `!` to draw
+without replacement for the current render:
+
+[source]
+----
+name = ["Mia", "Lina"]
+duel = "{name!} faces {name!}"
+----
+
 Template expressions also support processor pipelines:
 
 [source]

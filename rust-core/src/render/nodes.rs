@@ -13,6 +13,15 @@ use super::state::RenderState;
 pub trait TextGeneratorNode {
     /// Generates text using the supplied render state.
     fn generate_text(&self, state: &mut RenderState) -> Result<String, RenderError>;
+
+    /// Generates text for a strict unique call to `rule_name`.
+    fn generate_unique_text(
+        &self,
+        rule_name: &str,
+        _state: &mut RenderState,
+    ) -> Result<String, RenderError> {
+        Err(RenderError::UnsupportedUniqueChoice(rule_name.to_string()))
+    }
 }
 
 /// Literal text node.
@@ -62,12 +71,21 @@ impl TextGeneratorNode for VariableNode {
 /// 3. render the named rule from `RuleSet`.
 pub struct RuleCallNode {
     name: String,
+    unique: bool,
 }
 
 impl RuleCallNode {
     /// Creates a rule call node for a template reference.
     pub fn new(name: String) -> Self {
-        RuleCallNode { name }
+        RuleCallNode {
+            name,
+            unique: false,
+        }
+    }
+
+    /// Creates a strict unique rule call node for a template reference.
+    pub fn new_unique(name: String) -> Self {
+        RuleCallNode { name, unique: true }
     }
 }
 
@@ -83,6 +101,12 @@ impl TextGeneratorNode for RuleCallNode {
         {
             state.context.insert(self.name.clone(), value.clone());
             return Ok(value);
+        }
+
+        if self.unique {
+            return state
+                .ruleset
+                .render_unique_rule_with_state(&self.name, state);
         }
 
         state.ruleset.render_rule_with_state(&self.name, state)
@@ -177,6 +201,26 @@ impl TextGeneratorNode for ChoiceNode {
             .ok_or(RenderError::EmptyChoice)?;
         random_node.generate_text(state)
     }
+
+    fn generate_unique_text(
+        &self,
+        rule_name: &str,
+        state: &mut RenderState,
+    ) -> Result<String, RenderError> {
+        if self.nodes.is_empty() {
+            return Err(RenderError::EmptyChoice);
+        }
+
+        let used_indices = state.used_unique_choice_indices(rule_name);
+        let unused_indices = (0..self.nodes.len())
+            .filter(|index| used_indices.is_none_or(|used| !used.contains(index)))
+            .collect::<Vec<_>>();
+        let selected_index = *unused_indices
+            .choose(&mut state.rng)
+            .ok_or_else(|| RenderError::ExhaustedUniqueChoice(rule_name.to_string()))?;
+        state.mark_unique_choice_index(rule_name, selected_index);
+        self.nodes[selected_index].generate_text(state)
+    }
 }
 
 /// Randomly renders one child node using per-child weights.
@@ -186,6 +230,7 @@ impl TextGeneratorNode for ChoiceNode {
 /// the same array receive weight `1.0`.
 pub struct WeightedChoiceNode {
     nodes: Vec<Box<dyn TextGeneratorNode>>,
+    weights: Vec<f64>,
     distribution: WeightedIndex<f64>,
 }
 
@@ -193,10 +238,11 @@ impl WeightedChoiceNode {
     /// Creates a weighted choice node from renderable alternatives and weights.
     pub fn new(entries: Vec<(Box<dyn TextGeneratorNode>, f64)>) -> Result<Self, RenderError> {
         let (nodes, weights): (Vec<_>, Vec<_>) = entries.into_iter().unzip();
-        let distribution = WeightedIndex::new(weights)
+        let distribution = WeightedIndex::new(weights.clone())
             .map_err(|error| RenderError::InvalidWeightedChoice(error.to_string()))?;
         Ok(WeightedChoiceNode {
             nodes,
+            weights,
             distribution,
         })
     }
@@ -206,6 +252,39 @@ impl TextGeneratorNode for WeightedChoiceNode {
     fn generate_text(&self, state: &mut RenderState) -> Result<String, RenderError> {
         let index = self.distribution.sample(&mut state.rng);
         self.nodes[index].generate_text(state)
+    }
+
+    fn generate_unique_text(
+        &self,
+        rule_name: &str,
+        state: &mut RenderState,
+    ) -> Result<String, RenderError> {
+        if self.nodes.is_empty() {
+            return Err(RenderError::EmptyChoice);
+        }
+
+        let used_indices = state.used_unique_choice_indices(rule_name);
+        let unused_entries = self
+            .weights
+            .iter()
+            .enumerate()
+            .filter(|(index, _)| used_indices.is_none_or(|used| !used.contains(index)))
+            .map(|(index, weight)| (index, *weight))
+            .collect::<Vec<_>>();
+        if unused_entries.is_empty() {
+            return Err(RenderError::ExhaustedUniqueChoice(rule_name.to_string()));
+        }
+
+        let remaining_weights = unused_entries
+            .iter()
+            .map(|(_, weight)| *weight)
+            .collect::<Vec<_>>();
+        let distribution = WeightedIndex::new(remaining_weights)
+            .map_err(|_| RenderError::ExhaustedUniqueChoice(rule_name.to_string()))?;
+        let selected_entry_index = distribution.sample(&mut state.rng);
+        let selected_node_index = unused_entries[selected_entry_index].0;
+        state.mark_unique_choice_index(rule_name, selected_node_index);
+        self.nodes[selected_node_index].generate_text(state)
     }
 }
 

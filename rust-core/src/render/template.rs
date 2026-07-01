@@ -141,10 +141,8 @@ fn expression_to_node(
     if name.is_empty() {
         return Err(RenderError::InvalidExpression(expression.to_string()));
     }
-    Ok(pipeline_node(
-        Box::new(RuleCallNode::new(name.to_string())),
-        processor_names,
-    ))
+    let (name, unique) = parse_unique_call(name, expression)?;
+    Ok(pipeline_node(rule_call_node(name, unique), processor_names))
 }
 
 fn parse_pipeline<'a>(
@@ -183,11 +181,28 @@ fn bind_node(
     if name.is_empty() || source.is_empty() {
         return Err(RenderError::InvalidExpression(expression.to_string()));
     }
-    let node = pipeline_node(
-        Box::new(RuleCallNode::new(source.to_string())),
-        processor_names,
-    );
+    let (source, unique) = parse_unique_call(source, expression)?;
+    let node = pipeline_node(rule_call_node(source, unique), processor_names);
     Ok(Box::new(BindNode::new(name.to_string(), node, mode)))
+}
+
+fn parse_unique_call<'a>(name: &'a str, expression: &str) -> Result<(&'a str, bool), RenderError> {
+    let Some(name) = name.strip_suffix('!') else {
+        return Ok((name, false));
+    };
+    let name = name.trim_end();
+    if name.is_empty() {
+        return Err(RenderError::InvalidExpression(expression.to_string()));
+    }
+    Ok((name, true))
+}
+
+fn rule_call_node(name: &str, unique: bool) -> Box<dyn TextGeneratorNode> {
+    if unique {
+        Box::new(RuleCallNode::new_unique(name.to_string()))
+    } else {
+        Box::new(RuleCallNode::new(name.to_string()))
+    }
 }
 
 fn pipeline_node(

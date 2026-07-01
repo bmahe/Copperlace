@@ -262,6 +262,28 @@ impl RuleSet {
             return Err(RenderError::UnknownRule(rule_name.to_string()));
         };
 
+        self.render_node_with_state(rule_name, rule.as_ref(), state, false)
+    }
+
+    pub(crate) fn render_unique_rule_with_state(
+        &self,
+        rule_name: &str,
+        state: &mut RenderState,
+    ) -> Result<String, RenderError> {
+        let Some(rule) = self.text_rules.get(rule_name) else {
+            return Err(RenderError::UnknownRule(rule_name.to_string()));
+        };
+
+        self.render_node_with_state(rule_name, rule.as_ref(), state, true)
+    }
+
+    fn render_node_with_state(
+        &self,
+        rule_name: &str,
+        rule: &dyn TextGeneratorNode,
+        state: &mut RenderState,
+        unique: bool,
+    ) -> Result<String, RenderError> {
         let existing_calls = state
             .call_stack
             .iter()
@@ -277,7 +299,11 @@ impl RuleSet {
         }
 
         state.call_stack.push(rule_name.to_string());
-        let result = rule.generate_text(state);
+        let result = if unique {
+            rule.generate_unique_text(rule_name, state)
+        } else {
+            rule.generate_text(state)
+        };
         state.call_stack.pop();
         result
     }
