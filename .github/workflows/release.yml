@@ -127,12 +127,18 @@ jobs:
           API_JAR="java/api/target/copperlace-api-${VERSION}.jar"
           NATIVE_JAR="java/native/${{ matrix.classifier }}/target/copperlace-${{ matrix.classifier }}-${VERSION}.jar"
           python scripts/smoke_java_artifacts.py --api-jar "$API_JAR" --native-jar "$NATIVE_JAR"
+      - shell: bash
+        run: |
+          VERSION=$(python scripts/check_versions.py)
+          mkdir -p dist
+          if [[ "${{ matrix.target }}" == "linux-x86_64" ]]; then
+            cp "java/api/target/copperlace-api-${VERSION}.jar" dist/
+          fi
+          cp "java/native/${{ matrix.classifier }}/target/copperlace-${{ matrix.classifier }}-${VERSION}.jar" dist/
       - uses: actions/upload-artifact@v4
         with:
           name: java-jars-${{ matrix.target }}
-          path: |
-            java/api/target/*.jar
-            java/native/${{ matrix.classifier }}/target/*.jar
+          path: dist/*.jar
 
   cli-archive:
     name: CLI archive (${{ matrix.target }})
