@@ -82,6 +82,7 @@ fn copperlace_ruleset_render_with_context(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn copperlace_ruleset_render_with_context_and_options(
     handle: *const CopperlaceRuleSet,
     rule: *const c_char,
