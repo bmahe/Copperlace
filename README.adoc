@@ -77,14 +77,47 @@ Copyright 2026 Bruno Mahé.
 Copperlace is licensed under the Apache License, Version 2.0. See
 link:LICENSE[LICENSE] for details.
 
+== Packages
+
+* link:https://crates.io/crates/copperlace[crates.io]
+* link:https://docs.rs/copperlace[docs.rs]
+* link:https://pypi.org/project/copperlace/[PyPI]
+* link:https://central.sonatype.com/artifact/dev.mahe.copperlace/copperlace[Maven Central]
+* link:https://www.npmjs.com/package/copperlace[npm]
+* link:https://bmahe.github.io/Copperlace/[Project site]
+
 == Quick Start
 
-Run the bundled example from the Rust project:
+Install the released CLI:
 
 [source,sh]
 ----
-cd rust-core
-cargo run --bin copperlace -- render -c ../examples/character_scene.conf
+cargo install copperlace
+----
+
+Render a small configuration from standard input:
+
+[source,sh]
+----
+cat <<'EOF' | copperlace render -c -
+name = ["Mia"]
+pet = ["owl"]
+origin = "{name} travels with {pet | article}."
+EOF
+----
+
+Output:
+
+[source,text]
+----
+Mia travels with an owl.
+----
+
+From a repository checkout, run the bundled example:
+
+[source,sh]
+----
+copperlace render -c examples/character_scene.conf
 ----
 
 Example output:
@@ -96,11 +129,12 @@ Darcy's scholar found a brass compass in a moonlit bridge while running. The qui
 
 Your exact result may differ because the example contains random choices.
 
-Render three results from the same loaded configuration:
+Using the same example file, render three results from one loaded
+configuration:
 
 [source,sh]
 ----
-cargo run --bin copperlace -- render -c ../examples/character_scene.conf -n 3
+copperlace render -c examples/character_scene.conf -n 3
 ----
 
 Example output:
@@ -117,7 +151,7 @@ the other values can still vary:
 
 [source,sh]
 ----
-cargo run --bin copperlace -- render -c ../examples/character_scene.conf --set hero=Mia
+copperlace render -c examples/character_scene.conf --set hero=Mia
 ----
 
 Example output:
@@ -131,7 +165,7 @@ Check a configuration without rendering it:
 
 [source,sh]
 ----
-cargo run --bin copperlace -- check -c ../examples/character_scene.conf
+copperlace check -c examples/character_scene.conf
 ----
 
 Output:
@@ -145,8 +179,8 @@ Use `-` as the config path to read configuration from standard input:
 
 [source,sh]
 ----
-cat ../examples/character_scene.conf | cargo run --bin copperlace -- render -c -
-cat ../examples/character_scene.conf | cargo run --bin copperlace -- check -c -
+cat examples/character_scene.conf | copperlace render -c -
+cat examples/character_scene.conf | copperlace check -c -
 ----
 
 More runnable examples live in link:examples/README.adoc[examples/], covering
@@ -158,7 +192,7 @@ with tabs by default:
 
 [source,sh]
 ----
-cargo run --bin copperlace -- render -c ../examples/structured_item.conf
+copperlace render -c examples/structured_item.conf
 ----
 
 Example output:
@@ -204,6 +238,20 @@ Python, Java, and browser JavaScript/WebAssembly.
 
 === Rust
 
+Add Copperlace to a Rust project:
+
+[source,sh]
+----
+cargo add copperlace
+----
+
+Or add it to `Cargo.toml`:
+
+[source,toml]
+----
+copperlace = "0.3.1"
+----
+
 [source,rust]
 ----
 use copperlace::Copperlace;
@@ -220,6 +268,13 @@ let seeded = copperlace.render_with_context(
 One-shot helpers are also available when repeated rendering is not needed.
 
 === Python
+
+Install the Python package:
+
+[source,sh]
+----
+pip install copperlace
+----
 
 [source,python]
 ----
@@ -241,6 +296,24 @@ Python also exposes `RuleSet` and one-shot render helpers. Wrapper errors are
 raised as `CopperlaceError`.
 
 === Java
+
+Use the all-platform Maven Central dependency:
+
+[source,xml]
+----
+<dependency>
+  <groupId>dev.mahe.copperlace</groupId>
+  <artifactId>copperlace</artifactId>
+  <version>0.3.1</version>
+</dependency>
+----
+
+Gradle Kotlin DSL:
+
+[source,kotlin]
+----
+implementation("dev.mahe.copperlace:copperlace:0.3.1")
+----
 
 [source,java]
 ----
@@ -265,9 +338,16 @@ Java also exposes `RuleSet` and one-shot render helpers. `Copperlace` and
 
 === JS/TS
 
+Install the npm package:
+
+[source,sh]
+----
+npm install copperlace
+----
+
 [source,ts]
 ----
-import { Copperlace } from "./pkg/copperlace";
+import { Copperlace } from "copperlace";
 
 const response = await fetch("/config.conf");
 const config = await response.text();
@@ -279,11 +359,11 @@ const custom = Copperlace.withProcessors(config, {
 }).render("origin");
 ----
 
-The JS/TS package is generated with `wasm-pack`. Bundler output can be imported
-directly; direct browser ES module output must call the generated `init`
-function before using `Copperlace`. Browser code should load config text, then
-pass the string to `new Copperlace(config)`. File-path APIs are not exported to
-WebAssembly.
+The published JS/TS package is generated with `wasm-pack`. Bundler output can
+be imported directly; direct browser ES module output must call the generated
+`init` function before using `Copperlace`. Browser code should load config
+text, then pass the string to `new Copperlace(config)`. File-path APIs are not
+exported to WebAssembly.
 
 == Documentation
 
@@ -292,6 +372,7 @@ The detailed behavior and configuration contract lives in `docs/`:
 * link:docs/index.adoc[Documentation index]
 * link:docs/capabilities.adoc[Capabilities]
 * link:docs/configuration.adoc[Configuration]
+* link:docs/structured-output.adoc[Structured output]
 * link:docs/errors.adoc[Errors and API behavior]
 * link:docs/packaging.adoc[Packaging and language wrappers]
 
