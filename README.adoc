@@ -88,12 +88,29 @@ link:LICENSE[LICENSE] for details.
 
 == Quick Start
 
-Install the released CLI:
+If you have Rust installed, install the released CLI from crates.io:
 
 [source,sh]
 ----
 cargo install copperlace
 ----
+
+If you do not want to build from source, download the prebuilt CLI archive for
+your platform from the latest link:https://github.com/bmahe/Copperlace/releases[GitHub Release].
+The archive includes the `copperlace` executable, the native library, the
+README, and the license.
+
+On Linux and macOS, extract the archive and run the executable:
+
+[source,sh]
+----
+tar -xzf copperlace-<version>-<platform>-cli.tar.gz
+cd copperlace-<version>-<platform>-cli
+./copperlace --help
+----
+
+On Windows, extract `copperlace-<version>-windows-x86_64-cli.zip` and run
+`copperlace.exe`.
 
 Render a small configuration from standard input:
 

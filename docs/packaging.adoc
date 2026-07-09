@@ -66,6 +66,42 @@ The Rust package in `rust-core/` builds:
 `make cli-archive` builds the current-platform CLI release archive under
 `target/release-artifacts/`.
 
+== Prebuilt CLI Archives
+
+GitHub Releases publish prebuilt CLI archives for each first-class native
+platform. These archives are for users who want the `copperlace` executable
+without installing Rust or building from source.
+
+Archive names use this shape:
+
+[source,text]
+----
+copperlace-<version>-linux-x86_64-cli.tar.gz
+copperlace-<version>-linux-aarch64-cli.tar.gz
+copperlace-<version>-macos-x86_64-cli.tar.gz
+copperlace-<version>-macos-aarch64-cli.tar.gz
+copperlace-<version>-windows-x86_64-cli.zip
+----
+
+Each archive contains:
+
+* the `copperlace` executable, or `copperlace.exe` on Windows;
+* the platform native library;
+* `README.adoc`;
+* `LICENSE`.
+
+On Linux and macOS, extract the archive and run the executable:
+
+[source,sh]
+----
+tar -xzf copperlace-<version>-<platform>-cli.tar.gz
+cd copperlace-<version>-<platform>-cli
+./copperlace --help
+----
+
+On Windows, extract `copperlace-<version>-windows-x86_64-cli.zip` and run
+`copperlace.exe`.
+
 The CLI supports:
 
 [source,sh]
