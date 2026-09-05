@@ -46,8 +46,5 @@ defmodule Copperlace.Nif do
     do: :erlang.nif_error(:nif_not_loaded)
 
   @doc false
-  def close_raw(_handle), do: :erlang.nif_error(:nif_not_loaded)
-
-  @doc false
   def loaded, do: :erlang.nif_error(:nif_not_loaded)
 end

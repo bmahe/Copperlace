@@ -406,7 +406,11 @@ Public entry points are:
 * `Copperlace.render_inferred(copperlace, rule, context \\ %{}, opts \\ [])`
 * `Copperlace.render_structured(copperlace, rule, context \\ %{}, opts \\ [])`
 * `Copperlace.render!/4`, `Copperlace.render_inferred!/4`, `Copperlace.render_structured!/4`
-* `Copperlace.close(copperlace)`
+
+The native handle is a NIF resource released by the BEAM garbage collector
+when the `%Copperlace{}` struct becomes unreachable. There is no explicit
+`close/1`; this avoids the use-after-free risk of freeing a handle while a
+concurrent render is still in flight.
 
 `render/4` options: `:max_recursion_depth` (default `0`).
 `render_structured/4` options: `:max_recursion_depth` (default `0`) and

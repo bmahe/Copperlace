@@ -87,7 +87,6 @@ static struct {
 static ErlNifResourceType *copperlace_resource_type;
 
 typedef struct {
-  ErlNifMutex *lock;
   void *handle;
 } copperlace_resource;
 
@@ -267,14 +266,10 @@ static void copperlace_resource_destructor(ErlNifEnv *env, void *resource) {
   (void)env;
   copperlace_resource *res = (copperlace_resource *)resource;
   /* The BEAM calls the destructor only after the resource is no longer
-   * reachable, so no lock is needed here. */
+   * reachable, so there is no concurrent access to worry about. */
   if (res->handle != NULL && copperlace.ruleset_free != NULL) {
     copperlace.ruleset_free(res->handle);
     res->handle = NULL;
-  }
-  if (res->lock != NULL) {
-    enif_mutex_destroy(res->lock);
-    res->lock = NULL;
   }
 }
 
@@ -494,14 +489,7 @@ static ERL_NIF_TERM alloc_ruleset_resource(ErlNifEnv *env, void *handle) {
     return make_error_msg(env, COPPERLACE_INVALID_ARGUMENT,
                            "failed to allocate ruleset resource");
   }
-  res->lock = enif_mutex_create("copperlace");
   res->handle = handle;
-  if (res->lock == NULL) {
-    copperlace.ruleset_free(handle);
-    enif_release_resource(res);
-    return make_error_msg(env, COPPERLACE_INVALID_ARGUMENT,
-                           "failed to allocate ruleset mutex");
-  }
   ERL_NIF_TERM resource_term = enif_make_resource(env, res);
   enif_release_resource(res);
   return make_ok(env, resource_term);
@@ -582,29 +570,17 @@ static ERL_NIF_TERM do_render(ErlNifEnv *env, ERL_NIF_TERM handle_term,
   copperlace_resource *res = NULL;
   if (!enif_get_resource(env, handle_term, copperlace_resource_type,
                          (void **)&res) ||
-      res == NULL || res->lock == NULL) {
+      res == NULL || res->handle == NULL) {
     return make_error_msg(env, COPPERLACE_INVALID_ARGUMENT,
                            "invalid ruleset handle");
   }
 
-  /* Hold the lock for the entire render so a concurrent close/1 cannot
-   * free the handle while the Rust call is in flight. This serializes
-   * renders and close on the same handle, which is the safe tradeoff. */
-  enif_mutex_lock(res->lock);
-  if (res->handle == NULL) {
-    enif_mutex_unlock(res->lock);
-    return make_error_msg(env, COPPERLACE_INVALID_ARGUMENT,
-                           "ruleset handle is closed");
-  }
-
   ErlNifBinary rule_bin;
   if (!get_string(env, rule_term, &rule_bin)) {
-    enif_mutex_unlock(res->lock);
     return enif_make_badarg(env);
   }
   char *rule = malloc(rule_bin.size + 1);
   if (rule == NULL) {
-    enif_mutex_unlock(res->lock);
     return enif_make_badarg(env);
   }
   memcpy(rule, rule_bin.data, rule_bin.size);
@@ -617,7 +593,6 @@ static ERL_NIF_TERM do_render(ErlNifEnv *env, ERL_NIF_TERM handle_term,
   if (!build_context(env, context_term, &keys, &values, &context_len,
                      &context_error)) {
     free(rule);
-    enif_mutex_unlock(res->lock);
     return context_error;
   }
 
@@ -643,13 +618,11 @@ static ERL_NIF_TERM do_render(ErlNifEnv *env, ERL_NIF_TERM handle_term,
     default:
       free(rule);
       free_context_arrays(keys, values, context_len);
-      enif_mutex_unlock(res->lock);
       return make_error_msg(env, COPPERLACE_INVALID_ARGUMENT, "unknown render mode");
   }
 
   free(rule);
   free_context_arrays(keys, values, context_len);
-  enif_mutex_unlock(res->lock);
 
   if (status != COPPERLACE_OK) {
     return make_error(env, status, error);
@@ -696,26 +669,6 @@ static ERL_NIF_TERM nif_render_structured(ErlNifEnv *env, int argc,
   bool format_json = enif_is_identical(argv[4], true_atom) != 0;
   return do_render(env, argv[0], argv[1], argv[2], (size_t)max_recursion,
                    RENDER_STRUCTURED, format_json);
-}
-
-static ERL_NIF_TERM nif_close(ErlNifEnv *env, int argc,
-                              const ERL_NIF_TERM argv[]) {
-  if (argc != 1) {
-    return enif_make_badarg(env);
-  }
-  copperlace_resource *res = NULL;
-  if (!enif_get_resource(env, argv[0], copperlace_resource_type,
-                         (void **)&res) ||
-      res == NULL || res->lock == NULL) {
-    return enif_make_atom(env, "ok");
-  }
-  enif_mutex_lock(res->lock);
-  if (res->handle != NULL && copperlace.ruleset_free != NULL) {
-    copperlace.ruleset_free(res->handle);
-    res->handle = NULL;
-  }
-  enif_mutex_unlock(res->lock);
-  return enif_make_atom(env, "ok");
 }
 
 static ERL_NIF_TERM nif_loaded(ErlNifEnv *env, int argc,
@@ -787,7 +740,6 @@ static ErlNifFunc nif_funcs[] = {
     {"render_inferred_raw", 4, nif_render_inferred, ERL_NIF_DIRTY_JOB_CPU_BOUND},
     {"render_structured_raw", 5, nif_render_structured,
      ERL_NIF_DIRTY_JOB_CPU_BOUND},
-    {"close_raw", 1, nif_close, 0},
     {"loaded", 0, nif_loaded, 0},
 };
 

@@ -154,21 +154,6 @@ defmodule CopperlaceTest do
     end
   end
 
-  describe "close/1" do
-    test "renders after close return an error" do
-      {:ok, copperlace} = Copperlace.from_string(@hello_config)
-      assert :ok = Copperlace.close(copperlace)
-
-      assert {:error, %Error{}} = Copperlace.render(copperlace, "origin")
-    end
-
-    test "close is idempotent" do
-      {:ok, copperlace} = Copperlace.from_string(@hello_config)
-      assert :ok = Copperlace.close(copperlace)
-      assert :ok = Copperlace.close(copperlace)
-    end
-  end
-
   describe "custom processors" do
     test "passing :processors raises ArgumentError" do
       assert_raise ArgumentError, fn ->

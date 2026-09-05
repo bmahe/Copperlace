@@ -405,8 +405,9 @@ The NIF resolves the Copperlace native library from `COPPERLACE_LIBRARY_PATH`,
 the packaged `priv/native/` directory, or the local `rust-core` build output.
 For source-tree development, run `make rust-build` first. The bang variants
 `render!/4`, `render_inferred!/4`, and `render_structured!/4` raise
-`Copperlace.Error` on failure; `close/1` releases the native handle. This
-release uses the builtin processor registry only.
+`Copperlace.Error` on failure. The native handle is a NIF resource released
+automatically by the BEAM garbage collector; there is no explicit `close/1`.
+This release uses the builtin processor registry only.
 
 == Documentation
 

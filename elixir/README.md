@@ -59,9 +59,10 @@ Inferred and structured rendering are also available:
 `render!/3`, `render_inferred!/3`, and `render_structured!/3` raise
 `Copperlace.Error` on failure.
 
-Release the native handle explicitly with `Copperlace.close/1`. Handles are
-also released automatically when the BEAM garbage-collects the resource, but
-explicit closing is recommended for long-lived renderers.
+The native handle is a NIF resource released automatically by the BEAM
+garbage collector when the `%Copperlace{}` struct becomes unreachable. There
+is no explicit `close/1` — this avoids the use-after-free risk of freeing a
+handle while a concurrent render is still in flight.
 
 ## Custom processors
 

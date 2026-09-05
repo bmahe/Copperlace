@@ -11,8 +11,11 @@ defmodule Copperlace do
       {:ok, copperlace} = Copperlace.from_string(~s(name = ["Mia"]\\norigin = "Hello {name}"))
       {:ok, "Hello Mia"} = Copperlace.render(copperlace, "origin")
 
-  The native handle is released by `close/1` or automatically when the BEAM
-  garbage-collects the resource. Call `close/1` for long-lived renderers.
+  The native handle is a NIF resource released automatically by the BEAM
+  garbage collector when the `%Copperlace{}` struct becomes unreachable. There
+  is no explicit `close/1` — this avoids the use-after-free risk of freeing a
+  handle while a concurrent render is still in flight. For long-lived
+  renderers, simply let the struct go out of scope when done.
 
   Custom Elixir processor callbacks are not yet supported; this release uses
   the builtin processor registry only.
@@ -165,16 +168,6 @@ defmodule Copperlace do
       {:ok, output} -> output
       {:error, error} -> raise error
     end
-  end
-
-  @doc """
-  Releases the native ruleset handle. Calling `close/1` more than once is safe.
-  Rendering after close returns an error from the native layer.
-  """
-  @spec close(t()) :: :ok
-  def close(%__MODULE__{handle: handle}) do
-    Nif.close_raw(handle)
-    :ok
   end
 
   defp max_recursion_depth(opts) do
