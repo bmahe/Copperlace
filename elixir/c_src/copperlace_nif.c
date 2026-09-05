@@ -87,6 +87,7 @@ static struct {
 static ErlNifResourceType *copperlace_resource_type;
 
 typedef struct {
+  ErlNifMutex *lock;
   void *handle;
 } copperlace_resource;
 
@@ -153,8 +154,10 @@ static char *probe_path(const char *dir, const char *name) {
 }
 
 /* Resolve the native library path, returning a freshly malloc'd string or
- * NULL on failure. The caller frees the result. */
-static char *resolve_library_path(void) {
+ * NULL on failure. The caller frees the result. `priv_dir` is the absolute
+ * path to the app's priv directory (passed from the Elixir loader via
+ * load_info), or NULL when unavailable. */
+static char *resolve_library_path(const char *priv_dir) {
   const char *name = native_library_name();
 
   /* 1. COPPERLACE_LIBRARY_PATH environment variable. */
@@ -167,8 +170,22 @@ static char *resolve_library_path(void) {
     }
   }
 
-  /* 2. Packaged native library under priv/native/<name> (relative to common
-   *    working directories). */
+  /* 2. Packaged native library under <priv_dir>/native/<name>. When the NIF
+   *    is loaded as a dependency, priv_dir is the absolute path returned by
+   *    :code.priv_dir(:copperlace); this is the only reliable way to find
+   *    the precompiled archive's extracted native library. */
+  if (priv_dir != NULL) {
+    char *path = probe_path(priv_dir, "native");
+    if (path != NULL) {
+      char *full = probe_path(path, name);
+      free(path);
+      if (full != NULL) {
+        return full;
+      }
+    }
+  }
+
+  /* Fallback: relative packaged paths for standalone builds. */
   const char *packaged_dirs[] = {"priv/native", "native", "../priv/native"};
   for (size_t i = 0; i < sizeof(packaged_dirs) / sizeof(packaged_dirs[0]); i++) {
     char *path = probe_path(packaged_dirs[i], name);
@@ -191,8 +208,8 @@ static char *resolve_library_path(void) {
   return NULL;
 }
 
-static int resolve_symbols(char **error_out) {
-  char *path = resolve_library_path();
+static int resolve_symbols(const char *priv_dir, char **error_out) {
+  char *path = resolve_library_path(priv_dir);
   if (path == NULL) {
     *error_out = strdup("Could not find the Copperlace native library. Build "
                         "rust-core or set COPPERLACE_LIBRARY_PATH.");
@@ -218,6 +235,8 @@ static int resolve_symbols(char **error_out) {
     copperlace.field = (type)platform_dlsym(copperlace.library, symbol);     \
     if (copperlace.field == NULL) {                                          \
       *error_out = strdup("Missing Copperlace symbol: " symbol);            \
+      platform_dlclose(copperlace.library);                                  \
+      copperlace.library = NULL;                                             \
       return -1;                                                             \
     }                                                                        \
   } while (0)
@@ -247,9 +266,15 @@ static int resolve_symbols(char **error_out) {
 static void copperlace_resource_destructor(ErlNifEnv *env, void *resource) {
   (void)env;
   copperlace_resource *res = (copperlace_resource *)resource;
+  /* The BEAM calls the destructor only after the resource is no longer
+   * reachable, so no lock is needed here. */
   if (res->handle != NULL && copperlace.ruleset_free != NULL) {
     copperlace.ruleset_free(res->handle);
     res->handle = NULL;
+  }
+  if (res->lock != NULL) {
+    enif_mutex_destroy(res->lock);
+    res->lock = NULL;
   }
 }
 
@@ -469,7 +494,14 @@ static ERL_NIF_TERM alloc_ruleset_resource(ErlNifEnv *env, void *handle) {
     return make_error_msg(env, COPPERLACE_INVALID_ARGUMENT,
                            "failed to allocate ruleset resource");
   }
+  res->lock = enif_mutex_create("copperlace");
   res->handle = handle;
+  if (res->lock == NULL) {
+    copperlace.ruleset_free(handle);
+    enif_release_resource(res);
+    return make_error_msg(env, COPPERLACE_INVALID_ARGUMENT,
+                           "failed to allocate ruleset mutex");
+  }
   ERL_NIF_TERM resource_term = enif_make_resource(env, res);
   enif_release_resource(res);
   return make_ok(env, resource_term);
@@ -550,17 +582,29 @@ static ERL_NIF_TERM do_render(ErlNifEnv *env, ERL_NIF_TERM handle_term,
   copperlace_resource *res = NULL;
   if (!enif_get_resource(env, handle_term, copperlace_resource_type,
                          (void **)&res) ||
-      res == NULL || res->handle == NULL) {
+      res == NULL || res->lock == NULL) {
     return make_error_msg(env, COPPERLACE_INVALID_ARGUMENT,
                            "invalid ruleset handle");
   }
 
+  /* Hold the lock for the entire render so a concurrent close/1 cannot
+   * free the handle while the Rust call is in flight. This serializes
+   * renders and close on the same handle, which is the safe tradeoff. */
+  enif_mutex_lock(res->lock);
+  if (res->handle == NULL) {
+    enif_mutex_unlock(res->lock);
+    return make_error_msg(env, COPPERLACE_INVALID_ARGUMENT,
+                           "ruleset handle is closed");
+  }
+
   ErlNifBinary rule_bin;
   if (!get_string(env, rule_term, &rule_bin)) {
+    enif_mutex_unlock(res->lock);
     return enif_make_badarg(env);
   }
   char *rule = malloc(rule_bin.size + 1);
   if (rule == NULL) {
+    enif_mutex_unlock(res->lock);
     return enif_make_badarg(env);
   }
   memcpy(rule, rule_bin.data, rule_bin.size);
@@ -573,6 +617,7 @@ static ERL_NIF_TERM do_render(ErlNifEnv *env, ERL_NIF_TERM handle_term,
   if (!build_context(env, context_term, &keys, &values, &context_len,
                      &context_error)) {
     free(rule);
+    enif_mutex_unlock(res->lock);
     return context_error;
   }
 
@@ -598,11 +643,13 @@ static ERL_NIF_TERM do_render(ErlNifEnv *env, ERL_NIF_TERM handle_term,
     default:
       free(rule);
       free_context_arrays(keys, values, context_len);
+      enif_mutex_unlock(res->lock);
       return make_error_msg(env, COPPERLACE_INVALID_ARGUMENT, "unknown render mode");
   }
 
   free(rule);
   free_context_arrays(keys, values, context_len);
+  enif_mutex_unlock(res->lock);
 
   if (status != COPPERLACE_OK) {
     return make_error(env, status, error);
@@ -659,13 +706,15 @@ static ERL_NIF_TERM nif_close(ErlNifEnv *env, int argc,
   copperlace_resource *res = NULL;
   if (!enif_get_resource(env, argv[0], copperlace_resource_type,
                          (void **)&res) ||
-      res == NULL) {
+      res == NULL || res->lock == NULL) {
     return enif_make_atom(env, "ok");
   }
+  enif_mutex_lock(res->lock);
   if (res->handle != NULL && copperlace.ruleset_free != NULL) {
     copperlace.ruleset_free(res->handle);
     res->handle = NULL;
   }
+  enif_mutex_unlock(res->lock);
   return enif_make_atom(env, "ok");
 }
 
@@ -682,7 +731,16 @@ static ERL_NIF_TERM nif_loaded(ErlNifEnv *env, int argc,
 /* ------------------------------------------------------------------ */
 
 static int load(ErlNifEnv *env, void **priv_data, ERL_NIF_TERM load_info) {
-  (void)load_info;
+  /* load_info is the priv directory path (a binary) passed by the Elixir
+   * loader via :erlang.load_nif/2, so we can resolve the precompiled native
+   * library under <priv>/native/ regardless of the consumer's CWD. */
+  char priv_dir[4096] = {0};
+  ErlNifBinary priv_bin;
+  if (enif_inspect_iolist_as_binary(env, load_info, &priv_bin) &&
+      priv_bin.size > 0 && priv_bin.size < sizeof(priv_dir)) {
+    memcpy(priv_dir, priv_bin.data, priv_bin.size);
+    priv_dir[priv_bin.size] = '\0';
+  }
 
   copperlace_resource_type = enif_open_resource_type(
       env, NIF_MODULE, "copperlace_resource", copperlace_resource_destructor,
@@ -693,7 +751,8 @@ static int load(ErlNifEnv *env, void **priv_data, ERL_NIF_TERM load_info) {
 
   memset(&copperlace, 0, sizeof(copperlace));
   char *error = NULL;
-  if (resolve_symbols(&error) != 0) {
+  const char *dir = priv_dir[0] != '\0' ? priv_dir : NULL;
+  if (resolve_symbols(dir, &error) != 0) {
     /* The native library may be absent while compiling the NIF (for example
      * `mix compile` in CI without a Rust build). We do not fail the load:
      * callers get a clear error when they invoke a NIF, and tests are
@@ -722,11 +781,12 @@ static void unload(ErlNifEnv *env, void *priv_data) {
 }
 
 static ErlNifFunc nif_funcs[] = {
-    {"from_string_raw", 1, nif_from_string, 0},
-    {"from_file_raw", 1, nif_from_file, 0},
-    {"render_raw", 4, nif_render, 0},
-    {"render_inferred_raw", 4, nif_render_inferred, 0},
-    {"render_structured_raw", 5, nif_render_structured, 0},
+    {"from_string_raw", 1, nif_from_string, ERL_NIF_DIRTY_JOB_CPU_BOUND},
+    {"from_file_raw", 1, nif_from_file, ERL_NIF_DIRTY_JOB_CPU_BOUND},
+    {"render_raw", 4, nif_render, ERL_NIF_DIRTY_JOB_CPU_BOUND},
+    {"render_inferred_raw", 4, nif_render_inferred, ERL_NIF_DIRTY_JOB_CPU_BOUND},
+    {"render_structured_raw", 5, nif_render_structured,
+     ERL_NIF_DIRTY_JOB_CPU_BOUND},
     {"close_raw", 1, nif_close, 0},
     {"loaded", 0, nif_loaded, 0},
 };

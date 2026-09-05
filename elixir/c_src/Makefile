@@ -69,8 +69,8 @@ $(NIF): $(SRC) | $(PRIV_DIR)
 # during normal dev/test builds (the source file does not exist; the NIF
 # resolves it at runtime via dlopen).
 stage_native: | $(PRIV_DIR)/native
-	@if [ -f "$(STAGED_NATIVE)" ] && [ "$(STAGED_NATIVE)" != "$(PRIV_DIR)/native/$(RENDERER_NAME)" ]; then \
-		cp "$(STAGED_NATIVE)" "$(PRIV_DIR)/native/$(RENDERER_NAME)"; \
+	@if [ -f "$(STAGED_NATIVE)" ]; then \
+		cp -n "$(STAGED_NATIVE)" "$(PRIV_DIR)/native/$(RENDERER_NAME)" 2>/dev/null || true; \
 		echo "Staged $(RENDERER_NAME) into $(PRIV_DIR)/native/"; \
 	fi
 

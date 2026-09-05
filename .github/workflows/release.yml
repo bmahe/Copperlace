@@ -203,7 +203,7 @@ jobs:
       - name: Precompile NIF and native archive
         shell: bash
         run: |
-          export ELIXIR_MAKE_CACHE_DIR="$(pwd)/elixir/cache"
+          export ELIXIR_MAKE_CACHE_DIR="$(pwd)/cache"
           mkdir -p "$ELIXIR_MAKE_CACHE_DIR"
           MIX_ENV=prod mix deps.get
           MIX_ENV=prod mix elixir_make.precompile

@@ -9,8 +9,12 @@ defmodule Copperlace.Nif do
 
   def load_nif do
     nif = :filename.join(:code.priv_dir(:copperlace), "copperlace_nif")
+    # Pass the priv directory as load_info so the NIF can resolve the
+    # precompiled native library under <priv>/native/ regardless of the
+    # consumer's working directory.
+    priv_dir = :code.priv_dir(:copperlace)
 
-    case :erlang.load_nif(nif, 0) do
+    case :erlang.load_nif(nif, priv_dir) do
       :ok ->
         :ok
 
