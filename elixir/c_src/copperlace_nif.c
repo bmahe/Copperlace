@@ -172,14 +172,18 @@ static char *resolve_library_path(const char *priv_dir) {
   /* 2. Packaged native library under <priv_dir>/native/<name>. When the NIF
    *    is loaded as a dependency, priv_dir is the absolute path returned by
    *    :code.priv_dir(:copperlace); this is the only reliable way to find
-   *    the precompiled archive's extracted native library. */
+   *    the precompiled archive's extracted native library. Construct the
+   *    full path and probe only the final file — probing the directory with
+   *    fopen fails on Windows. */
   if (priv_dir != NULL) {
-    char *path = probe_path(priv_dir, "native");
-    if (path != NULL) {
-      char *full = probe_path(path, name);
-      free(path);
-      if (full != NULL) {
-        return full;
+    char candidate[4096];
+    int written = snprintf(candidate, sizeof(candidate), "%s/native/%s",
+                           priv_dir, name);
+    if (written > 0 && (size_t)written < sizeof(candidate)) {
+      FILE *probe = fopen(candidate, "rb");
+      if (probe != NULL) {
+        fclose(probe);
+        return strdup(candidate);
       }
     }
   }
@@ -308,24 +312,35 @@ static ERL_NIF_TERM take_native_string(ErlNifEnv *env, char *value) {
   return enif_make_binary(env, &binary);
 }
 
+static ERL_NIF_TERM make_string_binary(ErlNifEnv *env, const char *str) {
+  size_t len = strlen(str);
+  ErlNifBinary binary;
+  if (enif_alloc_binary(len, &binary)) {
+    if (len > 0) {
+      memcpy(binary.data, str, len);
+    }
+    return enif_make_binary(env, &binary);
+  }
+  return make_empty_binary(env);
+}
+
+static ERL_NIF_TERM status_atom_for(ErlNifEnv *env, int status) {
+  switch (status) {
+    case COPPERLACE_INVALID_ARGUMENT:
+      return enif_make_atom(env, "invalid_argument");
+    case COPPERLACE_PARSE_ERROR:
+      return enif_make_atom(env, "parse_error");
+    case COPPERLACE_RENDER_ERROR:
+      return enif_make_atom(env, "render_error");
+    default:
+      return enif_make_atom(env, "unknown");
+  }
+}
+
 /* Build an error tuple {:error, status_atom, message_binary}. Takes ownership
  * of `message` (a C ABI-owned string freed via copperlace_string_free). */
 static ERL_NIF_TERM make_error(ErlNifEnv *env, int status, char *message) {
-  ERL_NIF_TERM status_atom;
-  switch (status) {
-    case COPPERLACE_INVALID_ARGUMENT:
-      status_atom = enif_make_atom(env, "invalid_argument");
-      break;
-    case COPPERLACE_PARSE_ERROR:
-      status_atom = enif_make_atom(env, "parse_error");
-      break;
-    case COPPERLACE_RENDER_ERROR:
-      status_atom = enif_make_atom(env, "render_error");
-      break;
-    default:
-      status_atom = enif_make_atom(env, "unknown");
-      break;
-  }
+  ERL_NIF_TERM status_atom = status_atom_for(env, status);
   ERL_NIF_TERM message_term = take_native_string(env, message);
   return enif_make_tuple3(env, enif_make_atom(env, "error"), status_atom,
                           message_term);
@@ -336,34 +351,9 @@ static ERL_NIF_TERM make_error(ErlNifEnv *env, int status, char *message) {
  * binary and never freed via copperlace_string_free. */
 static ERL_NIF_TERM make_error_msg(ErlNifEnv *env, int status,
                                     const char *message) {
-  ERL_NIF_TERM status_atom;
-  switch (status) {
-    case COPPERLACE_INVALID_ARGUMENT:
-      status_atom = enif_make_atom(env, "invalid_argument");
-      break;
-    case COPPERLACE_PARSE_ERROR:
-      status_atom = enif_make_atom(env, "parse_error");
-      break;
-    case COPPERLACE_RENDER_ERROR:
-      status_atom = enif_make_atom(env, "render_error");
-      break;
-    default:
-      status_atom = enif_make_atom(env, "unknown");
-      break;
-  }
-  size_t len = strlen(message);
-  ErlNifBinary binary;
-  ERL_NIF_TERM message_term;
-  if (enif_alloc_binary(len, &binary)) {
-    if (len > 0) {
-      memcpy(binary.data, message, len);
-    }
-    message_term = enif_make_binary(env, &binary);
-  } else {
-    message_term = make_empty_binary(env);
-  }
+  ERL_NIF_TERM status_atom = status_atom_for(env, status);
   return enif_make_tuple3(env, enif_make_atom(env, "error"), status_atom,
-                          message_term);
+                          make_string_binary(env, message));
 }
 
 static ERL_NIF_TERM make_ok(ErlNifEnv *env, ERL_NIF_TERM value) {
@@ -373,10 +363,9 @@ static ERL_NIF_TERM make_ok(ErlNifEnv *env, ERL_NIF_TERM value) {
 static ERL_NIF_TERM not_loaded_error(ErlNifEnv *env) {
   return enif_make_tuple3(
       env, enif_make_atom(env, "error"), enif_make_atom(env, "native_not_loaded"),
-      enif_make_string(env,
-                       "Copperlace native library not loaded; build "
-                       "rust-core or set COPPERLACE_LIBRARY_PATH",
-                       ERL_NIF_LATIN1));
+      make_string_binary(env,
+                         "Copperlace native library not loaded; build "
+                         "rust-core or set COPPERLACE_LIBRARY_PATH"));
 }
 
 static int get_string(ErlNifEnv *env, ERL_NIF_TERM term, ErlNifBinary *out) {
@@ -683,6 +672,13 @@ static ERL_NIF_TERM nif_loaded(ErlNifEnv *env, int argc,
 /* Load / upgrade                                                      */
 /* ------------------------------------------------------------------ */
 
+static int open_resource_type(ErlNifEnv *env, int flags) {
+  copperlace_resource_type = enif_open_resource_type(
+      env, NIF_MODULE, "copperlace_resource", copperlace_resource_destructor,
+      flags, NULL);
+  return copperlace_resource_type != NULL ? 0 : -1;
+}
+
 static int load(ErlNifEnv *env, void **priv_data, ERL_NIF_TERM load_info) {
   /* load_info is the priv directory path (a binary) passed by the Elixir
    * loader via :erlang.load_nif/2, so we can resolve the precompiled native
@@ -695,10 +691,7 @@ static int load(ErlNifEnv *env, void **priv_data, ERL_NIF_TERM load_info) {
     priv_dir[priv_bin.size] = '\0';
   }
 
-  copperlace_resource_type = enif_open_resource_type(
-      env, NIF_MODULE, "copperlace_resource", copperlace_resource_destructor,
-      ERL_NIF_RT_CREATE, NULL);
-  if (copperlace_resource_type == NULL) {
+  if (open_resource_type(env, ERL_NIF_RT_CREATE) != 0) {
     return -1;
   }
 
@@ -723,7 +716,32 @@ static int load(ErlNifEnv *env, void **priv_data, ERL_NIF_TERM load_info) {
 static int upgrade(ErlNifEnv *env, void **priv_data, void **old_priv_data,
                    ERL_NIF_TERM load_info) {
   (void)old_priv_data;
-  return load(env, priv_data, load_info);
+  /* Take over the existing resource type so NIF resource terms created
+   * under the old code remain valid under the new code. */
+  if (open_resource_type(env, ERL_NIF_RT_CREATE | ERL_NIF_RT_TAKEOVER) != 0) {
+    return -1;
+  }
+
+  char priv_dir[4096] = {0};
+  ErlNifBinary priv_bin;
+  if (enif_inspect_iolist_as_binary(env, load_info, &priv_bin) &&
+      priv_bin.size > 0 && priv_bin.size < sizeof(priv_dir)) {
+    memcpy(priv_dir, priv_bin.data, priv_bin.size);
+    priv_dir[priv_bin.size] = '\0';
+  }
+
+  memset(&copperlace, 0, sizeof(copperlace));
+  char *error = NULL;
+  const char *dir = priv_dir[0] != '\0' ? priv_dir : NULL;
+  if (resolve_symbols(dir, &error) != 0) {
+    if (error != NULL) {
+      fprintf(stderr, "copperlace_nif: %s\n", error);
+      free(error);
+    }
+  }
+
+  *priv_data = NULL;
+  return 0;
 }
 
 static void unload(ErlNifEnv *env, void *priv_data) {

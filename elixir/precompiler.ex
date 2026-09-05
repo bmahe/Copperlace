@@ -53,6 +53,12 @@ defmodule Copperlace.Precompiler do
           arch == "" ->
             {:error, "cannot determine current target from: #{sys}"}
 
+          # musl-based systems (Alpine, etc.) are not covered by the precompiled
+          # glibc archives; leave the target as-is so elixir_make's
+          # unavailable_target/1 falls back to a source build.
+          Enum.any?(parts, &String.contains?(&1, "musl")) ->
+            {:ok, sys}
+
           Enum.any?(parts, &String.starts_with?(&1, "linux")) ->
             {:ok, "#{arch}-linux-gnu"}
 
