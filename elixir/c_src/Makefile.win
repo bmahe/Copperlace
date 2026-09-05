@@ -1,0 +1,30 @@
+# Makefile.win for the Copperlace NIF shim (Windows / nmake + MSVC).
+#
+# Invoked by elixir_make on Windows. erl_nif.h lives in the ERTS include
+# directory; prefer ERTS_INCLUDE_DIR and fall back to ERL_EI_INCLUDE_DIR.
+# The Copperlace native library is NOT linked here; the NIF resolves it at
+# runtime via LoadLibrary (see copperlace_nif.c).
+
+CC = cl
+
+!IF "$(ERTS_INCLUDE_DIR)" != ""
+INCLUDES = /I"$(ERTS_INCLUDE_DIR)"
+!ELSE
+INCLUDES = /I"$(ERL_EI_INCLUDE_DIR)"
+!ENDIF
+
+CFLAGS = /O2 /LD /nologo $(INCLUDES)
+LDFLAGS = /link
+
+PRIV_DIR = ..\priv
+NIF = $(PRIV_DIR)\copperlace_nif.dll
+SRC = copperlace_nif.c
+
+all: $(NIF)
+
+$(NIF): $(SRC)
+	@if not exist $(PRIV_DIR) mkdir $(PRIV_DIR)
+	$(CC) $(CFLAGS) $(SRC) /Fe"$(NIF)" $(LDFLAGS)
+
+clean:
+	@if exist $(NIF) del /q $(NIF)

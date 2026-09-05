@@ -1,0 +1,8 @@
+# Build artifacts
+/_build/
+/deps/
+/priv/copperlace_nif.*
+/priv/native/
+
+# Precompile cache
+/cache/

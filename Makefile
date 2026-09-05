@@ -4,11 +4,13 @@ CARGO ?= cargo
 MVN ?= mvn
 PYTHON ?= python
 WASM_PACK ?= wasm-pack
+MIX ?= mix
 
 RUST_DIR := rust-core
 PYTHON_DIR := python
 JAVA_DIR := java
 JS_DIR := js
+ELIXIR_DIR := elixir
 JAVA_NATIVE_CLASSIFIER := $(shell $(PYTHON) scripts/stage_java_native.py --print-classifier 2>/dev/null)
 
 .PHONY: help
@@ -26,12 +28,16 @@ help:
 	@printf '%s\n' '  make js-web         Build JS/TS WebAssembly package for direct browser import'
 	@printf '%s\n' '  make java-test      Run Java FFM tests'
 	@printf '%s\n' '  make java-package   Build Java API and current-platform native JARs'
+	@printf '%s\n' '  make elixir-test    Run Elixir wrapper tests'
+	@printf '%s\n' '  make elixir-build   Build the Elixir wrapper (NIF + Elixir)'
+	@printf '%s\n' '  make elixir-package Build the Elixir Hex package'
+	@printf '%s\n' '  make elixir-precompile Build precompiled NIF + native archives for CI'
 	@printf '%s\n' '  make site           Build website and native API documentation'
 	@printf '%s\n' '  make site-main      Build website pages from AsciiDoc sources'
 	@printf '%s\n' '  make site-api       Build native API documentation sub-sites'
 	@printf '%s\n' '  make site-serve     Serve generated website locally'
-	@printf '%s\n' '  make test           Run Rust, Python, and Java tests'
-	@printf '%s\n' '  make package        Build Python, JS/TS, and Java distributable artifacts'
+	@printf '%s\n' '  make test           Run Rust, Python, Java, and Elixir tests'
+	@printf '%s\n' '  make package        Build Python, JS/TS, Java, and Elixir distributable artifacts'
 	@printf '%s\n' '  make release-check  Check package version metadata consistency'
 	@printf '%s\n' '  make check          Run formatting checks and tests'
 	@printf '%s\n' '  make clean          Remove build outputs'
@@ -85,6 +91,30 @@ java-package: rust-build
 	$(PYTHON) scripts/stage_java_native.py --classifier $(JAVA_NATIVE_CLASSIFIER)
 	cd $(JAVA_DIR) && $(MVN) -q -P$(JAVA_NATIVE_CLASSIFIER) package
 
+.PHONY: elixir-build
+elixir-build:
+	cd $(ELIXIR_DIR) && $(MIX) deps.get
+	cd $(ELIXIR_DIR) && $(MIX) compile
+
+.PHONY: elixir-test
+elixir-test: rust-build
+	cd $(ELIXIR_DIR) && $(MIX) deps.get
+	cd $(ELIXIR_DIR) && $(MIX) test
+
+.PHONY: elixir-format
+elixir-format:
+	cd $(ELIXIR_DIR) && $(MIX) format --check-formatted
+
+.PHONY: elixir-package
+elixir-package: elixir-precompile
+	cd $(ELIXIR_DIR) && $(MIX) hex.build
+
+.PHONY: elixir-precompile
+elixir-precompile: rust-build
+	$(PYTHON) scripts/stage_elixir_native.py
+	cd $(ELIXIR_DIR) && $(MIX) deps.get
+	cd $(ELIXIR_DIR) && MIX_ENV=prod $(MIX) elixir_make.precompile
+
 .PHONY: site
 site:
 	$(PYTHON) website/build_site.py --clean
@@ -102,17 +132,17 @@ site-serve: site-main
 	cd target/site && $(PYTHON) -m http.server 8000
 
 .PHONY: test
-test: rust-test python-test java-test
+test: rust-test python-test java-test elixir-test
 
 .PHONY: package
-package: cli-archive python-wheel js-package java-package
+package: cli-archive python-wheel js-package java-package elixir-package
 
 .PHONY: release-check
 release-check:
 	$(PYTHON) scripts/check_versions.py
 
 .PHONY: check
-check: test-locations rust-fmt test
+check: test-locations rust-fmt elixir-format test
 
 .PHONY: clean
 clean:
@@ -123,3 +153,5 @@ clean:
 	rm -rf $(JAVA_DIR)/native-artifacts
 	find $(PYTHON_DIR) -type d -name __pycache__ -prune -exec rm -rf {} +
 	cd $(JAVA_DIR) && $(MVN) -q clean
+	cd $(ELIXIR_DIR) && $(MIX) clean
+	rm -rf $(ELIXIR_DIR)/_build $(ELIXIR_DIR)/deps $(ELIXIR_DIR)/priv/copperlace_nif.*

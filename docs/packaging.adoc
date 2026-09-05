@@ -48,11 +48,12 @@ Release assets include:
   Rust core from source;
 * Java API, all-platform, and platform native JARs;
 * a JS/WASM package tarball generated from `wasm-pack --target bundler`;
+* an Elixir Hex package containing the NIF shim and Elixir modules;
 * `SHA256SUMS` for uploaded release assets.
 
-Use `make release-check` locally to verify Cargo, Python, and Maven versions
-match before creating a release tag. Release tags should use the package version
-prefixed with `v`, such as `v0.1.1`.
+Use `make release-check` locally to verify Cargo, Python, Java, and Elixir
+versions match before creating a release tag. Release tags should use the
+package version prefixed with `v`, such as `v0.1.1`.
 
 == Rust Artifacts
 
@@ -373,3 +374,89 @@ parameter controls serialization: `false` returns compact JSON and `true`
 returns formatted JSON. `renderInferred` also returns strings: normal text for
 string-valued and list-valued rules, or formatted JSON text for object-valued
 rules.
+
+== Elixir Wrapper
+
+The Elixir package in `elixir/` binds the C ABI to the BEAM through Native
+Implemented Functions (NIFs). The NIF shim in `c_src/copperlace_nif.c`
+`dlopen`s the native library at load time and never links it at build time,
+mirroring the Python and Java wrappers. Build it with:
+
+[source,sh]
+----
+make elixir-build
+make elixir-test
+make elixir-package
+----
+
+Add the dependency in `mix.exs`:
+
+[source,elixir]
+----
+defp deps do
+  [{:copperlace, "~> 0.3"}]
+end
+----
+
+Public entry points are:
+
+* `Copperlace.from_string(config, opts \\ [])`
+* `Copperlace.from_file(path, opts \\ [])`
+* `Copperlace.render(copperlace, rule, context \\ %{}, opts \\ [])`
+* `Copperlace.render_inferred(copperlace, rule, context \\ %{}, opts \\ [])`
+* `Copperlace.render_structured(copperlace, rule, context \\ %{}, opts \\ [])`
+* `Copperlace.render!/4`, `Copperlace.render_inferred!/4`, `Copperlace.render_structured!/4`
+
+The native handle is a NIF resource released by the BEAM garbage collector
+when the `%Copperlace{}` struct becomes unreachable. There is no explicit
+`close/1`; this avoids the use-after-free risk of freeing a handle while a
+concurrent render is still in flight.
+
+`render/4` options: `:max_recursion_depth` (default `0`).
+`render_structured/4` options: `:max_recursion_depth` (default `0`) and
+`:format_json` (default `true`; `false` returns compact JSON).
+
+`context` is a map of string to string. Each render uses a fresh context.
+
+[source,elixir]
+----
+{:ok, copperlace} = Copperlace.from_string(~s(name = ["Mia"]\norigin = "Hello {name}"))
+{:ok, "Hello Mia"} = Copperlace.render(copperlace, "origin")
+{:ok, _} = Copperlace.render(copperlace, "origin", %{"name" => "Darcy"})
+{:ok, _} = Copperlace.render_structured(copperlace, "object-rule")
+----
+
+At runtime, the NIF resolves the native library in this order:
+
+. `COPPERLACE_LIBRARY_PATH`
+. packaged native library under `priv/native/<libname>`
+. local Rust build output for source-tree development
+
+When the Hex package includes a `checksum.exs` file (generated during the
+release process), `elixir_make` downloads a precompiled archive at install
+time that contains both the NIF shim and the Copperlace native library for the
+current platform. No C toolchain or `COPPERLACE_LIBRARY_PATH` is needed. If the
+precompiled archive is unavailable for the current target or NIF version,
+`elixir_make` falls back to compiling the NIF shim from source and the native
+library is resolved at runtime via the order above.
+
+Precompiled archives are built against OTP 26 (NIF API 2.17) and are
+backward-compatible with OTP 27+ via `elixir_make`'s NIF version fallback.
+OTP 25 and earlier compile the NIF shim from source.
+
+Ruleset handles are NIF resource objects; the BEAM releases them through the
+resource destructor, which calls `copperlace_ruleset_free`. Strings returned by
+the C ABI are copied into Elixir binaries and freed immediately. Wrapper
+failures are returned as `{:error, %Copperlace.Error{}}` tuples; the bang
+variants raise `Copperlace.Error` with `:status` (`:invalid_argument`,
+`:parse_error`, `:render_error`, or `:native_not_loaded`) and `:message`.
+
+This release uses the builtin processor registry only. Custom Elixir processor
+callbacks are not yet supported; passing `:processors` to `from_string/2` or
+`from_file/2` raises `ArgumentError`. A follow-up will wire C-to-Elixir
+processor callbacks.
+
+Elixir structured and inferred rendering are intentionally string-based, like
+the other wrappers: `render_structured/4` returns JSON text, and
+`render_inferred/4` returns text for string-valued and list-valued rules or
+formatted JSON text for object-valued rules.
