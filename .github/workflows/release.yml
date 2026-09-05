@@ -140,6 +140,79 @@ jobs:
           name: java-jars-${{ matrix.target }}
           path: dist/*.jar
 
+  elixir-package:
+    name: Elixir package
+    needs: versions
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: "27"
+          elixir-version: "1.17"
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build Rust native library
+        run: cargo build --release --manifest-path rust-core/Cargo.toml
+      - name: Fetch Elixir dependencies
+        run: mix deps.get
+        working-directory: elixir
+      - name: Run Elixir tests
+        run: mix test
+        working-directory: elixir
+      - name: Build Hex package
+        run: mix hex.build
+        working-directory: elixir
+      - name: Smoke-test Hex package
+        shell: bash
+        run: |
+          python scripts/smoke_elixir_artifact.py elixir/copperlace-*.tar
+      - uses: actions/upload-artifact@v4
+        with:
+          name: elixir-package
+          path: elixir/copperlace-*.tar
+
+  elixir-precompile:
+    name: Elixir precompiled NIF (${{ matrix.target }})
+    needs: versions
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: linux-x86_64
+            runner: ubuntu-24.04
+          - target: linux-aarch64
+            runner: ubuntu-24.04-arm
+          - target: macos-x86_64
+            runner: macos-15-intel
+          - target: macos-aarch64
+            runner: macos-15
+          - target: windows-x86_64
+            runner: windows-2022
+    steps:
+      - uses: actions/checkout@v4
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: "26"
+          elixir-version: "1.17"
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build Rust native library
+        run: cargo build --release --manifest-path rust-core/Cargo.toml
+      - name: Stage native library
+        run: python scripts/stage_elixir_native.py
+      - name: Precompile NIF and native archive
+        shell: bash
+        run: |
+          export ELIXIR_MAKE_CACHE_DIR="$(pwd)/elixir/cache"
+          mkdir -p "$ELIXIR_MAKE_CACHE_DIR"
+          MIX_ENV=prod mix deps.get
+          MIX_ENV=prod mix elixir_make.precompile
+        working-directory: elixir
+      - uses: actions/upload-artifact@v4
+        with:
+          name: elixir-precompiled-${{ matrix.target }}
+          path: elixir/cache/*.tar.gz
+
   cli-archive:
     name: CLI archive (${{ matrix.target }})
     needs: versions
@@ -224,6 +297,8 @@ jobs:
       - java-package
       - cli-archive
       - js-package
+      - elixir-package
+      - elixir-precompile
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4

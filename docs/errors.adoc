@@ -87,9 +87,11 @@ Compiles a config with the builtin processor registry plus Rust-provided custom
 processors. Custom processor names override builtin names when they collide.
 
 Wrapper processor constructors::
-The C ABI, Python, Java, and JS/WASM wrappers also expose construction-time
-custom processor registration. Callback failures are reported as
-`ProcessorError`.
+The C ABI, Python, Java, JS/WASM, and Elixir wrappers also expose
+construction-time custom processor registration. Callback failures are
+reported as `ProcessorError`. The Elixir wrapper uses the builtin processor
+registry only in this release; custom Elixir callbacks are planned for a
+follow-up.
 
 == CLI
 
@@ -154,9 +156,10 @@ lazy values created from top-level `context` defaults live only for the current
 
 Callers may provide initial context values for a render through Rust,
 `copperlace_ruleset_render_with_context`, Python and Java render overloads,
-JS/WASM context methods, or CLI `--set key=value`. Initial context values
-resolve before top-level `context` defaults and named rules. They are scoped to
-one render call and do not persist on the ruleset.
+JS/WASM context methods, Elixir `render/4` context map, or CLI `--set
+key=value`. Initial context values resolve before top-level `context`
+defaults and named rules. They are scoped to one render call and do not
+persist on the ruleset.
 
 Bind-if-missing statements are idempotent within a render. If `{% alias:rule %}`
 runs after `alias` already exists, it leaves the existing value unchanged and

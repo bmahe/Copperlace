@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import re
 import tomllib
 import xml.etree.ElementTree as ET
 from pathlib import Path
@@ -33,6 +34,7 @@ def package_versions() -> dict[str, str]:
         "rust-core/Cargo.toml": cargo_version(),
         "python/pyproject.toml": python_version(),
         "java/pom.xml": java_version(ROOT / "java" / "pom.xml"),
+        "elixir/mix.exs": elixir_version(),
     }
     for path in sorted((ROOT / "java").glob("**/pom.xml")):
         if path == ROOT / "java" / "pom.xml":
@@ -65,6 +67,17 @@ def java_parent_version(path: Path) -> str:
     if not version:
         raise SystemExit(f"{path.relative_to(ROOT)} does not declare parent version")
     return version
+
+
+_MIX_VERSION = re.compile(r'@version\s+"([^"]+)"')
+
+
+def elixir_version() -> str:
+    text = (ROOT / "elixir" / "mix.exs").read_text(encoding="utf-8")
+    match = _MIX_VERSION.search(text)
+    if not match:
+        raise SystemExit("elixir/mix.exs does not declare @version")
+    return match.group(1)
 
 
 if __name__ == "__main__":

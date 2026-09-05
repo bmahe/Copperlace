@@ -121,6 +121,39 @@ jobs:
             java/api/target/*.jar
             java/native/${{ matrix.classifier }}/target/*.jar
 
+  elixir-package:
+    name: Elixir package
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: "27"
+          elixir-version: "1.17"
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build Rust native library
+        run: cargo build --release --manifest-path rust-core/Cargo.toml
+      - name: Fetch Elixir dependencies
+        run: mix deps.get
+        working-directory: elixir
+      - name: Check Elixir formatting
+        run: mix format --check-formatted
+        working-directory: elixir
+      - name: Run Elixir tests
+        run: mix test
+        working-directory: elixir
+      - name: Build Hex package
+        run: mix hex.build
+        working-directory: elixir
+      - name: Smoke-test Hex package
+        shell: bash
+        run: |
+          python scripts/smoke_elixir_artifact.py elixir/copperlace-*.tar
+      - uses: actions/upload-artifact@v4
+        with:
+          name: elixir-package
+          path: elixir/copperlace-*.tar
+
   cli-archive:
     name: CLI archive (${{ matrix.target }})
     runs-on: ${{ matrix.runner }}

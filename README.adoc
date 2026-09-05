@@ -84,6 +84,7 @@ link:LICENSE[LICENSE] for details.
 * link:https://pypi.org/project/copperlace/[PyPI]
 * link:https://central.sonatype.com/artifact/dev.mahe.copperlace/copperlace[Maven Central]
 * link:https://www.npmjs.com/package/copperlace[npm]
+* link:https://hex.pm/packages/copperlace[Hex]
 * link:https://bmahe.github.io/Copperlace/[Project site]
 
 == Quick Start
@@ -251,7 +252,7 @@ For repeated renders, load the configuration once and call `render` multiple
 times. This avoids recompiling the rule set for each render.
 
 Copperlace is available as a command-line tool and as libraries for Rust,
-Python, Java, and browser JavaScript/WebAssembly.
+Python, Java, browser JavaScript/WebAssembly, and Elixir.
 
 === Rust
 
@@ -382,6 +383,31 @@ be imported directly; direct browser ES module output must call the generated
 text, then pass the string to `new Copperlace(config)`. File-path APIs are not
 exported to WebAssembly.
 
+=== Elixir
+
+Add `copperlace` to your `mix.exs` dependencies:
+
+[source,elixir]
+----
+defp deps do
+  [{:copperlace, "~> 0.3"}]
+end
+----
+
+[source,elixir]
+----
+{:ok, copperlace} = Copperlace.from_string(~s(name = ["Mia"]\norigin = "Hello {name}"))
+{:ok, "Hello Mia"} = Copperlace.render(copperlace, "origin")
+{:ok, _} = Copperlace.render(copperlace, "origin", %{"name" => "Darcy"})
+----
+
+The NIF resolves the Copperlace native library from `COPPERLACE_LIBRARY_PATH`,
+the packaged `priv/native/` directory, or the local `rust-core` build output.
+For source-tree development, run `make rust-build` first. The bang variants
+`render!/4`, `render_inferred!/4`, and `render_structured!/4` raise
+`Copperlace.Error` on failure; `close/1` releases the native handle. This
+release uses the builtin processor registry only.
+
 == Documentation
 
 The detailed behavior and configuration contract lives in `docs/`:
@@ -398,6 +424,7 @@ The detailed behavior and configuration contract lives in `docs/`:
 * `rust-core/` contains the renderer library, C ABI, and CLI.
 * `python/` contains the Python wheel wrapper and `ctypes` bindings.
 * `java/` contains the Java FFM wrapper and Maven packaging.
+* `elixir/` contains the Elixir NIF wrapper and Hex packaging.
 * `js/` contains JS/TS WebAssembly package documentation.
 * `docs/` contains the behavior and configuration specification.
 * `examples/` contains runnable rule examples.
@@ -409,10 +436,10 @@ Use the root `Makefile` for normal workflows:
 [source,sh]
 ----
 make help          # list available targets
-make check         # Rust fmt check plus Rust, Python, and Java tests
-make test          # Rust, Python, and Java tests
-make package       # Python wheel, JS/TS wasm package, and Java JARs
-make clean         # remove generated Rust, Python, JS/TS, and Java build outputs
+make check         # Rust fmt check plus Rust, Python, Java, and Elixir tests
+make test          # Rust, Python, Java, and Elixir tests
+make package       # Python wheel, JS/TS wasm package, Java JARs, and Elixir Hex package
+make clean         # remove generated Rust, Python, JS/TS, Java, and Elixir build outputs
 ----
 
 Common targeted commands:
@@ -428,6 +455,8 @@ make js-package
 make js-web
 make java-test
 make java-package
+make elixir-test
+make elixir-package
 ----
 
 == Packaging Notes
@@ -435,7 +464,10 @@ make java-package
 Python wheels and Java native JARs are platform-specific because they include
 the Rust dynamic library. Python source distributions include the Rust sources
 needed to build that native library locally. JS/TS packages are generated from
-the same Rust renderer as WebAssembly and require `wasm-pack`.
+the same Rust renderer as WebAssembly and require `wasm-pack`. The Elixir Hex
+package ships a NIF shim that resolves the Rust dynamic library at runtime
+from `COPPERLACE_LIBRARY_PATH`, the packaged `priv/native/` directory, or the
+local `rust-core` build output.
 
 The simplest Java dependency is `dev.mahe.copperlace:copperlace`, which brings
 in the Java API plus all supported native platform artifacts. Users who only
