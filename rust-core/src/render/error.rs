@@ -23,6 +23,15 @@ pub enum RenderError {
     CircularRuleReference(Vec<String>),
     /// A config value type was parsed but is not renderable.
     UnsupportedValue(String),
+    /// A loop source resolved successfully but is not iterable.
+    UnsupportedIterationSource {
+        /// Source expression from the `for` statement.
+        source: String,
+        /// Resolved value type.
+        value_type: String,
+    },
+    /// An overwrite binding targeted an immutable loop value.
+    ImmutableLoopBinding(String),
     /// The root configuration value was not an object.
     InvalidConfigRoot,
     /// A structured render was requested for a non-object path.
@@ -59,6 +68,15 @@ impl fmt::Display for RenderError {
             }
             RenderError::UnsupportedValue(value_type) => {
                 write!(formatter, "unsupported value type: {value_type}")
+            }
+            RenderError::UnsupportedIterationSource { source, value_type } => {
+                write!(
+                    formatter,
+                    "iteration source is not iterable: {source} ({value_type})"
+                )
+            }
+            RenderError::ImmutableLoopBinding(name) => {
+                write!(formatter, "cannot overwrite immutable loop binding: {name}")
             }
             RenderError::InvalidConfigRoot => write!(formatter, "config root must be an object"),
             RenderError::UnsupportedStructuredTarget(rule) => {

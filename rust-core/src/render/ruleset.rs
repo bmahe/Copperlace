@@ -232,7 +232,7 @@ impl RuleSet {
         &self.document
     }
 
-    fn structured_node(&self, rule_name: &str) -> Result<&StructuredNode, RenderError> {
+    pub(crate) fn structured_node(&self, rule_name: &str) -> Result<&StructuredNode, RenderError> {
         let mut node = &self.document;
         for segment in rule_name.split('.') {
             if segment.is_empty() {
@@ -247,6 +247,24 @@ impl RuleSet {
             node = next_node;
         }
         Ok(node)
+    }
+
+    pub(crate) fn structured_context_node(&self, name: &str) -> Option<&StructuredNode> {
+        let StructuredNode::Object(document) = &self.document else {
+            return None;
+        };
+        let StructuredNode::Object(context) = document.get("context")? else {
+            return None;
+        };
+
+        let mut node = context.get(name.split('.').next()?)?;
+        for segment in name.split('.').skip(1) {
+            let StructuredNode::Object(values) = node else {
+                return None;
+            };
+            node = values.get(segment)?;
+        }
+        Some(node)
     }
 
     pub(crate) fn render_rule_with_state(

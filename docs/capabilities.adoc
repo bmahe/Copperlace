@@ -118,6 +118,29 @@ arrays that are valid structured data but not valid weighted text choices are
 accepted structurally and rejected only if callers try to render that nested
 array as a dotted text rule.
 
+== Iteration
+
+Template `for` blocks iterate arrays deterministically in source order while
+ordinary array rule calls remain random choices.
+
+[source]
+----
+items = [apple, pear]
+origin = """{% for item in items %}{loop.index}: {item}
+{% endfor %}"""
+----
+
+The syntax is `{% for variable in source %}...{% endfor %}`. Sources may be
+top-level or dotted config arrays, `context` default arrays, or nested arrays
+reached through an enclosing loop variable. Object fields use dotted access.
+Nested loops are supported.
+
+The immutable `loop` metadata object provides `index`, `index0`, `length`,
+`first`, and `last`. Bindings made inside a body are scoped to its current
+iteration. Element templates render on every reference, empty arrays render
+nothing, and weighted entries retain their authored object shape. Loops
+concatenate text; they do not construct structured arrays.
+
 == Bindings
 
 Copperlace supports two binding forms. Both forms emit no text directly.

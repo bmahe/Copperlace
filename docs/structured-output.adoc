@@ -55,6 +55,10 @@ example above, `{name}` and `{title}` choose one list item when the text leaf
 renders. The `tags` field itself is an array because it is inside a structured
 object.
 
+Text leaves may also contain `for` blocks. The loop body is concatenated into
+that leaf's string value; it does not add, remove, or splice fields or array
+entries in the surrounding structured output.
+
 Object fields are not an ordering mechanism. If multiple fields need the same
 generated value, put that value in `context` defaults or pass it as initial
 context instead of relying on one sibling field to bind a value before another

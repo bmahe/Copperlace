@@ -27,6 +27,43 @@ pub enum StructuredNode {
 }
 
 impl StructuredNode {
+    pub(crate) fn child(&self, path: &str) -> Option<&StructuredNode> {
+        if path.is_empty() {
+            return Some(self);
+        }
+
+        let mut node = self;
+        for segment in path.split('.') {
+            let StructuredNode::Object(values) = node else {
+                return None;
+            };
+            node = values.get(segment)?;
+        }
+        Some(node)
+    }
+
+    pub(crate) fn value_type(&self) -> &'static str {
+        match self {
+            StructuredNode::Object(_) => "object",
+            StructuredNode::Array(_) => "array",
+            StructuredNode::Text(_) => "string",
+            StructuredNode::Number(_) => "number",
+            StructuredNode::Boolean(_) => "boolean",
+            StructuredNode::Null => "null",
+        }
+    }
+
+    pub(crate) fn generate_text(&self, state: &mut RenderState) -> Result<String, RenderError> {
+        match self {
+            StructuredNode::Text(node) => node.generate_text(state),
+            StructuredNode::Number(value) => Ok(value.to_string()),
+            StructuredNode::Boolean(value) => Ok(value.to_string()),
+            StructuredNode::Null => Ok("null".to_string()),
+            StructuredNode::Object(_) => Err(RenderError::UnsupportedValue("object".to_string())),
+            StructuredNode::Array(_) => Err(RenderError::UnsupportedValue("array".to_string())),
+        }
+    }
+
     pub(crate) fn generate_value(
         &self,
         state: &mut RenderState,
@@ -68,6 +105,43 @@ pub enum CopperlaceValue {
 }
 
 impl CopperlaceValue {
+    pub(crate) fn child(&self, path: &str) -> Option<&CopperlaceValue> {
+        if path.is_empty() {
+            return Some(self);
+        }
+
+        let mut value = self;
+        for segment in path.split('.') {
+            let CopperlaceValue::Object(values) = value else {
+                return None;
+            };
+            value = values.get(segment)?;
+        }
+        Some(value)
+    }
+
+    pub(crate) fn value_type(&self) -> &'static str {
+        match self {
+            CopperlaceValue::Object(_) => "object",
+            CopperlaceValue::Array(_) => "array",
+            CopperlaceValue::String(_) => "string",
+            CopperlaceValue::Number(_) => "number",
+            CopperlaceValue::Boolean(_) => "boolean",
+            CopperlaceValue::Null => "null",
+        }
+    }
+
+    pub(crate) fn to_rendered_text(&self) -> Result<String, RenderError> {
+        match self {
+            CopperlaceValue::String(value) => Ok(value.clone()),
+            CopperlaceValue::Number(value) => Ok(value.to_string()),
+            CopperlaceValue::Boolean(value) => Ok(value.to_string()),
+            CopperlaceValue::Null => Ok("null".to_string()),
+            CopperlaceValue::Object(_) => Err(RenderError::UnsupportedValue("object".to_string())),
+            CopperlaceValue::Array(_) => Err(RenderError::UnsupportedValue("array".to_string())),
+        }
+    }
+
     /// Converts this value into a JSON value.
     pub fn into_json_value(self) -> serde_json::Value {
         match self {
@@ -122,6 +196,16 @@ pub enum CopperlaceNumber {
     Unsigned(u64),
     /// Floating-point value representable as finite `f64`.
     Float(f64),
+}
+
+impl std::fmt::Display for CopperlaceNumber {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            CopperlaceNumber::Integer(value) => value.fmt(formatter),
+            CopperlaceNumber::Unsigned(value) => value.fmt(formatter),
+            CopperlaceNumber::Float(value) => value.fmt(formatter),
+        }
+    }
 }
 
 impl CopperlaceNumber {

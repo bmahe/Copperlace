@@ -747,3 +747,29 @@ fn structured_compile_errors_cover_invalid_config_and_weighted_choices() {
         Err(RenderError::UnknownProcessor(_))
     ));
 }
+
+#[test]
+fn structured_text_leaf_can_concatenate_for_loop_output() {
+    let rules = ruleset(
+        r#"
+        items = [apple, pear]
+        origin {
+          summary = """{% for item in items %}{item};{% endfor %}"""
+          preserved = [one, two]
+        }
+        "#,
+    );
+
+    let rendered = rules.render_rule_structured("origin").unwrap();
+    assert_eq!(
+        object_field(&rendered, "summary"),
+        &CopperlaceValue::String("apple;pear;".to_string())
+    );
+    assert_eq!(
+        object_field(&rendered, "preserved"),
+        &CopperlaceValue::Array(vec![
+            CopperlaceValue::String("one".to_string()),
+            CopperlaceValue::String("two".to_string()),
+        ])
+    );
+}

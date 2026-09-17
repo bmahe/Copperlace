@@ -2103,3 +2103,241 @@ fn non_object_context_is_a_normal_rule() {
 
     assert_eq!(rules.render_rule("context").unwrap(), "literal");
 }
+
+#[test]
+fn for_loop_iterates_array_in_source_order() {
+    let rules = ruleset(
+        r#"
+        items = [apple, pear, plum]
+        origin = """{% for item in items %}{item};{% endfor %}"""
+        "#,
+    );
+
+    assert_eq!(rules.render_rule("origin").unwrap(), "apple;pear;plum;");
+}
+
+#[test]
+fn for_loop_renders_nothing_for_empty_array() {
+    let rules = ruleset(
+        r#"
+        items = []
+        origin = "before{% for item in items %}{item}{% endfor %}after"
+        "#,
+    );
+
+    assert_eq!(rules.render_rule("origin").unwrap(), "beforeafter");
+}
+
+#[test]
+fn nested_for_loops_resolve_object_fields_and_local_arrays() {
+    let rules = ruleset(
+        r#"
+        groups = [
+          { name = A, members = [Mia, Lina] },
+          { name = B, members = [Noah] }
+        ]
+        origin = """{% for group in groups %}{group.name}:{% for member in group.members %}{member},{% endfor %};{% endfor %}"""
+        "#,
+    );
+
+    assert_eq!(rules.render_rule("origin").unwrap(), "A:Mia,Lina,;B:Noah,;");
+}
+
+#[test]
+fn for_loop_supports_dotted_and_context_array_sources() {
+    let rules = ruleset(
+        r#"
+        context {
+          defaults = [one, two]
+        }
+        catalog {
+          featured = [lamp, desk]
+        }
+        origin = """{% for item in defaults %}{item},{% endfor %}|{% for item in catalog.featured %}{item},{% endfor %}"""
+        "#,
+    );
+
+    assert_eq!(rules.render_rule("origin").unwrap(), "one,two,|lamp,desk,");
+}
+
+#[test]
+fn for_loop_renders_scalar_element_types() {
+    let rules = ruleset(
+        r#"
+        items = [3, true, null]
+        origin = """{% for item in items %}{item},{% endfor %}"""
+        "#,
+    );
+
+    assert_eq!(rules.render_rule("origin").unwrap(), "3,true,null,");
+}
+
+#[test]
+fn for_loop_exposes_full_metadata() {
+    let rules = ruleset(
+        r#"
+        items = [a, b]
+        origin = """{% for item in items %}{loop.index}/{loop.index0}/{loop.length}/{loop.first}/{loop.last}:{item};{% endfor %}"""
+        "#,
+    );
+
+    assert_eq!(
+        rules.render_rule("origin").unwrap(),
+        "1/0/2/true/false:a;2/1/2/false/true:b;"
+    );
+}
+
+#[test]
+fn nested_for_loop_metadata_shadows_and_restores_outer_metadata() {
+    let rules = ruleset(
+        r#"
+        groups = [{ members = [a, b] }]
+        origin = """{% for group in groups %}{loop.index}:{% for member in group.members %}{loop.index}{% endfor %}:{loop.index}{% endfor %}"""
+        "#,
+    );
+
+    assert_eq!(rules.render_rule("origin").unwrap(), "1:12:1");
+}
+
+#[test]
+fn loop_element_templates_render_on_every_reference() {
+    let rules = ruleset(
+        r#"
+        names = [Mia, Lina]
+        items = ["{names!}"]
+        origin = """{% for item in items %}{item}/{item}{% endfor %}"""
+        "#,
+    );
+
+    let rendered = rules.render_rule("origin").unwrap();
+    let (first, second) = slash_pair(&rendered);
+    assert_ne!(first, second);
+}
+
+#[test]
+fn loop_body_bindings_are_local_to_each_iteration() {
+    let rules = ruleset(
+        r#"
+        names = [Mia, Lina]
+        items = [one, two]
+        origin = """{% for item in items %}{% chosen:names! %}{chosen};{% endfor %}"""
+        "#,
+    );
+
+    let rendered = rules.render_rule("origin").unwrap();
+    assert!(rendered == "Mia;Lina;" || rendered == "Lina;Mia;");
+}
+
+#[test]
+fn loop_overwrite_bindings_restore_outer_values() {
+    let rules = ruleset(
+        r#"
+        names = [Mia]
+        items = [one]
+        origin = """{% for item in items %}{% hero:=names %}{hero};{% endfor %}{hero}"""
+        "#,
+    );
+    let mut context = RenderContext::new();
+    context.insert("hero".to_string(), "outside".to_string());
+
+    assert_eq!(
+        rules.render_rule_with_context("origin", context).unwrap(),
+        "Mia;outside"
+    );
+}
+
+#[test]
+fn loop_variable_and_metadata_are_immutable() {
+    let item_rules = ruleset(
+        r#"
+        items = [one]
+        replacement = [two]
+        origin = """{% for item in items %}{% item:=replacement %}{% endfor %}"""
+        "#,
+    );
+    assert_eq!(
+        item_rules.render_rule("origin"),
+        Err(RenderError::ImmutableLoopBinding("item".to_string()))
+    );
+
+    let metadata_rules = ruleset(
+        r#"
+        items = [one]
+        replacement = [two]
+        origin = """{% for item in items %}{% loop.index:=replacement %}{% endfor %}"""
+        "#,
+    );
+    assert_eq!(
+        metadata_rules.render_rule("origin"),
+        Err(RenderError::ImmutableLoopBinding("loop.index".to_string()))
+    );
+}
+
+#[test]
+fn visible_string_binding_shadows_iterable_source() {
+    let rules = ruleset(
+        r#"
+        items = [one, two]
+        origin = """{% for item in items %}{item}{% endfor %}"""
+        "#,
+    );
+    let mut context = RenderContext::new();
+    context.insert("items".to_string(), "not an array".to_string());
+
+    assert_eq!(
+        rules.render_rule_with_context("origin", context),
+        Err(RenderError::UnsupportedIterationSource {
+            source: "items".to_string(),
+            value_type: "string".to_string(),
+        })
+    );
+}
+
+#[test]
+fn weighted_entries_keep_their_authored_object_shape() {
+    let rules = ruleset(
+        r#"
+        items = [
+          { value = red, weight = 2 },
+          { value = blue, weight = 1 }
+        ]
+        origin = """{% for item in items %}{item.value}:{item.weight};{% endfor %}"""
+        "#,
+    );
+
+    assert_eq!(rules.render_rule("origin").unwrap(), "red:2;blue:1;");
+}
+
+#[test]
+fn non_array_loop_source_returns_specific_error() {
+    let rules = ruleset(
+        r#"
+        item = one
+        origin = """{% for value in item %}{value}{% endfor %}"""
+        "#,
+    );
+
+    assert_eq!(
+        rules.render_rule("origin"),
+        Err(RenderError::UnsupportedIterationSource {
+            source: "item".to_string(),
+            value_type: "string".to_string(),
+        })
+    );
+}
+
+#[test]
+fn malformed_for_blocks_fail_during_ruleset_construction() {
+    for template in [
+        "{% for item items %}{% endfor %}",
+        "{% for loop in items %}{% endfor %}",
+        "{% for item in items %}",
+        "{% endfor %}",
+    ] {
+        let config = format!("origin = \"\"\"{template}\"\"\"");
+        assert!(matches!(
+            ruleset_result(&config),
+            Err(RenderError::InvalidExpression(_))
+        ));
+    }
+}
