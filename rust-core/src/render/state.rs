@@ -34,6 +34,7 @@ pub struct RenderState<'a> {
     scopes: Vec<IterationScope<'a>>,
     pub(crate) options: RenderOptions,
     pub(crate) call_stack: Vec<String>,
+    scoped_call_stack: Vec<usize>,
     pub(crate) unique_choices: HashMap<String, HashSet<usize>>,
     pub(crate) rng: rand::rngs::ThreadRng,
 }
@@ -86,6 +87,7 @@ impl<'a> RenderState<'a> {
             scopes: Vec::new(),
             options,
             call_stack: Vec::new(),
+            scoped_call_stack: Vec::new(),
             unique_choices: HashMap::new(),
             rng: rand::rngs::ThreadRng::default(),
         }
@@ -262,10 +264,11 @@ impl<'a> RenderState<'a> {
         name: &str,
         node: &'a StructuredNode,
     ) -> Result<String, RenderError> {
+        let identity = node as *const StructuredNode as usize;
         let existing_calls = self
-            .call_stack
+            .scoped_call_stack
             .iter()
-            .filter(|rule_name| rule_name.as_str() == name)
+            .filter(|entry| **entry == identity)
             .count();
         if self.options.max_recursion_depth == 0 && existing_calls > 0 {
             let mut cycle = self.call_stack.clone();
@@ -276,9 +279,11 @@ impl<'a> RenderState<'a> {
             return Ok(String::new());
         }
 
+        self.scoped_call_stack.push(identity);
         self.call_stack.push(name.to_string());
         let result = node.generate_text(self);
         self.call_stack.pop();
+        self.scoped_call_stack.pop();
         result
     }
 

@@ -2242,6 +2242,20 @@ fn loop_element_templates_render_on_every_reference() {
 }
 
 #[test]
+fn nested_loop_variable_shadowing_does_not_trigger_scoped_recursion() {
+    let rules = ruleset(
+        r#"
+        inner = [nested]
+        outer = ["{helper}"]
+        helper = """{% for item in inner %}{item}{% endfor %}"""
+        origin = """{% for item in outer %}{item}{% endfor %}"""
+        "#,
+    );
+
+    assert_eq!(rules.render_rule("origin").unwrap(), "nested");
+}
+
+#[test]
 fn loop_body_bindings_are_local_to_each_iteration() {
     let rules = ruleset(
         r#"
