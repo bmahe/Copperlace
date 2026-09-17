@@ -2173,6 +2173,33 @@ fn for_loop_renders_scalar_element_types() {
 }
 
 #[test]
+fn for_loop_preserves_json_number_formatting() {
+    let rules = ruleset(
+        r#"
+        items = [1.0, 1.5]
+        origin = """{% for item in items %}{item},{% endfor %}"""
+        "#,
+    );
+
+    assert_eq!(rules.render_rule("origin").unwrap(), "1.0,1.5,");
+}
+
+#[test]
+fn for_loop_does_not_make_integral_float_values_look_like_integers() {
+    let rules = ruleset(
+        r#"
+        items = [1.0]
+        origin = """{% for item in items %}{item | ordinal}{% endfor %}"""
+        "#,
+    );
+
+    assert!(matches!(
+        rules.render_rule("origin"),
+        Err(RenderError::ProcessorError { processor, .. }) if processor == "ordinal"
+    ));
+}
+
+#[test]
 fn for_loop_exposes_full_metadata() {
     let rules = ruleset(
         r#"

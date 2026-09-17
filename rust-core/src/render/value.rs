@@ -203,7 +203,12 @@ impl std::fmt::Display for CopperlaceNumber {
         match self {
             CopperlaceNumber::Integer(value) => value.fmt(formatter),
             CopperlaceNumber::Unsigned(value) => value.fmt(formatter),
-            CopperlaceNumber::Float(value) => value.fmt(formatter),
+            CopperlaceNumber::Float(value) => {
+                let Some(number) = serde_json::Number::from_f64(*value) else {
+                    return Err(std::fmt::Error);
+                };
+                number.fmt(formatter)
+            }
         }
     }
 }
