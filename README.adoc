@@ -70,6 +70,21 @@ You found an ancient key.
 The `article` processor chooses `a` or `an`, and `slug` turns text into a
 URL-friendly value such as `ancient-key`.
 
+Arrays can also be traversed deterministically with a `for` block. Ordinary
+`{item}` calls still make random choices; iteration visits every authored entry
+in source order:
+
+[source]
+----
+items = ["ancient key", "owl feather", "brass compass"]
+inventory = """{% for item in items %}{loop.index}. {item}
+{% endfor %}"""
+----
+
+Loops support nested arrays and object fields. See
+link:docs/configuration.adoc#_iteration[Iteration] for scoping, metadata, and
+weighted-entry behavior.
+
 == License
 
 Copyright 2026 Bruno Mahé.

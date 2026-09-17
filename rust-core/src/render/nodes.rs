@@ -3,7 +3,7 @@ use rand::distr::weighted::WeightedIndex;
 use rand::seq::IndexedRandom;
 
 use super::error::RenderError;
-use super::state::RenderState;
+use super::state::{IterationValue, LoopMetadata, RenderState};
 
 /// A renderable text-generating piece of a compiled rule.
 ///
@@ -55,9 +55,7 @@ impl VariableNode {
 impl TextGeneratorNode for VariableNode {
     fn generate_text(&self, state: &mut RenderState) -> Result<String, RenderError> {
         state
-            .context
-            .get(&self.name)
-            .cloned()
+            .resolve_bound_text(&self.name)?
             .ok_or_else(|| RenderError::UnknownRule(self.name.clone()))
     }
 }
@@ -91,15 +89,15 @@ impl RuleCallNode {
 
 impl TextGeneratorNode for RuleCallNode {
     fn generate_text(&self, state: &mut RenderState) -> Result<String, RenderError> {
-        if let Some(value) = state.context.get(&self.name) {
-            return Ok(value.clone());
+        if let Some(value) = state.resolve_bound_text(&self.name)? {
+            return Ok(value);
         }
 
         if let Some(value) = state
             .ruleset
             .render_context_default_with_state(&self.name, state)?
         {
-            state.context.insert(self.name.clone(), value.clone());
+            state.cache_context_default(&self.name, value.clone());
             return Ok(value);
         }
 
@@ -144,13 +142,81 @@ impl BindNode {
 
 impl TextGeneratorNode for BindNode {
     fn generate_text(&self, state: &mut RenderState) -> Result<String, RenderError> {
-        if matches!(self.mode, BindMode::IfMissing) && state.context.contains_key(&self.name) {
+        if matches!(self.mode, BindMode::IfMissing) && state.contains_bound_value(&self.name)? {
             return Ok(String::new());
+        }
+        if matches!(self.mode, BindMode::Overwrite) {
+            state.ensure_mutable_binding(&self.name)?;
         }
 
         let value = self.node.generate_text(state)?;
-        state.context.insert(self.name.clone(), value);
+        state.bind(&self.name, value, matches!(self.mode, BindMode::Overwrite))?;
         Ok(String::new())
+    }
+}
+
+pub(crate) trait IterationSource {
+    fn elements<'a>(&self, state: &RenderState<'a>)
+    -> Result<Vec<IterationValue<'a>>, RenderError>;
+}
+
+pub(crate) struct ArrayIterationSource {
+    path: String,
+}
+
+impl ArrayIterationSource {
+    pub(crate) fn new(path: String) -> Self {
+        ArrayIterationSource { path }
+    }
+}
+
+impl IterationSource for ArrayIterationSource {
+    fn elements<'a>(
+        &self,
+        state: &RenderState<'a>,
+    ) -> Result<Vec<IterationValue<'a>>, RenderError> {
+        state.iterable_elements(&self.path)
+    }
+}
+
+pub(crate) struct ForEachNode {
+    variable_name: String,
+    source: Box<dyn IterationSource>,
+    body: Box<dyn TextGeneratorNode>,
+}
+
+impl ForEachNode {
+    pub(crate) fn new(
+        variable_name: String,
+        source: Box<dyn IterationSource>,
+        body: Box<dyn TextGeneratorNode>,
+    ) -> Self {
+        ForEachNode {
+            variable_name,
+            source,
+            body,
+        }
+    }
+}
+
+impl TextGeneratorNode for ForEachNode {
+    fn generate_text(&self, state: &mut RenderState) -> Result<String, RenderError> {
+        let elements = self.source.elements(state)?;
+        let length = elements.len();
+        let mut output = String::new();
+
+        for (index, element) in elements.into_iter().enumerate() {
+            state.push_iteration_scope(
+                &self.variable_name,
+                element,
+                LoopMetadata { index, length },
+            );
+            let rendered = self.body.generate_text(state);
+            state.pop_iteration_scope();
+            output.push_str(&rendered?);
+        }
+
+        Ok(output)
     }
 }
 

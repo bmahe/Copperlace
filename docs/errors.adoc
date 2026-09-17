@@ -216,6 +216,15 @@ current unsupported value types are `"object"` for object parents such as
 `"array"` for nested arrays that are valid structured data but not valid dotted
 text-choice rules.
 
+`UnsupportedIterationSource { source, value_type }`::
+Returned when a `for` source resolves to a string, scalar, or object instead of
+an array. Lexically visible bindings take precedence over config arrays, so a
+string binding can produce this error by shadowing an array with the same name.
+
+`ImmutableLoopBinding(String)`::
+Returned when an overwrite statement attempts to replace the active loop
+element or a field of the immutable `loop` metadata object.
+
 `UnsupportedStructuredTarget(String)`::
 Returned when structured rendering is requested for a target that is not an
 object-valued rule.

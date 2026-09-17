@@ -276,6 +276,56 @@ title = ["Mia's Story"]
 origin = "{title | slug}"
 ----
 
+== Iteration
+
+`{% for item in items %}...{% endfor %}` iterates an array in source order and
+concatenates the text rendered by the loop body. An empty array renders no
+text. Top-level arrays, dotted config paths, arrays from the special `context`
+object, and array fields of an enclosing loop element can be sources.
+
+[source]
+----
+groups = [
+  { name = A, members = [Mia, Lina] },
+  { name = B, members = [Noah] }
+]
+
+origin = """{% for group in groups %}
+{group.name}: {% for member in group.members %}{member} {% endfor %}
+{% endfor %}"""
+----
+
+Scalar elements render through the loop variable, such as `{member}`. Object
+fields use dotted paths such as `{group.name}`. Array and object values are not
+renderable directly as text, but their fields and nested arrays can be used.
+Templates in an element or field are rendered on every reference, so repeated
+references may make different random choices.
+
+Each iteration exposes an immutable `loop` object:
+
+* `loop.index` is the one-based index;
+* `loop.index0` is the zero-based index;
+* `loop.length` is the source length;
+* `loop.first` and `loop.last` are booleans.
+
+Nested loops temporarily shadow `loop` and restore the outer metadata when the
+inner loop finishes. The name `loop` cannot be used as the element variable.
+Loop elements and metadata cannot be overwritten.
+
+Bindings created by `{% alias:rule %}` or `{% alias:=rule %}` inside the body
+are local to that iteration. They are visible to nested loops and the remainder
+of the current iteration, then discarded. Values from outer scopes remain
+visible and are restored afterward.
+
+Name lookup is lexical. A visible string binding shadows a config array with
+the same name, so attempting to iterate it returns
+`UnsupportedIterationSource`. Weighted array entries are exposed exactly as
+authored: `{ value = red, weight = 2 }` is an object addressed with
+`{item.value}` and `{item.weight}`. Iteration never applies weights.
+
+Loops produce text only. A structured rule may use a loop inside a string leaf,
+but a loop does not create or splice structured array entries.
+
 == Array Values
 
 Arrays are random choices. The selected element is rendered using the same value

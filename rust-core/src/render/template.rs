@@ -1,14 +1,32 @@
 use super::error::RenderError;
 use super::nodes::{
-    BindMode, BindNode, ProcessorPipelineNode, RuleCallNode, TextGeneratorNode, VecNode,
+    ArrayIterationSource, BindMode, BindNode, ForEachNode, ProcessorPipelineNode, RuleCallNode,
+    TextGeneratorNode, VecNode,
 };
 use super::processor::ProcessorRegistry;
+
+enum TemplateToken {
+    Literal(String),
+    Expression(String),
+    Statement(String),
+}
 
 pub(crate) fn template_to_node(
     template: &str,
     processors: &ProcessorRegistry,
 ) -> Result<Box<dyn TextGeneratorNode>, RenderError> {
-    let mut nodes: Vec<Box<dyn TextGeneratorNode>> = Vec::new();
+    let tokens = tokenize_template(template)?;
+    let mut parser = TemplateParser {
+        tokens: &tokens,
+        index: 0,
+        processors,
+    };
+    let nodes = parser.parse_nodes(false)?;
+    Ok(Box::new(VecNode::new(nodes)))
+}
+
+fn tokenize_template(template: &str) -> Result<Vec<TemplateToken>, RenderError> {
+    let mut tokens = Vec::new();
     let mut literal = String::new();
     let mut chars = template.char_indices().peekable();
 
@@ -23,7 +41,7 @@ pub(crate) fn template_to_node(
             },
             '{' => {
                 if !literal.is_empty() {
-                    nodes.push(Box::new(std::mem::take(&mut literal)));
+                    tokens.push(TemplateToken::Literal(std::mem::take(&mut literal)));
                 }
 
                 if let Some((_, '%')) = chars.peek() {
@@ -52,7 +70,7 @@ pub(crate) fn template_to_node(
                     };
 
                     let statement = template[statement_start..statement_end].trim();
-                    nodes.push(statement_to_node(statement, processors)?);
+                    tokens.push(TemplateToken::Statement(statement.to_string()));
                 } else {
                     let expression_start = index + character.len_utf8();
                     let mut expression_end = None;
@@ -70,7 +88,7 @@ pub(crate) fn template_to_node(
                     };
 
                     let expression = template[expression_start..expression_end].trim();
-                    nodes.push(expression_to_node(expression, processors)?);
+                    tokens.push(TemplateToken::Expression(expression.to_string()));
                 }
             }
             '%' => {
@@ -92,10 +110,99 @@ pub(crate) fn template_to_node(
     }
 
     if !literal.is_empty() {
-        nodes.push(Box::new(literal));
+        tokens.push(TemplateToken::Literal(literal));
     }
 
-    Ok(Box::new(VecNode::new(nodes)))
+    Ok(tokens)
+}
+
+struct TemplateParser<'a> {
+    tokens: &'a [TemplateToken],
+    index: usize,
+    processors: &'a ProcessorRegistry,
+}
+
+impl TemplateParser<'_> {
+    fn parse_nodes(
+        &mut self,
+        inside_loop: bool,
+    ) -> Result<Vec<Box<dyn TextGeneratorNode>>, RenderError> {
+        let mut nodes = Vec::new();
+
+        while let Some(token) = self.tokens.get(self.index) {
+            match token {
+                TemplateToken::Literal(value) => {
+                    nodes.push(Box::new(value.clone()) as Box<dyn TextGeneratorNode>);
+                    self.index += 1;
+                }
+                TemplateToken::Expression(expression) => {
+                    nodes.push(expression_to_node(expression, self.processors)?);
+                    self.index += 1;
+                }
+                TemplateToken::Statement(statement) if statement == "endfor" => {
+                    if !inside_loop {
+                        return Err(RenderError::InvalidExpression(statement.clone()));
+                    }
+                    self.index += 1;
+                    return Ok(nodes);
+                }
+                TemplateToken::Statement(statement) if statement.starts_with("for ") => {
+                    let (variable_name, source_name) = parse_for_statement(statement)?;
+                    self.index += 1;
+                    let body = Box::new(VecNode::new(self.parse_nodes(true)?));
+                    nodes.push(Box::new(ForEachNode::new(
+                        variable_name,
+                        Box::new(ArrayIterationSource::new(source_name)),
+                        body,
+                    )));
+                }
+                TemplateToken::Statement(statement) => {
+                    nodes.push(statement_to_node(statement, self.processors)?);
+                    self.index += 1;
+                }
+            }
+        }
+
+        if inside_loop {
+            return Err(RenderError::InvalidExpression(
+                "missing endfor for template loop".to_string(),
+            ));
+        }
+        Ok(nodes)
+    }
+}
+
+fn parse_for_statement(statement: &str) -> Result<(String, String), RenderError> {
+    let parts = statement.split_whitespace().collect::<Vec<_>>();
+    if parts.len() != 4 || parts[0] != "for" || parts[2] != "in" {
+        return Err(RenderError::InvalidExpression(statement.to_string()));
+    }
+
+    let variable_name = parts[1];
+    let source_name = parts[3];
+    if variable_name == "loop" || !is_identifier(variable_name) || !is_source_path(source_name) {
+        return Err(RenderError::InvalidExpression(statement.to_string()));
+    }
+
+    Ok((variable_name.to_string(), source_name.to_string()))
+}
+
+fn is_source_path(value: &str) -> bool {
+    value.split('.').all(|segment| {
+        !segment.is_empty()
+            && segment
+                .chars()
+                .all(|character| !matches!(character, '|' | ':' | '!' | '{' | '}' | '%'))
+    })
+}
+
+fn is_identifier(value: &str) -> bool {
+    let mut characters = value.chars();
+    let Some(first) = characters.next() else {
+        return false;
+    };
+    (first.is_alphabetic() || first == '_')
+        && characters.all(|character| character.is_alphanumeric() || matches!(character, '_' | '-'))
 }
 
 fn statement_to_node(
