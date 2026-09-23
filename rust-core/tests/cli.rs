@@ -675,6 +675,45 @@ fn count_with_compact_structured_json_outputs_json_lines() {
 }
 
 #[test]
+fn renders_structured_array_loops_as_json() {
+    let config_path = write_temp_config(
+        r#"
+        items = ["one", "two"]
+        origin {
+            entries = [
+                {% for item in items %}
+                { index = "{loop.index}", value = "{item}" }
+                {% endfor %}
+            ]
+        }
+        "#,
+    );
+    let output = Command::new(env!("CARGO_BIN_EXE_copperlace"))
+        .args([
+            "render",
+            "--config",
+            &config_path.to_string_lossy(),
+            "--rule",
+            "origin",
+            "--compact-json",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    assert_eq!(
+        serde_json::from_slice::<serde_json::Value>(&output.stdout).unwrap(),
+        json!({
+            "entries": [
+                {"index": "1", "value": "one"},
+                {"index": "2", "value": "two"}
+            ]
+        })
+    );
+    let _ = fs::remove_file(config_path);
+}
+
+#[test]
 fn compact_json_rejects_text_rules() {
     let config_path = write_temp_config(
         r#"

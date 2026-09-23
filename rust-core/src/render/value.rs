@@ -4,6 +4,7 @@ use serde::Serialize;
 
 use super::error::RenderError;
 use super::nodes::TextGeneratorNode;
+use super::state::LoopMetadata;
 use super::state::RenderState;
 
 /// Compiled structured document tree.
@@ -15,7 +16,7 @@ pub enum StructuredNode {
     /// Object entries keyed by field name.
     Object(BTreeMap<String, StructuredNode>),
     /// Array entries in source order.
-    Array(Vec<StructuredNode>),
+    Array(Vec<StructuredArrayEntry>),
     /// A text-generating template leaf.
     Text(Box<dyn TextGeneratorNode>),
     /// Numeric scalar.
@@ -74,16 +75,145 @@ impl StructuredNode {
                 .map(|(key, value)| Ok((key.clone(), value.generate_value(state)?)))
                 .collect::<Result<BTreeMap<_, _>, _>>()
                 .map(CopperlaceValue::Object),
-            StructuredNode::Array(values) => values
-                .iter()
-                .map(|value| value.generate_value(state))
-                .collect::<Result<Vec<_>, _>>()
-                .map(CopperlaceValue::Array),
+            StructuredNode::Array(values) => {
+                let mut rendered = Vec::new();
+                for value in values {
+                    value.append_values(state, &mut rendered)?;
+                }
+                Ok(CopperlaceValue::Array(rendered))
+            }
             StructuredNode::Text(node) => node.generate_text(state).map(CopperlaceValue::String),
             StructuredNode::Number(value) => Ok(CopperlaceValue::Number(*value)),
             StructuredNode::Boolean(value) => Ok(CopperlaceValue::Boolean(*value)),
             StructuredNode::Null => Ok(CopperlaceValue::Null),
         }
+    }
+}
+
+/// One compiled entry in a structured array.
+///
+/// Fixed entries emit one structured value. Iteration entries emit one value
+/// for each source element. The internal representation is kept private so
+/// array rendering and template compilation remain separate concerns.
+pub struct StructuredArrayEntry {
+    renderer: Box<dyn StructuredArrayEntryRenderer>,
+}
+
+trait StructuredArrayEntryRenderer {
+    fn append_values(
+        &self,
+        state: &mut RenderState,
+        output: &mut Vec<CopperlaceValue>,
+    ) -> Result<(), RenderError>;
+
+    fn value_node(&self) -> Option<&StructuredNode>;
+
+    fn iteration(&self) -> Option<(&str, &str, &StructuredNode)>;
+}
+
+struct FixedStructuredArrayEntry {
+    value: StructuredNode,
+}
+
+struct ForEachStructuredArrayEntry {
+    variable_name: String,
+    source_name: String,
+    template: StructuredNode,
+}
+
+impl StructuredArrayEntry {
+    /// Creates a fixed structured array entry.
+    pub fn from_value(value: StructuredNode) -> Self {
+        StructuredArrayEntry {
+            renderer: Box::new(FixedStructuredArrayEntry { value }),
+        }
+    }
+
+    pub(crate) fn for_each(
+        variable_name: String,
+        source_name: String,
+        template: StructuredNode,
+    ) -> Self {
+        StructuredArrayEntry {
+            renderer: Box::new(ForEachStructuredArrayEntry {
+                variable_name,
+                source_name,
+                template,
+            }),
+        }
+    }
+
+    /// Returns the fixed value for a non-iterating entry.
+    pub fn value_node(&self) -> Option<&StructuredNode> {
+        self.renderer.value_node()
+    }
+
+    /// Returns the loop variable, source, and template for an iteration entry.
+    pub fn iteration(&self) -> Option<(&str, &str, &StructuredNode)> {
+        self.renderer.iteration()
+    }
+
+    pub(crate) fn append_values(
+        &self,
+        state: &mut RenderState,
+        output: &mut Vec<CopperlaceValue>,
+    ) -> Result<(), RenderError> {
+        self.renderer.append_values(state, output)
+    }
+}
+
+impl StructuredArrayEntryRenderer for FixedStructuredArrayEntry {
+    fn append_values(
+        &self,
+        state: &mut RenderState,
+        output: &mut Vec<CopperlaceValue>,
+    ) -> Result<(), RenderError> {
+        output.push(self.value.generate_value(state)?);
+        Ok(())
+    }
+
+    fn value_node(&self) -> Option<&StructuredNode> {
+        Some(&self.value)
+    }
+
+    fn iteration(&self) -> Option<(&str, &str, &StructuredNode)> {
+        None
+    }
+}
+
+impl StructuredArrayEntryRenderer for ForEachStructuredArrayEntry {
+    fn append_values(
+        &self,
+        state: &mut RenderState,
+        output: &mut Vec<CopperlaceValue>,
+    ) -> Result<(), RenderError> {
+        let elements = state.iterable_elements(&self.source_name)?;
+        let length = elements.len();
+        for (index, element) in elements.into_iter().enumerate() {
+            state.push_iteration_scope(
+                &self.variable_name,
+                element,
+                LoopMetadata { index, length },
+            );
+            let rendered = self.template.generate_value(state);
+            state.pop_iteration_scope();
+            output.push(rendered?);
+        }
+        Ok(())
+    }
+
+    fn value_node(&self) -> Option<&StructuredNode> {
+        None
+    }
+
+    fn iteration(&self) -> Option<(&str, &str, &StructuredNode)> {
+        Some((&self.variable_name, &self.source_name, &self.template))
+    }
+}
+
+impl From<StructuredNode> for StructuredArrayEntry {
+    fn from(value: StructuredNode) -> Self {
+        StructuredArrayEntry::from_value(value)
     }
 }
 

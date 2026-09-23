@@ -2,7 +2,10 @@ use std::fmt;
 use std::path::Path;
 use std::str::FromStr;
 
-use crate::render::{CopperlaceValue, RenderContext, RenderError, RenderOptions, RuleSet};
+use crate::render::structured_template::{ParsedTemplateConfig, parse_config};
+use crate::render::{
+    CopperlaceValue, ProcessorRegistry, RenderContext, RenderError, RenderOptions, RuleSet,
+};
 
 /// Error returned while loading, parsing, compiling, or rendering configuration.
 #[derive(Debug, PartialEq, Eq)]
@@ -188,9 +191,15 @@ impl FromStr for Copperlace {
 
 /// Parses a configuration string and compiles it into a reusable [`RuleSet`].
 pub fn ruleset_from_str(config: &str) -> Result<RuleSet, ConfigError> {
-    let value = hocon_rs::Config::parse_str::<hocon_rs::Value>(config, None)
-        .map_err(|error| ConfigError::Parse(format!("{error:?}")))?;
-    RuleSet::from_config(value).map_err(ConfigError::Render)
+    ruleset_from_str_with_processors(config, ProcessorRegistry::new())
+}
+
+pub(crate) fn ruleset_from_str_with_processors(
+    config: &str,
+    processors: ProcessorRegistry,
+) -> Result<RuleSet, ConfigError> {
+    let parsed = parse_config(config, None).map_err(ConfigError::Parse)?;
+    RuleSet::from_template_config(parsed, processors).map_err(ConfigError::Render)
 }
 
 pub(crate) fn config_value_from_file(
@@ -218,8 +227,41 @@ fn config_options_for_file(path: &Path) -> hocon_rs::ConfigOptions {
 
 /// Loads a configuration file and compiles it into a reusable [`RuleSet`].
 pub fn ruleset_from_file(path: impl AsRef<Path>) -> Result<RuleSet, ConfigError> {
-    let value = config_value_from_file(path)?;
-    RuleSet::from_config(value).map_err(ConfigError::Render)
+    ruleset_from_file_with_processors(path, ProcessorRegistry::new())
+}
+
+pub(crate) fn ruleset_from_file_with_processors(
+    path: impl AsRef<Path>,
+    processors: ProcessorRegistry,
+) -> Result<RuleSet, ConfigError> {
+    let path = path.as_ref();
+    let parsed = if let Some(config_path) = source_config_path(path) {
+        let source = std::fs::read_to_string(&config_path)
+            .map_err(|error| ConfigError::Parse(error.to_string()))?;
+        parse_config(&source, Some(config_options_for_file(&config_path)))
+            .map_err(ConfigError::Parse)?
+    } else {
+        ParsedTemplateConfig {
+            value: config_value_from_file(path)?,
+            loops: std::collections::HashMap::new(),
+        }
+    };
+    RuleSet::from_template_config(parsed, processors).map_err(ConfigError::Render)
+}
+
+fn source_config_path(path: &Path) -> Option<std::path::PathBuf> {
+    if let Some(extension) = path.extension() {
+        return (extension == "conf" && path.is_file()).then(|| path.to_path_buf());
+    }
+
+    let mut hocon_path = path.to_path_buf();
+    hocon_path.set_extension("conf");
+    let mut json_path = path.to_path_buf();
+    json_path.set_extension("json");
+    let mut properties_path = path.to_path_buf();
+    properties_path.set_extension("properties");
+    (hocon_path.is_file() && !json_path.is_file() && !properties_path.is_file())
+        .then_some(hocon_path)
 }
 
 /// Renders one rule from a configuration string.

@@ -5,7 +5,7 @@ use copperlace::{
     RenderOptions, RuleSet, processor, render_config_rule_structured_with_context,
     render_file_inferred, render_file_inferred_with_context, render_file_structured,
     render_file_structured_with_context, render_str_inferred, render_str_inferred_with_context,
-    render_str_structured, render_str_structured_with_context,
+    render_str_structured, render_str_structured_with_context, ruleset_from_str,
 };
 
 fn ruleset(config: &str) -> RuleSet {
@@ -772,4 +772,213 @@ fn structured_text_leaf_can_concatenate_for_loop_output() {
             CopperlaceValue::String("two".to_string()),
         ])
     );
+}
+
+#[test]
+fn structured_array_loop_emits_typed_values_in_source_order() {
+    let config = r#"
+        items = [
+            { name = "Mia" },
+            { name = "Lina" }
+        ]
+        origin {
+            entries = [
+                "before",
+                {% for item in items %}
+                {
+                    name = "{item.name}",
+                    index = "{loop.index}",
+                    first = "{loop.first}",
+                    quantity = 3,
+                    active = true,
+                    missing = null
+                }
+                {% endfor %},
+                "after"
+            ]
+        }
+    "#;
+
+    let rendered = render_str_structured(config, "origin").unwrap();
+    assert_eq!(
+        rendered.to_json_value(),
+        serde_json::json!({
+            "entries": [
+                "before",
+                {
+                    "name": "Mia", "index": "1", "first": "true",
+                    "quantity": 3, "active": true, "missing": null
+                },
+                {
+                    "name": "Lina", "index": "2", "first": "false",
+                    "quantity": 3, "active": true, "missing": null
+                },
+                "after"
+            ]
+        })
+    );
+
+    let rules = ruleset_from_str(config).unwrap();
+    let copperlace::StructuredNode::Object(document) = rules.structured_document() else {
+        panic!("expected root object");
+    };
+    let copperlace::StructuredNode::Object(origin) = document.get("origin").unwrap() else {
+        panic!("expected origin object");
+    };
+    let copperlace::StructuredNode::Array(entries) = origin.get("entries").unwrap() else {
+        panic!("expected array");
+    };
+    assert!(entries[0].value_node().is_some());
+    assert_eq!(entries[1].iteration().unwrap().1, "items");
+}
+
+#[test]
+fn structured_source_loops_leave_quoted_templates_and_comments_untouched() {
+    let rendered = render_str_structured(
+        r#"
+        items = ["Mia"]
+        origin {
+            quoted = "{% for item in items %}{item}{% endfor %}"
+            # {% for ignored in items %} this is only a comment {% endfor %}
+            entries = [
+                {% for item in items %}"{item}"{% endfor %}
+            ]
+        }
+        "#,
+        "origin",
+    )
+    .unwrap();
+
+    assert_eq!(
+        rendered.to_json_value(),
+        serde_json::json!({"quoted": "Mia", "entries": ["Mia"]})
+    );
+}
+
+#[test]
+fn structured_array_loops_can_nest_and_restore_outer_metadata() {
+    let config = r#"
+        groups = [
+            { name = "A", children = ["one", "two"] },
+            { name = "B", children = ["three"] }
+        ]
+        origin {
+            groups = [
+                {% for group in groups %}
+                {
+                    name = "{group.name}",
+                    outer_index = "{loop.index}",
+                    children = [
+                        {% for child in group.children %}
+                        "{loop.index}:{child}"
+                        {% endfor %}
+                    ]
+                }
+                {% endfor %}
+            ]
+        }
+    "#;
+
+    assert_eq!(
+        render_str_structured(config, "origin")
+            .unwrap()
+            .to_json_value(),
+        serde_json::json!({
+            "groups": [
+                {"name": "A", "outer_index": "1", "children": ["1:one", "2:two"]},
+                {"name": "B", "outer_index": "2", "children": ["1:three"]}
+            ]
+        })
+    );
+}
+
+#[test]
+fn structured_array_loops_allow_empty_sources_and_report_invalid_sources() {
+    assert_eq!(
+        render_str_structured(
+            r#"
+            items = []
+            origin {
+                entries = [
+                    {% for item in items %}"{item}"{% endfor %}
+                ]
+            }
+            "#,
+            "origin"
+        )
+        .unwrap()
+        .to_json_value(),
+        serde_json::json!({"entries": []})
+    );
+
+    let rules = ruleset_from_str(
+        r#"
+        items = "one"
+        origin {
+            entries = [
+                {% for item in items %}"{item}"{% endfor %}
+            ]
+        }
+        "#,
+    )
+    .unwrap();
+    assert!(matches!(
+        rules.render_rule_structured("origin"),
+        Err(RenderError::UnsupportedIterationSource { source, value_type })
+            if source == "items" && value_type == "string"
+    ));
+
+    assert!(matches!(
+        ruleset_from_str(
+            r#"
+            items = ["one"]
+            origin {
+                entries = {% for item in items %}"{item}"{% endfor %}
+            }
+            "#
+        ),
+        Err(ConfigError::Render(RenderError::InvalidExpression(_)))
+    ));
+
+    assert!(matches!(
+        ruleset_from_str(
+            r#"
+            items = ["one"]
+            origin {
+                entries = [
+                    {% for item in items %}"{item}"
+                ]
+            }
+            "#
+        ),
+        Err(ConfigError::Parse(_))
+    ));
+}
+
+#[test]
+fn structured_array_loops_render_from_files() {
+    let path = std::env::temp_dir().join(format!(
+        "copperlace-structured-loop-{}.conf",
+        std::process::id()
+    ));
+    std::fs::write(
+        &path,
+        r#"
+        items = ["one", "two"]
+        origin {
+            entries = [
+                {% for item in items %}"{loop.index}:{item}"{% endfor %}
+            ]
+        }
+        "#,
+    )
+    .unwrap();
+
+    assert_eq!(
+        render_file_structured(&path, "origin")
+            .unwrap()
+            .to_json_value(),
+        serde_json::json!({"entries": ["1:one", "2:two"]})
+    );
+    let _ = std::fs::remove_file(path);
 }

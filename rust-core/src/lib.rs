@@ -32,8 +32,8 @@ pub use config::{
 };
 pub use render::{
     CopperlaceNumber, CopperlaceValue, Processor, ProcessorRegistry, RenderContext, RenderError,
-    RenderOptions, RuleSet, StructuredNode, TextGeneratorNode, processor, render_config_rule,
-    render_config_rule_structured, render_config_rule_structured_with_context,
+    RenderOptions, RuleSet, StructuredArrayEntry, StructuredNode, TextGeneratorNode, processor,
+    render_config_rule, render_config_rule_structured, render_config_rule_structured_with_context,
     render_config_rule_structured_with_context_and_options, render_config_rule_with_context,
     render_config_rule_with_context_and_options,
 };

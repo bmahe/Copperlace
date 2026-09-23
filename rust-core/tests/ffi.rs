@@ -665,6 +665,57 @@ fn renders_structured_json_compact() {
 }
 
 #[test]
+fn renders_structured_array_loops_to_json() {
+    let config = CString::new(
+        r#"
+        items = ["Mia", "Lina"]
+        origin {
+            entries = [
+                {% for item in items %}
+                { name = "{item}", index = "{loop.index}" }
+                {% endfor %}
+            ]
+        }
+        "#,
+    )
+    .unwrap();
+    let rule = CString::new("origin").unwrap();
+    let mut handle = ptr::null_mut();
+    let mut error = ptr::null_mut();
+    let mut output = ptr::null_mut();
+
+    assert_eq!(
+        copperlace_ruleset_from_string(config.as_ptr(), &mut handle, &mut error),
+        COPPERLACE_OK
+    );
+    assert_eq!(
+        copperlace_ruleset_render_structured_json(
+            handle,
+            rule.as_ptr(),
+            false,
+            &mut output,
+            &mut error,
+        ),
+        COPPERLACE_OK
+    );
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(
+            unsafe { CStr::from_ptr(output) }.to_str().unwrap()
+        )
+        .unwrap(),
+        json!({
+            "entries": [
+                {"name": "Mia", "index": "1"},
+                {"name": "Lina", "index": "2"}
+            ]
+        })
+    );
+
+    copperlace_string_free(output);
+    copperlace_ruleset_free(handle);
+}
+
+#[test]
 fn renders_structured_json_formatted_with_tabs() {
     let config = CString::new(
         r#"

@@ -4,6 +4,7 @@ mod nodes;
 mod processor;
 mod ruleset;
 mod state;
+pub(crate) mod structured_template;
 mod template;
 mod value;
 
@@ -20,4 +21,4 @@ pub use ruleset::{
     render_config_rule_with_context_and_options,
 };
 pub use state::{RenderContext, RenderOptions, RenderState};
-pub use value::{CopperlaceNumber, CopperlaceValue, StructuredNode};
+pub use value::{CopperlaceNumber, CopperlaceValue, StructuredArrayEntry, StructuredNode};

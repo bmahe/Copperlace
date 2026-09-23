@@ -3,8 +3,9 @@ use std::collections::{BTreeMap, HashMap};
 use super::error::RenderError;
 use super::nodes::{ChoiceNode, TextGeneratorNode, UnsupportedValueNode, WeightedChoiceNode};
 use super::processor::ProcessorRegistry;
+use super::structured_template::StructuredLoopTemplate;
 use super::template::template_to_node;
-use super::value::{CopperlaceNumber, StructuredNode};
+use super::value::{CopperlaceNumber, StructuredArrayEntry, StructuredNode};
 
 const WEIGHTED_CHOICE_VALUE_KEY: &str = "value";
 const WEIGHTED_CHOICE_WEIGHT_KEY: &str = "weight";
@@ -31,24 +32,38 @@ pub(crate) fn value_to_node(
     })
 }
 
-pub(crate) fn value_to_structured_node(
+pub(crate) fn value_to_structured_template_node(
     value: hocon_rs::Value,
     processors: &ProcessorRegistry,
+    loops: &HashMap<String, StructuredLoopTemplate>,
 ) -> Result<StructuredNode, RenderError> {
     Ok(match value {
         hocon_rs::Value::Object(values) => {
             let mut nodes = BTreeMap::new();
             for (name, value) in values {
-                nodes.insert(name, value_to_structured_node(value, processors)?);
+                nodes.insert(
+                    name,
+                    value_to_structured_template_node(value, processors, loops)?,
+                );
             }
             StructuredNode::Object(nodes)
         }
         hocon_rs::Value::Array(values) => StructuredNode::Array(
             values
                 .into_iter()
-                .map(|value| value_to_structured_node(value, processors))
+                .map(|value| template_array_entry(value, processors, loops))
                 .collect::<Result<Vec<_>, _>>()?,
         ),
+        hocon_rs::Value::String(template) if loops.contains_key(&template) => {
+            return Err(RenderError::InvalidExpression(
+                "structured loop blocks must be array entries".to_string(),
+            ));
+        }
+        hocon_rs::Value::String(template) if contains_loop_marker(&template, loops) => {
+            return Err(RenderError::InvalidExpression(
+                "structured loop blocks must occupy one array entry".to_string(),
+            ));
+        }
         hocon_rs::Value::String(template) => {
             StructuredNode::Text(template_to_node(&template, processors)?)
         }
@@ -60,11 +75,44 @@ pub(crate) fn value_to_structured_node(
     })
 }
 
+fn template_array_entry(
+    value: hocon_rs::Value,
+    processors: &ProcessorRegistry,
+    loops: &HashMap<String, StructuredLoopTemplate>,
+) -> Result<StructuredArrayEntry, RenderError> {
+    if let hocon_rs::Value::String(marker) = &value
+        && let Some(template) = loops.get(marker)
+    {
+        let body = value_to_structured_template_node(
+            template.body.value.clone(),
+            processors,
+            &template.body.loops,
+        )?;
+        return Ok(StructuredArrayEntry::for_each(
+            template.variable_name.clone(),
+            template.source_name.clone(),
+            body,
+        ));
+    }
+
+    if let hocon_rs::Value::String(marker) = &value
+        && contains_loop_marker(marker, loops)
+    {
+        return Err(RenderError::InvalidExpression(
+            "structured loop blocks must occupy one array entry".to_string(),
+        ));
+    }
+
+    value_to_structured_template_node(value, processors, loops)
+        .map(StructuredArrayEntry::from_value)
+}
+
 pub(crate) fn insert_named_text_nodes(
     nodes: &mut HashMap<String, Box<dyn TextGeneratorNode>>,
     name: String,
     value: hocon_rs::Value,
     processors: &ProcessorRegistry,
+    loops: &HashMap<String, StructuredLoopTemplate>,
 ) -> Result<(), RenderError> {
     match value {
         hocon_rs::Value::Object(values) => {
@@ -78,6 +126,7 @@ pub(crate) fn insert_named_text_nodes(
                     format!("{name}.{child_name}"),
                     child_value,
                     processors,
+                    loops,
                 )?;
             }
         }
@@ -94,6 +143,7 @@ pub(crate) fn insert_context_text_nodes(
     name: String,
     value: hocon_rs::Value,
     processors: &ProcessorRegistry,
+    loops: &HashMap<String, StructuredLoopTemplate>,
 ) -> Result<(), RenderError> {
     match value {
         hocon_rs::Value::Object(values) => {
@@ -107,6 +157,7 @@ pub(crate) fn insert_context_text_nodes(
                     format!("{name}.{child_name}"),
                     child_value,
                     processors,
+                    loops,
                 )?;
             }
         }
@@ -123,6 +174,7 @@ fn insert_structured_child_text_nodes(
     name: String,
     value: hocon_rs::Value,
     processors: &ProcessorRegistry,
+    loops: &HashMap<String, StructuredLoopTemplate>,
 ) -> Result<(), RenderError> {
     match value {
         hocon_rs::Value::Object(values) => {
@@ -136,10 +188,21 @@ fn insert_structured_child_text_nodes(
                     format!("{name}.{child_name}"),
                     child_value,
                     processors,
+                    loops,
                 )?;
             }
         }
         hocon_rs::Value::Array(values) => {
+            if values
+                .iter()
+                .any(|value| contains_template_loop(value, loops))
+            {
+                nodes.insert(
+                    name,
+                    Box::new(UnsupportedValueNode::new("array".to_string())),
+                );
+                return Ok(());
+            }
             match value_to_node(hocon_rs::Value::Array(values), processors) {
                 Ok(node) => {
                     nodes.insert(name, node);
@@ -159,6 +222,26 @@ fn insert_structured_child_text_nodes(
     }
 
     Ok(())
+}
+
+pub(crate) fn contains_template_loop(
+    value: &hocon_rs::Value,
+    loops: &HashMap<String, StructuredLoopTemplate>,
+) -> bool {
+    match value {
+        hocon_rs::Value::String(marker) => contains_loop_marker(marker, loops),
+        hocon_rs::Value::Array(values) => values
+            .iter()
+            .any(|value| contains_template_loop(value, loops)),
+        hocon_rs::Value::Object(values) => values
+            .values()
+            .any(|value| contains_template_loop(value, loops)),
+        _ => false,
+    }
+}
+
+fn contains_loop_marker(value: &str, loops: &HashMap<String, StructuredLoopTemplate>) -> bool {
+    loops.keys().any(|marker| value.contains(marker))
 }
 
 fn array_contains_weighted_entry(values: &[hocon_rs::Value]) -> bool {

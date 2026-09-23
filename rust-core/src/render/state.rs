@@ -155,9 +155,18 @@ impl<'a> RenderState<'a> {
         };
 
         match value {
-            ScopedValue::Node(StructuredNode::Array(values)) => {
-                Ok(values.iter().map(IterationValue::Compiled).collect())
-            }
+            ScopedValue::Node(StructuredNode::Array(values)) => values
+                .iter()
+                .map(|entry| {
+                    entry
+                        .value_node()
+                        .map(IterationValue::Compiled)
+                        .ok_or_else(|| RenderError::UnsupportedIterationSource {
+                            source: source.to_string(),
+                            value_type: "array with generated entries".to_string(),
+                        })
+                })
+                .collect(),
             ScopedValue::Node(node) => Err(RenderError::UnsupportedIterationSource {
                 source: source.to_string(),
                 value_type: node.value_type().to_string(),

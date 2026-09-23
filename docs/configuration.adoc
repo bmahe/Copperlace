@@ -323,8 +323,30 @@ the same name, so attempting to iterate it returns
 authored: `{ value = red, weight = 2 }` is an object addressed with
 `{item.value}` and `{item.weight}`. Iteration never applies weights.
 
-Loops produce text only. A structured rule may use a loop inside a string leaf,
-but a loop does not create or splice structured array entries.
+Loops inside quoted text templates produce text only. In an object-valued
+structured rule, an unquoted loop block can instead occupy one array-entry
+position. Its body must contain one HOCON value, which is rendered once per
+source element and appended to that array. The emitted value may be a scalar,
+object, or nested array. Nested structured loops are allowed.
+
+[source]
+----
+items = [{ name = Mia }, { name = Lina }]
+
+origin {
+  entries = [
+    {% for item in items %}
+    { name = "{item.name}", index = "{loop.index}" }
+    {% endfor %}
+  ]
+}
+----
+
+The block is recognized only outside quoted strings and comments. Text loops
+inside a string continue to concatenate their rendered body as before. A
+structured array produced by a loop is output data; loop sources continue to be
+authored config arrays, context arrays, dotted paths, and arrays on outer loop
+elements.
 
 == Array Values
 

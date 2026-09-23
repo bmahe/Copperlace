@@ -2,7 +2,10 @@ use std::ffi::{CStr, CString};
 use std::os::raw::{c_char, c_int, c_void};
 use std::ptr;
 
-use crate::config::{ConfigError, config_value_from_file, ruleset_from_file, ruleset_from_str};
+use crate::config::{
+    ruleset_from_file, ruleset_from_file_with_processors as load_file_with_processors,
+    ruleset_from_str, ruleset_from_str_with_processors as load_str_with_processors,
+};
 use crate::render::{Processor, ProcessorRegistry, RenderContext, RenderOptions, RuleSet};
 
 /// Status code for a successful C ABI call.
@@ -142,7 +145,7 @@ pub unsafe extern "C" fn copperlace_ruleset_from_file_with_processors(
         return COPPERLACE_INVALID_ARGUMENT;
     };
 
-    match ruleset_from_file_with_processors(path, processors) {
+    match load_file_with_processors(path, processors) {
         Ok(ruleset) => write_handle(ruleset, out_handle, out_error),
         Err(error) => {
             write_null_handle(out_handle);
@@ -227,7 +230,7 @@ pub unsafe extern "C" fn copperlace_ruleset_from_string_with_processors(
         return COPPERLACE_INVALID_ARGUMENT;
     };
 
-    match ruleset_from_str_with_processors(&config, processors) {
+    match load_str_with_processors(&config, processors) {
         Ok(ruleset) => write_handle(ruleset, out_handle, out_error),
         Err(error) => {
             write_null_handle(out_handle);
@@ -778,23 +781,6 @@ fn read_processors(
     }
 
     Some(processors)
-}
-
-fn ruleset_from_str_with_processors(
-    config: &str,
-    processors: ProcessorRegistry,
-) -> Result<RuleSet, ConfigError> {
-    let value = hocon_rs::Config::parse_str::<hocon_rs::Value>(config, None)
-        .map_err(|error| ConfigError::Parse(format!("{error:?}")))?;
-    RuleSet::from_config_with_processors(value, processors).map_err(ConfigError::Render)
-}
-
-fn ruleset_from_file_with_processors(
-    path: String,
-    processors: ProcessorRegistry,
-) -> Result<RuleSet, ConfigError> {
-    let value = config_value_from_file(path)?;
-    RuleSet::from_config_with_processors(value, processors).map_err(ConfigError::Render)
 }
 
 /// Releases a ruleset handle returned by the C ABI.
