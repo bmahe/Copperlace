@@ -83,11 +83,7 @@ fn template_array_entry(
     if let hocon_rs::Value::String(marker) = &value
         && let Some(template) = loops.get(marker)
     {
-        let body = value_to_structured_template_node(
-            template.body.value.clone(),
-            processors,
-            &template.body.loops,
-        )?;
+        let body = value_to_structured_template_node(template.body.clone(), processors, loops)?;
         return Ok(StructuredArrayEntry::for_each(
             template.variable_name.clone(),
             template.source_name.clone(),

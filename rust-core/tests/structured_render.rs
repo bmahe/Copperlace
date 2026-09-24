@@ -833,6 +833,169 @@ fn structured_array_loop_emits_typed_values_in_source_order() {
 }
 
 #[test]
+fn structured_loop_bodies_resolve_hocon_against_the_enclosing_document() {
+    let config = r#"
+        shared = 3
+        settings { active = true, label = ready }
+        items = [A, B]
+        origin {
+            entries = [
+                {% for item in items %}
+                {
+                    value = ${shared}
+                    enabled = ${settings.active}
+                    details = ${settings}
+                    name = "{item}"
+                }
+                {% endfor %}
+            ]
+        }
+    "#;
+
+    assert_eq!(
+        render_str_structured(config, "origin")
+            .unwrap()
+            .to_json_value(),
+        serde_json::json!({"entries": [
+            {"value": 3, "enabled": true, "details": {"active": true, "label": "ready"}, "name": "A"},
+            {"value": 3, "enabled": true, "details": {"active": true, "label": "ready"}, "name": "B"}
+        ]})
+    );
+}
+
+#[test]
+fn nested_structured_loop_bodies_share_hocon_resolution() {
+    let config = r#"
+        shared = 7
+        groups = [{ name = A, children = [one, two] }]
+        origin {
+            entries = [
+                {% for group in groups %}
+                {
+                    name = "{group.name}"
+                    count = ${shared}
+                    children = [
+                        {% for child in group.children %}
+                        { name = "{child}", count = ${shared} }
+                        {% endfor %}
+                    ]
+                }
+                {% endfor %}
+            ]
+        }
+    "#;
+
+    assert_eq!(
+        render_str_structured(config, "origin")
+            .unwrap()
+            .to_json_value(),
+        serde_json::json!({"entries": [{
+            "name": "A", "count": 7,
+            "children": [{"name": "one", "count": 7}, {"name": "two", "count": 7}]
+        }]})
+    );
+}
+
+#[test]
+fn structured_loop_bodies_use_values_from_later_files() {
+    let directory = std::env::temp_dir().join(format!(
+        "copperlace-loop-substitutions-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(&directory).unwrap();
+    let base = directory.join("config");
+    std::fs::write(
+        base.with_extension("conf"),
+        r#"
+        shared = 1
+        items = [A, B]
+        origin {
+            entries = [
+                {% for item in items %}{ value = ${shared}, name = "{item}" }{% endfor %}
+            ]
+        }
+        "#,
+    )
+    .unwrap();
+    std::fs::write(base.with_extension("json"), r#"{"shared": 3}"#).unwrap();
+
+    assert_eq!(
+        render_file_structured(&base, "origin")
+            .unwrap()
+            .to_json_value(),
+        serde_json::json!({"entries": [
+            {"value": 3, "name": "A"},
+            {"value": 3, "name": "B"}
+        ]})
+    );
+    std::fs::remove_dir_all(directory).unwrap();
+}
+
+#[test]
+fn included_structured_loop_bodies_resolve_values_from_the_root_file() {
+    let directory = std::env::temp_dir().join(format!(
+        "copperlace-included-loop-substitutions-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(&directory).unwrap();
+    std::fs::write(
+        directory.join("fragment.conf"),
+        r#"
+        origin {
+            entries = [
+                {% for item in items %}
+                { name = "{item}", value = ${shared}, optional = ${?missing} }
+                {% endfor %}
+            ]
+        }
+        "#,
+    )
+    .unwrap();
+    let root = directory.join("root.conf");
+    std::fs::write(
+        &root,
+        "include \"fragment.conf\"\nitems = [A, B]\nshared = 3\n",
+    )
+    .unwrap();
+
+    assert_eq!(
+        render_file_structured(&root, "origin")
+            .unwrap()
+            .to_json_value(),
+        serde_json::json!({"entries": [
+            {"name": "A", "value": 3},
+            {"name": "B", "value": 3}
+        ]})
+    );
+    std::fs::remove_dir_all(directory).unwrap();
+}
+
+#[test]
+fn missing_required_hocon_substitution_in_structured_loop_is_an_error() {
+    assert!(matches!(
+        ruleset_from_str(
+            r#"
+            items = [A]
+            origin {
+                entries = [
+                    {% for item in items %}{ value = ${missing} }{% endfor %}
+                ]
+            }
+            "#
+        ),
+        Err(ConfigError::Parse(_))
+    ));
+}
+
+#[test]
 fn structured_source_loops_leave_quoted_templates_and_comments_untouched() {
     let rendered = render_str_structured(
         r#"

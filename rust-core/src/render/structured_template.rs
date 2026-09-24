@@ -10,7 +10,7 @@ pub(crate) struct ParsedTemplateConfig {
 pub(crate) struct StructuredLoopTemplate {
     pub(crate) variable_name: String,
     pub(crate) source_name: String,
-    pub(crate) body: Box<ParsedTemplateConfig>,
+    pub(crate) body: hocon_rs::Value,
 }
 
 pub(crate) fn transform_source(

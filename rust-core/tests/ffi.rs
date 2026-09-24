@@ -670,10 +670,11 @@ fn renders_structured_array_loops_to_json() {
     let config = CString::new(
         r#"
         items = ["Mia", "Lina"]
+        shared = 3
         origin {
             entries = [
                 {% for item in items %}
-                { name = "{item}", index = "{loop.index}" }
+                { name = "{item}", index = "{loop.index}", shared = ${shared} }
                 {% endfor %}
             ]
         }
@@ -706,8 +707,8 @@ fn renders_structured_array_loops_to_json() {
         .unwrap(),
         json!({
             "entries": [
-                {"name": "Mia", "index": "1"},
-                {"name": "Lina", "index": "2"}
+                {"name": "Mia", "index": "1", "shared": 3},
+                {"name": "Lina", "index": "2", "shared": 3}
             ]
         })
     );

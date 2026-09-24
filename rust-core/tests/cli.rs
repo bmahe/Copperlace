@@ -679,10 +679,11 @@ fn renders_structured_array_loops_as_json() {
     let config_path = write_temp_config(
         r#"
         items = ["one", "two"]
+        shared = 3
         origin {
             entries = [
                 {% for item in items %}
-                { index = "{loop.index}", value = "{item}" }
+                { index = "{loop.index}", value = "{item}", shared = ${shared} }
                 {% endfor %}
             ]
         }
@@ -705,8 +706,8 @@ fn renders_structured_array_loops_as_json() {
         serde_json::from_slice::<serde_json::Value>(&output.stdout).unwrap(),
         json!({
             "entries": [
-                {"index": "1", "value": "one"},
-                {"index": "2", "value": "two"}
+                {"index": "1", "value": "one", "shared": 3},
+                {"index": "2", "value": "two", "shared": 3}
             ]
         })
     );

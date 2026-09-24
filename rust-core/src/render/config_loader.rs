@@ -6,6 +6,7 @@ use hocon_rs::parser::read::StrRead;
 use hocon_rs::raw::field::ObjectField;
 use hocon_rs::raw::include::Inclusion;
 use hocon_rs::raw::raw_object::RawObject;
+use hocon_rs::raw::raw_string::RawString;
 use hocon_rs::raw::raw_value::RawValue;
 use hocon_rs::{Config, ConfigOptions, Value};
 
@@ -33,7 +34,12 @@ struct IncludeSpec {
 
 struct ParsedRaw {
     value: RawObject,
-    loops: HashMap<String, StructuredLoopTemplate>,
+    loops: HashMap<String, LoopHeader>,
+}
+
+struct LoopHeader {
+    variable_name: String,
+    source_name: String,
 }
 
 struct TemplateConfigLoader {
@@ -101,13 +107,7 @@ impl TemplateConfigLoader {
             merged.value.extend(parsed.value.into_inner());
             merged.loops.extend(parsed.loops);
         }
-        let value = Config::from(merged.value)
-            .resolve::<Value>()
-            .map_err(|error| LoadError::Parse(format!("resolving configuration: {error:?}")))?;
-        Ok(ParsedTemplateConfig {
-            value,
-            loops: merged.loops,
-        })
+        self.finish(merged)
     }
 
     fn parse_document(
@@ -116,13 +116,32 @@ impl TemplateConfigLoader {
         active: &mut Vec<PathBuf>,
     ) -> LoadResult<ParsedTemplateConfig> {
         let parsed = self.parse_raw(source, active)?;
+        self.finish(parsed)
+    }
+
+    fn finish(&self, parsed: ParsedRaw) -> LoadResult<ParsedTemplateConfig> {
         let value = Config::from(parsed.value)
             .resolve::<Value>()
             .map_err(|error| LoadError::Parse(format!("resolving configuration: {error:?}")))?;
-        Ok(ParsedTemplateConfig {
-            value,
-            loops: parsed.loops,
-        })
+        let mut bodies = HashMap::new();
+        let value = extract_loop_bodies(value, &self.marker_prefix, &mut bodies)?;
+        let loops = parsed
+            .loops
+            .into_iter()
+            .filter_map(|(marker, header)| {
+                bodies.remove(&marker).map(|body| {
+                    (
+                        marker,
+                        StructuredLoopTemplate {
+                            variable_name: header.variable_name,
+                            source_name: header.source_name,
+                            body,
+                        },
+                    )
+                })
+            })
+            .collect();
+        Ok(ParsedTemplateConfig { value, loops })
     }
 
     fn parse_raw(&mut self, source: &str, active: &mut Vec<PathBuf>) -> LoadResult<ParsedRaw> {
@@ -143,31 +162,29 @@ impl TemplateConfigLoader {
         self.inject_includes(&mut value, &mut includes, &mut loops, active)?;
         for loop_source in loop_sources {
             let body_source = format!("structured_template_value = {}", loop_source.body);
-            let body = self.parse_document(&body_source, active)?;
-            let Value::Object(mut values) = body.value else {
+            let body = self.parse_raw(&body_source, active)?;
+            let body_value = single_loop_body(body.value)?;
+            let envelope = RawValue::object(vec![
+                (
+                    RawString::quoted(format!("{}loop_marker", self.marker_prefix)),
+                    RawValue::quoted_string(&loop_source.marker),
+                ),
+                (
+                    RawString::quoted(format!("{}loop_body", self.marker_prefix)),
+                    body_value,
+                ),
+            ]);
+            if !replace_loop_marker(&mut value, &loop_source.marker, envelope) {
                 return Err(LoadError::Parse(
-                    "structured loop body must contain one HOCON value".to_string(),
-                ));
-            };
-            let Some(body_value) = values.remove("structured_template_value") else {
-                return Err(LoadError::Parse(
-                    "structured loop body must contain one HOCON value".to_string(),
-                ));
-            };
-            if !values.is_empty() {
-                return Err(LoadError::Parse(
-                    "structured loop body must contain one HOCON value".to_string(),
+                    "structured loop marker was not found".to_string(),
                 ));
             }
+            loops.extend(body.loops);
             loops.insert(
                 loop_source.marker,
-                StructuredLoopTemplate {
+                LoopHeader {
                     variable_name: loop_source.variable_name,
                     source_name: loop_source.source_name,
-                    body: Box::new(ParsedTemplateConfig {
-                        value: body_value,
-                        loops: body.loops,
-                    }),
                 },
             );
         }
@@ -178,7 +195,7 @@ impl TemplateConfigLoader {
         &mut self,
         object: &mut RawObject,
         includes: &mut HashMap<String, IncludeSpec>,
-        loops: &mut HashMap<String, StructuredLoopTemplate>,
+        loops: &mut HashMap<String, LoopHeader>,
         active: &mut Vec<PathBuf>,
     ) -> LoadResult<()> {
         for field in object.iter_mut() {
@@ -210,7 +227,7 @@ impl TemplateConfigLoader {
         &mut self,
         value: &mut RawValue,
         includes: &mut HashMap<String, IncludeSpec>,
-        loops: &mut HashMap<String, StructuredLoopTemplate>,
+        loops: &mut HashMap<String, LoopHeader>,
         active: &mut Vec<PathBuf>,
     ) -> LoadResult<()> {
         match value {
@@ -427,6 +444,99 @@ impl TemplateConfigLoader {
         }
         output.push_str(&source[copied_until..]);
         (output, includes)
+    }
+}
+
+fn single_loop_body(object: RawObject) -> LoadResult<RawValue> {
+    let mut body = None;
+    for field in object.into_inner() {
+        match field {
+            ObjectField::KeyValue { key, value, .. }
+                if key.as_path().len() == 1
+                    && key.as_path()[0] == "structured_template_value"
+                    && body.is_none() =>
+            {
+                body = Some(value);
+            }
+            ObjectField::NewlineComment(_) => {}
+            _ => {
+                return Err(LoadError::Parse(
+                    "structured loop body must contain one HOCON value".to_string(),
+                ));
+            }
+        }
+    }
+    body.ok_or_else(|| {
+        LoadError::Parse("structured loop body must contain one HOCON value".to_string())
+    })
+}
+
+fn replace_loop_marker(object: &mut RawObject, marker: &str, envelope: RawValue) -> bool {
+    for field in object.iter_mut() {
+        if let ObjectField::KeyValue { value, .. } = field
+            && replace_marker_value(value, marker, &envelope)
+        {
+            return true;
+        }
+    }
+    false
+}
+
+fn replace_marker_value(value: &mut RawValue, marker: &str, envelope: &RawValue) -> bool {
+    if matches!(value, RawValue::String(RawString::QuotedString(text)) if text == marker) {
+        *value = envelope.clone();
+        return true;
+    }
+    match value {
+        RawValue::Object(object) => replace_loop_marker(object, marker, envelope.clone()),
+        RawValue::Array(array) => array
+            .iter_mut()
+            .any(|entry| replace_marker_value(entry, marker, envelope)),
+        RawValue::AddAssign(inner) => replace_marker_value(inner, marker, envelope),
+        _ => false,
+    }
+}
+
+fn extract_loop_bodies(
+    value: Value,
+    marker_prefix: &str,
+    bodies: &mut HashMap<String, Value>,
+) -> LoadResult<Value> {
+    match value {
+        Value::Object(mut fields) => {
+            let marker_key = format!("{marker_prefix}loop_marker");
+            let body_key = format!("{marker_prefix}loop_body");
+            if fields.contains_key(&marker_key) {
+                if fields.len() != 2 || !fields.contains_key(&body_key) {
+                    return Err(LoadError::Parse(
+                        "structured loop body must contain one HOCON value".to_string(),
+                    ));
+                }
+                let Some(Value::String(marker)) = fields.remove(&marker_key) else {
+                    return Err(LoadError::Parse(
+                        "invalid structured loop marker".to_string(),
+                    ));
+                };
+                let body = fields.remove(&body_key).unwrap();
+                let body = extract_loop_bodies(body, marker_prefix, bodies)?;
+                bodies.insert(marker.clone(), body);
+                return Ok(Value::String(marker));
+            }
+            let fields = fields
+                .into_iter()
+                .map(|(key, value)| {
+                    extract_loop_bodies(value, marker_prefix, bodies).map(|value| (key, value))
+                })
+                .collect::<LoadResult<HashMap<_, _>>>()?;
+            Ok(Value::Object(fields))
+        }
+        Value::Array(entries) => Ok(Value::Array(
+            entries
+                .into_iter()
+                .map(|entry| extract_loop_bodies(entry, marker_prefix, bodies))
+                .collect::<LoadResult<Vec<_>>>()?,
+        )),
+        other => Ok(other),
     }
 }
 
