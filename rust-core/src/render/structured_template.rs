@@ -1,7 +1,5 @@
 use std::collections::HashMap;
 
-use hocon_rs::ConfigOptions;
-
 use super::template::parse_for_statement;
 
 pub(crate) struct ParsedTemplateConfig {
@@ -15,43 +13,19 @@ pub(crate) struct StructuredLoopTemplate {
     pub(crate) body: Box<ParsedTemplateConfig>,
 }
 
-pub(crate) fn parse_config(
+pub(crate) fn transform_source(
     source: &str,
-    options: Option<ConfigOptions>,
-) -> Result<ParsedTemplateConfig, String> {
-    let mut parser = TemplateConfigParser::new(source);
+    marker_prefix: &str,
+    next_marker: &mut usize,
+) -> Result<(String, Vec<LoopSource>), String> {
+    let mut parser = TemplateConfigParser {
+        marker_prefix: marker_prefix.to_string(),
+        next_marker: *next_marker,
+        loops: Vec::new(),
+    };
     let transformed = parser.transform(source)?;
-    let value = hocon_rs::Config::parse_str::<hocon_rs::Value>(&transformed, options.clone())
-        .map_err(|error| format!("{error:?}"))?;
-
-    let mut loops = HashMap::new();
-    for loop_source in parser.loops {
-        let body_source = format!("structured_template_value = {}", loop_source.body);
-        let body = parse_config(&body_source, options.clone())?;
-        let hocon_rs::Value::Object(mut values) = body.value else {
-            return Err("structured loop body must contain one HOCON value".to_string());
-        };
-        let Some(body_value) = values.remove("structured_template_value") else {
-            return Err("structured loop body must contain one HOCON value".to_string());
-        };
-        if !values.is_empty() {
-            return Err("structured loop body must contain one HOCON value".to_string());
-        }
-
-        loops.insert(
-            loop_source.marker,
-            StructuredLoopTemplate {
-                variable_name: loop_source.variable_name,
-                source_name: loop_source.source_name,
-                body: Box::new(ParsedTemplateConfig {
-                    value: body_value,
-                    loops: body.loops,
-                }),
-            },
-        );
-    }
-
-    Ok(ParsedTemplateConfig { value, loops })
+    *next_marker = parser.next_marker;
+    Ok((transformed, parser.loops))
 }
 
 struct TemplateConfigParser {
@@ -60,31 +34,14 @@ struct TemplateConfigParser {
     loops: Vec<LoopSource>,
 }
 
-struct LoopSource {
-    marker: String,
-    variable_name: String,
-    source_name: String,
-    body: String,
+pub(crate) struct LoopSource {
+    pub(crate) marker: String,
+    pub(crate) variable_name: String,
+    pub(crate) source_name: String,
+    pub(crate) body: String,
 }
 
 impl TemplateConfigParser {
-    fn new(source: &str) -> Self {
-        let mut suffix = 0;
-        let marker_prefix = loop {
-            let candidate = format!("__copperlace_structured_loop_{suffix}_");
-            if !source.contains(&candidate) {
-                break candidate;
-            }
-            suffix += 1;
-        };
-
-        TemplateConfigParser {
-            marker_prefix,
-            next_marker: 0,
-            loops: Vec::new(),
-        }
-    }
-
     fn transform(&mut self, source: &str) -> Result<String, String> {
         let mut output = String::with_capacity(source.len());
         let mut copied_until = 0;

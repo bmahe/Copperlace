@@ -2,7 +2,7 @@ use std::fmt;
 use std::path::Path;
 use std::str::FromStr;
 
-use crate::render::structured_template::{ParsedTemplateConfig, parse_config};
+use crate::render::config_loader;
 use crate::render::{
     CopperlaceValue, ProcessorRegistry, RenderContext, RenderError, RenderOptions, RuleSet,
 };
@@ -198,17 +198,8 @@ pub(crate) fn ruleset_from_str_with_processors(
     config: &str,
     processors: ProcessorRegistry,
 ) -> Result<RuleSet, ConfigError> {
-    let parsed = parse_config(config, None).map_err(ConfigError::Parse)?;
+    let parsed = config_loader::load_str(config, None).map_err(ConfigError::Parse)?;
     RuleSet::from_template_config(parsed, processors).map_err(ConfigError::Render)
-}
-
-pub(crate) fn config_value_from_file(
-    path: impl AsRef<Path>,
-) -> Result<hocon_rs::Value, ConfigError> {
-    let path = path.as_ref();
-    let value = hocon_rs::Config::load(path, Some(config_options_for_file(path)))
-        .map_err(|error| ConfigError::Parse(format!("{error:?}")))?;
-    Ok(value)
 }
 
 fn config_options_for_file(path: &Path) -> hocon_rs::ConfigOptions {
@@ -235,33 +226,9 @@ pub(crate) fn ruleset_from_file_with_processors(
     processors: ProcessorRegistry,
 ) -> Result<RuleSet, ConfigError> {
     let path = path.as_ref();
-    let parsed = if let Some(config_path) = source_config_path(path) {
-        let source = std::fs::read_to_string(&config_path)
-            .map_err(|error| ConfigError::Parse(error.to_string()))?;
-        parse_config(&source, Some(config_options_for_file(&config_path)))
-            .map_err(ConfigError::Parse)?
-    } else {
-        ParsedTemplateConfig {
-            value: config_value_from_file(path)?,
-            loops: std::collections::HashMap::new(),
-        }
-    };
+    let parsed = config_loader::load_file(path, config_options_for_file(path))
+        .map_err(ConfigError::Parse)?;
     RuleSet::from_template_config(parsed, processors).map_err(ConfigError::Render)
-}
-
-fn source_config_path(path: &Path) -> Option<std::path::PathBuf> {
-    if let Some(extension) = path.extension() {
-        return (extension == "conf" && path.is_file()).then(|| path.to_path_buf());
-    }
-
-    let mut hocon_path = path.to_path_buf();
-    hocon_path.set_extension("conf");
-    let mut json_path = path.to_path_buf();
-    json_path.set_extension("json");
-    let mut properties_path = path.to_path_buf();
-    properties_path.set_extension("properties");
-    (hocon_path.is_file() && !json_path.is_file() && !properties_path.is_file())
-        .then_some(hocon_path)
 }
 
 /// Renders one rule from a configuration string.

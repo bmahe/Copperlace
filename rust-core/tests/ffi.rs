@@ -8,6 +8,7 @@ use copperlace::ffi::{
     copperlace_processor_result_set_error as raw_copperlace_processor_result_set_error,
     copperlace_processor_result_set_output as raw_copperlace_processor_result_set_output,
     copperlace_ruleset_free as raw_copperlace_ruleset_free,
+    copperlace_ruleset_from_file as raw_copperlace_ruleset_from_file,
     copperlace_ruleset_from_string as raw_copperlace_ruleset_from_string,
     copperlace_ruleset_from_string_with_processors as raw_copperlace_ruleset_from_string_with_processors,
     copperlace_ruleset_render as raw_copperlace_ruleset_render,
@@ -713,6 +714,61 @@ fn renders_structured_array_loops_to_json() {
 
     copperlace_string_free(output);
     copperlace_ruleset_free(handle);
+}
+
+#[test]
+fn renders_structured_loop_from_included_file_to_json() {
+    let directory = std::env::temp_dir().join(format!(
+        "copperlace-ffi-include-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(&directory).unwrap();
+    std::fs::write(
+        directory.join("fragment.conf"),
+        "origin.entries = [{% for item in items %}\"{item}\"{% endfor %}]\n",
+    )
+    .unwrap();
+    let root = directory.join("root.conf");
+    std::fs::write(
+        &root,
+        "items = [one, two]\ninclude classpath(\"fragment.conf\")\n",
+    )
+    .unwrap();
+    let path = CString::new(root.to_str().unwrap()).unwrap();
+    let rule = CString::new("origin").unwrap();
+    let mut handle = ptr::null_mut();
+    let mut error = ptr::null_mut();
+    let mut output = ptr::null_mut();
+
+    assert_eq!(
+        unsafe { raw_copperlace_ruleset_from_file(path.as_ptr(), &mut handle, &mut error) },
+        COPPERLACE_OK
+    );
+    assert_eq!(
+        copperlace_ruleset_render_structured_json(
+            handle,
+            rule.as_ptr(),
+            false,
+            &mut output,
+            &mut error,
+        ),
+        COPPERLACE_OK
+    );
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(
+            unsafe { CStr::from_ptr(output) }.to_str().unwrap()
+        )
+        .unwrap(),
+        json!({"entries": ["one", "two"]})
+    );
+
+    copperlace_string_free(output);
+    copperlace_ruleset_free(handle);
+    std::fs::remove_dir_all(directory).unwrap();
 }
 
 #[test]

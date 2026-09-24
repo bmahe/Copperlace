@@ -1,4 +1,5 @@
 mod compile;
+pub(crate) mod config_loader;
 mod error;
 mod nodes;
 mod processor;

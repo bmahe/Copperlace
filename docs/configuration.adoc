@@ -346,7 +346,9 @@ The block is recognized only outside quoted strings and comments. Text loops
 inside a string continue to concatenate their rendered body as before. A
 structured array produced by a loop is output data; loop sources continue to be
 authored config arrays, context arrays, dotted paths, and arrays on outer loop
-elements.
+elements. File-loaded `.conf` fragments can also contain structured loops,
+including fragments imported through `include classpath(...)`, `include file(...)`,
+or bare `include "..."`. Nested imports use the same behavior.
 
 == Array Values
 

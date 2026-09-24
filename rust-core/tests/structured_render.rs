@@ -982,3 +982,205 @@ fn structured_array_loops_render_from_files() {
     );
     let _ = std::fs::remove_file(path);
 }
+
+#[test]
+fn structured_loops_render_from_each_conf_include_form() {
+    let directory = std::env::temp_dir().join(format!(
+        "copperlace-include-loops-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(&directory).unwrap();
+    let fragment = directory.join("fragment.conf");
+    std::fs::write(
+        &fragment,
+        r#"
+        from_include = ${shared}
+        origin {
+            entries = [
+                {% for item in items %}"{loop.index}:{item}"{% endfor %}
+            ]
+        }
+        "#,
+    )
+    .unwrap();
+
+    for (name, directive) in [
+        (
+            "classpath",
+            "include classpath(\"fragment.conf\")".to_string(),
+        ),
+        ("bare", "include \"fragment.conf\"".to_string()),
+        ("file", format!("include file(\"{}\")", fragment.display())),
+    ] {
+        let root = directory.join(format!("{name}.conf"));
+        std::fs::write(
+            &root,
+            format!(
+                "shared = ready\nitems = [one, two]\norigin {{ label = \"{{from_include}}\" }}\n{directive}\n"
+            ),
+        )
+        .unwrap();
+        assert_eq!(
+            render_file_structured(&root, "origin")
+                .unwrap()
+                .to_json_value(),
+            serde_json::json!({"entries": ["1:one", "2:two"], "label": "ready"}),
+            "{name} include"
+        );
+    }
+    std::fs::remove_dir_all(directory).unwrap();
+}
+
+#[test]
+fn nested_and_extensionless_includes_keep_hocon_merging() {
+    let directory = std::env::temp_dir().join(format!(
+        "copperlace-nested-loops-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(&directory).unwrap();
+    std::fs::write(
+        directory.join("inner.conf"),
+        r#"origin.entries = [{% for item in items %}"{item}"{% endfor %}]"#,
+    )
+    .unwrap();
+    std::fs::write(
+        directory.join("fragment.conf"),
+        "include classpath(\"inner.conf\")\n",
+    )
+    .unwrap();
+    std::fs::write(
+        directory.join("fragment.json"),
+        r#"{"origin":{"extra":true}}"#,
+    )
+    .unwrap();
+    let root = directory.join("root.conf");
+    std::fs::write(
+        &root,
+        "items = [one, two]\ninclude classpath(\"fragment\")\n",
+    )
+    .unwrap();
+
+    assert_eq!(
+        render_file_structured(&root, "origin")
+            .unwrap()
+            .to_json_value(),
+        serde_json::json!({"entries": ["one", "two"], "extra": true})
+    );
+    std::fs::write(
+        directory.join("root.json"),
+        r#"{"origin":{"from_root_json":"kept"}}"#,
+    )
+    .unwrap();
+    assert_eq!(
+        render_file_structured(directory.join("root"), "origin")
+            .unwrap()
+            .to_json_value(),
+        serde_json::json!({
+            "entries": ["one", "two"],
+            "extra": true,
+            "from_root_json": "kept"
+        })
+    );
+    std::fs::remove_dir_all(directory).unwrap();
+}
+
+#[test]
+fn nested_object_include_keeps_relative_substitutions() {
+    let directory = std::env::temp_dir().join(format!(
+        "copperlace-object-include-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(&directory).unwrap();
+    std::fs::write(
+        directory.join("detail.conf"),
+        r#"
+        entries = [{% for item in items %}"{item}"{% endfor %}]
+        copied = ${label}
+        "#,
+    )
+    .unwrap();
+    let root = directory.join("root.conf");
+    std::fs::write(
+        &root,
+        r#"
+        items = [one]
+        origin {
+            label = ready
+            include classpath("detail.conf")
+        }
+        "#,
+    )
+    .unwrap();
+    assert_eq!(
+        render_file_structured(&root, "origin")
+            .unwrap()
+            .to_json_value(),
+        serde_json::json!({"label": "ready", "copied": "ready", "entries": ["one"]})
+    );
+    std::fs::remove_dir_all(directory).unwrap();
+}
+
+#[test]
+fn included_loops_preserve_optional_required_and_cycle_errors() {
+    let directory = std::env::temp_dir().join(format!(
+        "copperlace-include-errors-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(&directory).unwrap();
+    let root = directory.join("root.conf");
+    std::fs::write(
+        &root,
+        r#"
+        include classpath("missing.conf")
+        # include required(classpath("also-missing.conf"))
+        # __copperlace_internal_0_ forces another marker namespace
+        items = [one]
+        origin.note = "include classpath(\"missing.conf\")"
+        origin.entries = [{% for item in items %}"{item}"{% endfor %}]
+        "#,
+    )
+    .unwrap();
+    assert_eq!(
+        render_file_structured(&root, "origin")
+            .unwrap()
+            .to_json_value(),
+        serde_json::json!({
+            "entries": ["one"],
+            "note": "include classpath(\"missing.conf\")"
+        })
+    );
+
+    std::fs::write(&root, "include required(classpath(\"missing.conf\"))\n").unwrap();
+    assert!(matches!(
+        render_file_structured(&root, "origin"),
+        Err(ConfigError::Parse(message)) if message.contains("missing.conf")
+    ));
+
+    std::fs::write(&root, "include classpath(\"cycle.conf\")\n").unwrap();
+    std::fs::write(
+        directory.join("cycle.conf"),
+        "include classpath(\"root.conf\")\n",
+    )
+    .unwrap();
+    assert!(matches!(
+        render_file_structured(&root, "origin"),
+        Err(ConfigError::Parse(message)) if message.contains("include cycle")
+    ));
+    std::fs::remove_dir_all(directory).unwrap();
+}

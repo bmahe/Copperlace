@@ -714,6 +714,43 @@ fn renders_structured_array_loops_as_json() {
 }
 
 #[test]
+fn renders_structured_loops_from_included_conf_as_json() {
+    let directory = make_temp_dir("included-structured-loop");
+    fs::write(
+        directory.join("fragment.conf"),
+        "origin.entries = [{% for item in items %}\"{item}\"{% endfor %}]\n",
+    )
+    .unwrap();
+    let root = directory.join("root.conf");
+    fs::write(
+        &root,
+        "items = [one, two]\ninclude classpath(\"fragment.conf\")\n",
+    )
+    .unwrap();
+
+    let output = Command::new(env!("CARGO_BIN_EXE_copperlace"))
+        .args([
+            "render",
+            "--config",
+            &root.to_string_lossy(),
+            "--compact-json",
+        ])
+        .output()
+        .unwrap();
+
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(
+        serde_json::from_slice::<serde_json::Value>(&output.stdout).unwrap(),
+        json!({"entries": ["one", "two"]})
+    );
+    fs::remove_dir_all(directory).unwrap();
+}
+
+#[test]
 fn compact_json_rejects_text_rules() {
     let config_path = write_temp_config(
         r#"
