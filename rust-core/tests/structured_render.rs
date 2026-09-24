@@ -864,6 +864,25 @@ fn structured_loop_bodies_resolve_hocon_against_the_enclosing_document() {
 }
 
 #[test]
+fn structured_loop_marker_inside_concatenated_objects_renders() {
+    let config = r#"
+        items = [A, B]
+        origin = {
+            entries = [
+                {% for item in items %}"{item}"{% endfor %}
+            ]
+        } { extra = true }
+    "#;
+
+    assert_eq!(
+        render_str_structured(config, "origin")
+            .unwrap()
+            .to_json_value(),
+        serde_json::json!({"entries": ["A", "B"], "extra": true})
+    );
+}
+
+#[test]
 fn nested_structured_loop_bodies_share_hocon_resolution() {
     let config = r#"
         shared = 7
