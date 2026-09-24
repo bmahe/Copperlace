@@ -174,7 +174,7 @@ impl TemplateConfigLoader {
                     body_value,
                 ),
             ]);
-            if !replace_loop_marker(&mut value, &loop_source.marker, envelope) {
+            if !replace_loop_marker(&mut value, &loop_source.marker, &envelope)? {
                 return Err(LoadError::Parse(
                     "structured loop marker was not found".to_string(),
                 ));
@@ -471,29 +471,58 @@ fn single_loop_body(object: RawObject) -> LoadResult<RawValue> {
     })
 }
 
-fn replace_loop_marker(object: &mut RawObject, marker: &str, envelope: RawValue) -> bool {
+fn replace_loop_marker(
+    object: &mut RawObject,
+    marker: &str,
+    envelope: &RawValue,
+) -> LoadResult<bool> {
     for field in object.iter_mut() {
         if let ObjectField::KeyValue { value, .. } = field
-            && replace_marker_value(value, marker, &envelope)
+            && replace_marker_value(value, marker, envelope)?
         {
-            return true;
+            return Ok(true);
         }
     }
-    false
+    Ok(false)
 }
 
-fn replace_marker_value(value: &mut RawValue, marker: &str, envelope: &RawValue) -> bool {
+fn replace_marker_value(
+    value: &mut RawValue,
+    marker: &str,
+    envelope: &RawValue,
+) -> LoadResult<bool> {
     if matches!(value, RawValue::String(RawString::QuotedString(text)) if text == marker) {
         *value = envelope.clone();
-        return true;
+        return Ok(true);
     }
     match value {
-        RawValue::Object(object) => replace_loop_marker(object, marker, envelope.clone()),
-        RawValue::Array(array) => array
-            .iter_mut()
-            .any(|entry| replace_marker_value(entry, marker, envelope)),
+        RawValue::Object(object) => replace_loop_marker(object, marker, envelope),
+        RawValue::Array(array) => {
+            for entry in array.iter_mut() {
+                if replace_marker_value(entry, marker, envelope)? {
+                    return Ok(true);
+                }
+            }
+            Ok(false)
+        }
+        RawValue::Concat(_) => {
+            let RawValue::Concat(concat) = std::mem::replace(value, RawValue::Null) else {
+                unreachable!()
+            };
+            let (mut values, spaces) = concat.into_inner();
+            let mut found = false;
+            for entry in &mut values {
+                if replace_marker_value(entry, marker, envelope)? {
+                    found = true;
+                    break;
+                }
+            }
+            *value = RawValue::concat(values, spaces)
+                .map_err(|error| LoadError::Parse(format!("{error:?}")))?;
+            Ok(found)
+        }
         RawValue::AddAssign(inner) => replace_marker_value(inner, marker, envelope),
-        _ => false,
+        _ => Ok(false),
     }
 }
 
