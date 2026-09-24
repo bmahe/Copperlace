@@ -429,9 +429,13 @@ This release uses the builtin processor registry only.
 The detailed behavior and configuration contract lives in `docs/`:
 
 * link:docs/index.adoc[Documentation index]
+* link:docs/getting-started.adoc[Getting started]
+* link:docs/cli.adoc[Command-line guide]
 * link:docs/capabilities.adoc[Capabilities]
 * link:docs/configuration.adoc[Configuration]
+* link:docs/processors.adoc[Processor reference]
 * link:docs/structured-output.adoc[Structured output]
+* link:docs/troubleshooting.adoc[Troubleshooting]
 * link:docs/errors.adoc[Errors and API behavior]
 * link:docs/packaging.adoc[Packaging and language wrappers]
 

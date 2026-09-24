@@ -59,7 +59,7 @@ Text leaves may contain quoted `for` blocks, whose body is concatenated into
 the leaf's string value. Structured arrays may also contain unquoted `for`
 blocks as array entries. Each iteration contributes one typed value to the
 array, preserving object, array, scalar, and null values rather than building
-JSON inside a string. See link:configuration.adoc#iteration[Iteration] for the
+JSON inside a string. See link:configuration.adoc#_iteration[Iteration] for the
 syntax and examples.
 
 Object fields are not an ordering mechanism. If multiple fields need the same

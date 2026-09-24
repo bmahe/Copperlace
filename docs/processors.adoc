@@ -1,0 +1,55 @@
+= Builtin Processor Reference
+
+Processors transform rendered strings. Write them after a rule reference with
+`|`; a pipeline runs left to right. For example, `{name | trim | capitalize}`
+trims before changing case. They also work in binding statements, such as
+`{% hero:name | uppercase %}`. Unknown names fail at render time with
+`UnknownProcessor`.
+
+The examples below show processor input and output, independent of config
+string escaping.
+
+[cols="1,2,2",options="header"]
+|===
+|Processor |Input |Output
+|`uppercase` |`Mia` |`MIA`
+|`lowercase` |`MIA` |`mia`
+|`trim` |`  old  key  ` |`old  key`
+|`capitalize` |`mIA` |`Mia`
+|`titlecase` |`old BRASS key` |`Old Brass Key`
+|`sentence` |`...mia waits` |`...Mia waits`
+|`article` |`owl` |`an owl`
+|`past_tense` |`run` |`ran`
+|`present_participle` |`run` |`running`
+|`pluralize` |`city` |`cities`
+|`singularize` |`people` |`person`
+|`possessive` |`James` |`James'`
+|`ordinal` |`11` |`11th`
+|`quote` |`Mia` |`"Mia"`
+|`slug` |`Mia's Story` |`mias-story`
+|===
+
+`capitalize` changes the first character to uppercase and lowercases the
+remaining characters. `titlecase` capitalizes words separated by whitespace.
+`sentence` changes only the first alphabetic character and preserves the rest.
+`slug` lowercases text, removes apostrophes, and joins runs of other
+non-alphanumeric characters with hyphens.
+
+`article` uses English pronunciation heuristics (`an hour`, `a user`) and
+prefixes the original string. Use `trim | article` if leading or trailing
+whitespace should be removed first. The inflection processors use regular
+spelling rules and a set of common irregular English words. They are not full
+natural-language parsers. `past_tense`, `present_participle`, `pluralize`,
+`singularize`, `possessive`, and `ordinal` require exactly one token; blank or
+multi-word input returns `ProcessorError`. `ordinal` additionally requires an
+integer. These processors preserve surrounding whitespace. `quote` wraps text
+in ASCII double quotes and escapes embedded quotes and backslashes; it does not
+convert a complete object to JSON.
+
+== Extend the registry
+
+Rust, C ABI, Python, Java, and JS/WASM callers can register custom processors
+when constructing a ruleset. A custom processor with a builtin name overrides
+that builtin for the ruleset. Callback errors surface as `ProcessorError`.
+The CLI and current Elixir wrapper use builtin processors only. See
+link:packaging.adoc[Packaging and language wrappers] for constructor examples.

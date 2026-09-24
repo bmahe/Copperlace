@@ -1,0 +1,100 @@
+= Getting Started
+
+A Copperlace configuration names the pieces of text you want to reuse. Render a
+rule to turn those pieces into one result. The examples below work with the
+released `copperlace` CLI or with `cargo run --bin copperlace --` from
+`rust-core/` (adjust file paths when running there).
+
+== Render your first rule
+
+Save this as `hello.conf`:
+
+[source]
+----
+name = ["Mia"]
+pet = ["owl"]
+origin = "{name} travels with {pet | article}."
+----
+
+[source,sh]
+----
+copperlace check -c hello.conf
+copperlace render -c hello.conf
+----
+
+`check` prints `OK` when the configuration parses and compiles. `render` uses
+`origin` by default and prints `Mia travels with an owl.`. The braces in
+`{name}` and `{pet | article}` are template expressions. `article` adds the
+English indefinite article.
+
+You can also skip the file for a quick experiment:
+
+[source,sh]
+----
+printf 'name = "Mia"\norigin = "Hello {name}"\n' | copperlace render -c -
+----
+
+== Add variation without losing consistency
+
+Replace `hello.conf` with:
+
+[source]
+----
+name = ["Mia", "Lina"]
+pet = ["owl", "raven"]
+origin = "{% hero:name %}{hero} travels with {pet | article}. {hero} smiles."
+----
+
+Each array chooses one entry when referenced. The binding statement
+`{% hero:name %}` chooses a name once, stores it as `hero`, and prints nothing.
+Both `{hero}` expressions reuse that value. Run `copperlace render -c hello.conf
+-n 3` to get three independently rendered lines. Results can differ between
+runs; Copperlace does not expose a random seed.
+
+`{% hero:name %}` keeps an existing `hero` value. This lets a caller supply one:
+
+[source,sh]
+----
+copperlace render -c hello.conf --set hero=Darcy
+----
+
+The `--set` value applies to that render only. The next render starts fresh. To
+replace an existing value inside a template, use `{% hero:=name %}` instead.
+
+== Choose the output shape
+
+A string rule produces text. A top-level array rule chooses one text value. A
+top-level object rule produces structured JSON in the CLI:
+
+[source]
+----
+name = ["Mia"]
+context {
+  hero = "{name}"
+}
+origin {
+  title = "Welcome {hero}"
+  tags = ["welcome", "{hero | slug}"]
+  count = 2
+}
+----
+
+[source,sh]
+----
+copperlace render -c hello.conf
+copperlace render -c hello.conf --compact-json
+----
+
+The `tags` array stays an array because it is inside a structured object. Use
+`context.hero` when multiple fields need the same generated value: object field
+order is not a way to share a binding. For JSON that an application will parse,
+`--compact-json -n 3` emits one complete JSON object per line.
+
+== Where to go next
+
+* link:cli.adoc[Command-line guide] lists all flags and input forms.
+* link:configuration.adoc[Configuration reference] covers the full syntax,
+  weighted choices, unique draws, loops, and limited recursion.
+* link:processors.adoc[Processor reference] shows all builtin text transforms.
+* link:../examples/README.adoc[Examples] contains larger runnable files.
+* link:packaging.adoc[Packaging and language wrappers] covers application APIs.

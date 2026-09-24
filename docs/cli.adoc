@@ -1,0 +1,73 @@
+= Command-Line Guide
+
+Install the CLI with `cargo install copperlace` or download a platform archive
+from a link:https://github.com/bmahe/Copperlace/releases[GitHub Release]. From a
+source checkout, run the same commands with `cargo run --bin copperlace --`
+from `rust-core/` and adjust relative config paths.
+
+== Render
+
+[source,sh]
+----
+copperlace render --config examples/character_scene.conf
+copperlace render -c examples/character_scene.conf -r origin -n 3
+----
+
+`render` may be omitted when the first argument is a flag, as in `copperlace
+-c examples/character_scene.conf`. The default rule is `origin`. Each result
+starts with a fresh context and fresh random choices, even when `--count` loads
+the configuration only once.
+
+[cols="1,3",options="header"]
+|===
+|Option |Meaning
+|`-c, --config <path>` |Required. Load this file, or use `-` to read standard input.
+|`-r, --rule <name>` |Render a different rule; default `origin`. Dotted leaf names are accepted.
+|`-n, --count <n>` |Render a positive number of results; default `1`.
+|`--set <key=value>` |Provide an initial string context value. Repeat for more keys. Values may contain `=`.
+|`--compact-json` |Write one-line JSON for an object-valued rule. Invalid for text and top-level list rules.
+|`--max-recursion-depth <n>` |Allow up to `n` recursive re-entries per rule; default `0` rejects cycles.
+|`-h, --help` |Show render help.
+|`-V, --version` |Show the package version.
+|===
+
+The CLI infers the output shape from the selected rule. Strings and top-level
+arrays produce text. Top-level objects produce JSON formatted with tabs. With
+`--count`, text results are separated by newlines; formatted JSON documents
+are separated by a newline. Use `--compact-json --count 3` for one JSON object
+per line. Output ends with a newline.
+
+Pass context values before rendering. A provided value wins over a top-level
+`context` default and a rule with the same name:
+
+[source,sh]
+----
+copperlace render -c examples/character_scene.conf --set hero=Mia
+----
+
+== Check configuration
+
+[source,sh]
+----
+copperlace check -c examples/character_scene.conf
+copperlace check -c -
+copperlace check -s 'origin = "Hello"'
+----
+
+`check` parses and compiles, then prints `OK`. It does not render a rule, so a
+render-time problem such as an unknown referenced rule or an empty choice can
+still appear later. Supply exactly one of `-c/--config` and `-s/--string`. For
+multiline shell input, use a file or pipe it to `-c -`.
+
+== Standard input and shell pipelines
+
+[source,sh]
+----
+cat examples/character_scene.conf | copperlace render -c -
+cat examples/character_scene.conf | copperlace check -c -
+----
+
+Successful output, help, and version text go to standard output. Argument,
+parse, check, and render errors go to standard error with a nonzero exit code.
+This makes `check` useful as a validation step in scripts. See
+link:troubleshooting.adoc[Troubleshooting] for common errors.

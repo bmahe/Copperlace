@@ -1,42 +1,38 @@
 = Copperlace Documentation
 
-This directory documents Copperlace's current renderer behavior and
-configuration contract. Treat these documents as the working specification for
-the behavior currently implemented in `rust-core`.
+Copperlace turns named rules into varied text or structured JSON. Start with a
+small configuration, render its `origin` rule, then use the reference pages when
+you need a particular feature.
 
-== Contents
+== Start here
 
-* link:capabilities.adoc[Capabilities] describes what the renderer can produce
-  and how rendering resolves rules, choices, bindings, and context defaults.
-* link:configuration.adoc[Configuration] describes the accepted configuration shape and
-  how each supported value type is interpreted.
-* link:structured-output.adoc[Structured output] describes object-valued
-  rendering, JSON output, CLI mode inference, and wrapper structured APIs.
-* link:errors.adoc[Errors and API behavior] describes public Rust entry points
-  and render error conditions.
-* link:packaging.adoc[Packaging and language wrappers] describes build
-  workflows, distributable artifacts, and Python/Java wrapper surfaces.
-* link:releasing.adoc[Release process] describes how to prepare, publish, and
-  verify Copperlace package releases.
+. link:getting-started.adoc[Getting started] walks through a first render,
+  reusable choices, bindings, and structured output.
+. link:cli.adoc[Command-line guide] covers every CLI command and option, stdin,
+  multiple renders, and exit behavior.
+. link:../examples/README.adoc[Examples] provides complete configurations you can
+  run and adapt.
 
-== Documented Renderer Surface
+== Learn the language
 
-The behavior documented here is exported by the Rust library in
-`rust-core/src/lib.rs`:
+* link:capabilities.adoc[Capabilities] explains rules, choices, bindings,
+  context, iteration, and recursion.
+* link:configuration.adoc[Configuration reference] specifies HOCON values and
+  template syntax, including weighted choices and structured loops.
+* link:processors.adoc[Processor reference] lists every builtin processor with
+  input and output examples.
+* link:structured-output.adoc[Structured output] explains object-valued rules,
+  JSON, and wrapper APIs.
+* link:troubleshooting.adoc[Troubleshooting] maps common errors to fixes.
 
-* `RuleSet::from_config`
-* `RuleSet::render_rule`
-* `RuleSet::render_rule_inferred`
-* `RuleSet::render_rule_structured`
-* `render_config_rule`
-* `render_str_inferred` / `render_file_inferred`
-* `render_config_rule_structured`
-* `RenderError`
-* configuration file and string helper APIs
+== Integrate and release
 
-The package also builds and packages:
+* link:errors.adoc[Errors and API behavior] documents Rust entry points,
+  context lifetime, and render errors.
+* link:packaging.adoc[Packaging and language wrappers] covers Rust, C, Python,
+  Java, JS/TS WebAssembly, and Elixir artifacts and APIs.
+* link:releasing.adoc[Release process] is for maintainers publishing packages.
 
-* a `copperlace` CLI with `render --config <path> --rule <name>`;
-* a C ABI dynamic library with an opaque ruleset handle API;
-* Python wheels backed by the native library;
-* Java API, all-platform, and platform native JARs.
+The renderer implementation lives in `rust-core/`. Configuration examples live
+in `examples/`. The repository README includes installation instructions and
+a short example for each language.

@@ -1,0 +1,36 @@
+= Troubleshooting
+
+Run `copperlace check -c your.conf` first to catch parse and compile errors.
+Then render the specific rule that fails: `copperlace render -c your.conf -r
+rule_name`. `check` does not exercise template references or random choices, so
+a successful check is not a guarantee that every rule renders.
+
+[cols="2,3",options="header"]
+|===
+|Error or symptom |What to inspect
+|`UnknownRule(name)` |Check spelling and dotted paths. A bound name only exists after its binding statement runs in the current render. Initial values can be supplied with `--set name=value`.
+|`UnknownProcessor(name)` |Check the builtin names in link:processors.adoc[Processor reference]. The CLI cannot load application-defined processors.
+|`ProcessorError` |Check that a single-token processor received one word (or, for `ordinal`, one integer). For `article`, try `trim | article` if whitespace is unexpected.
+|`InvalidExpression` |Check braces and statement delimiters. Expressions use `{rule}`; bindings use `{% alias:rule %}`. Escape literal braces as described in link:configuration.adoc#_string_values[String values].
+|`EmptyChoice` |Add an entry to the array being rendered. An empty array can compile but cannot supply a choice.
+|`ExhaustedUniqueChoice` |A `{rule!}` call needs an unused array entry. Add entries or reduce the number of unique calls in one render. Zero-weight remaining entries cannot be drawn.
+|`UnsupportedUniqueChoice` |Use `!` only with an array-backed choice rule. A normal `{rule}` reference works for strings and scalars.
+|`InvalidWeightedChoice` |Check every weighted entry's `value` and finite, non-negative `weight`. At least one entry needs positive weight.
+|`CircularRuleReference` |Find the reference cycle. If recursion is intentional, set `--max-recursion-depth` or the API render option to a positive value.
+|`UnsupportedValue("object")` |Render a dotted leaf such as `name.first`, or render the top-level object through a structured API.
+|`UnsupportedIterationSource` |A `for` source must be an array. Check its path and whether a visible string binding shadows it.
+|`UnsupportedStructuredTarget` |Structured rendering requires an object-valued rule. Use text rendering for strings and top-level choice arrays.
+|`--compact-json` rejected |Select an object-valued rule with `-r`, or remove the flag for text output.
+|Different values within one result |Ordinary `{rule}` references can make new random choices. Bind once with `{% alias:rule %}` and reuse `{alias}`, or use a lazy `context` default.
+|===
+
+== A useful debugging sequence
+
+. Check the file: `copperlace check -c your.conf`.
+. Render the smallest failing rule with `-r` instead of starting at `origin`.
+. Replace random arrays temporarily with one value to isolate the path.
+. For structured objects, put shared generated values in top-level `context`
+  defaults. Sibling object fields should not depend on evaluation order.
+
+For the full list of error variants and API behavior, see
+link:errors.adoc[Errors and API behavior].

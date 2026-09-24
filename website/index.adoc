@@ -1,7 +1,7 @@
 = Copperlace
-:description: A procedural text generator for Rust, Python, Java, and JS/TS WebAssembly.
+:description: A procedural text generator for Rust, Python, Java, JS/TS WebAssembly, and Elixir.
 
-Copperlace is a tool for procedural text generation with support for Rust, Python, Java, and JS/TS WebAssembly.
+Copperlace is a tool for procedural text generation with support for Rust, Python, Java, JS/TS WebAssembly, and Elixir.
 
 It can be used for generating game content, product copy, structured snippets, browser-side experiments, and other text that needs controlled variation. You can use it directly from the command line, or embed it in your application code.
 
@@ -37,15 +37,20 @@ origin = "{% snack:treat %}{note}"</textarea>
 * Readable rules instead of embedding generation logic in application code.
 * Random choices, strict unique draws, rule references, limited recursion,
   reusable bindings, context defaults, and processor pipelines.
-* One Rust core exposed through CLI, C ABI, Python, Java, and JS/TS WebAssembly
+* One Rust core exposed through CLI, C ABI, Python, Java, JS/TS WebAssembly, and Elixir
   wrappers.
 * Runnable examples for stories, game items, JSON-like output, release notes,
   product copy, and quest logs.
 
 == Start Here
 
+* link:docs/getting-started.html[Getting started]
+* link:docs/cli.html[Command-line guide]
 * link:docs/capabilities.html[Capabilities]
 * link:docs/configuration.html[Configuration]
+* link:docs/processors.html[Processor reference]
+* link:docs/structured-output.html[Structured output]
+* link:docs/troubleshooting.html[Troubleshooting]
 * link:examples/index.html[Examples]
 * link:docs/packaging.html[Packaging and wrappers]
 * link:docs/releasing.html[Release process]
