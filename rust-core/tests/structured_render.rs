@@ -5,7 +5,7 @@ use copperlace::{
     RenderOptions, RuleSet, processor, render_config_rule_structured_with_context,
     render_file_inferred, render_file_inferred_with_context, render_file_structured,
     render_file_structured_with_context, render_str_inferred, render_str_inferred_with_context,
-    render_str_structured, render_str_structured_with_context,
+    render_str_structured, render_str_structured_with_context, ruleset_from_str,
 };
 
 fn ruleset(config: &str) -> RuleSet {
@@ -772,4 +772,597 @@ fn structured_text_leaf_can_concatenate_for_loop_output() {
             CopperlaceValue::String("two".to_string()),
         ])
     );
+}
+
+#[test]
+fn structured_array_loop_emits_typed_values_in_source_order() {
+    let config = r#"
+        items = [
+            { name = "Mia" },
+            { name = "Lina" }
+        ]
+        origin {
+            entries = [
+                "before",
+                {% for item in items %}
+                {
+                    name = "{item.name}",
+                    index = "{loop.index}",
+                    first = "{loop.first}",
+                    quantity = 3,
+                    active = true,
+                    missing = null
+                }
+                {% endfor %},
+                "after"
+            ]
+        }
+    "#;
+
+    let rendered = render_str_structured(config, "origin").unwrap();
+    assert_eq!(
+        rendered.to_json_value(),
+        serde_json::json!({
+            "entries": [
+                "before",
+                {
+                    "name": "Mia", "index": "1", "first": "true",
+                    "quantity": 3, "active": true, "missing": null
+                },
+                {
+                    "name": "Lina", "index": "2", "first": "false",
+                    "quantity": 3, "active": true, "missing": null
+                },
+                "after"
+            ]
+        })
+    );
+
+    let rules = ruleset_from_str(config).unwrap();
+    let copperlace::StructuredNode::Object(document) = rules.structured_document() else {
+        panic!("expected root object");
+    };
+    let copperlace::StructuredNode::Object(origin) = document.get("origin").unwrap() else {
+        panic!("expected origin object");
+    };
+    let copperlace::StructuredNode::Array(entries) = origin.get("entries").unwrap() else {
+        panic!("expected array");
+    };
+    assert!(entries[0].value_node().is_some());
+    assert_eq!(entries[1].iteration().unwrap().1, "items");
+}
+
+#[test]
+fn structured_loop_bodies_resolve_hocon_against_the_enclosing_document() {
+    let config = r#"
+        shared = 3
+        settings { active = true, label = ready }
+        items = [A, B]
+        origin {
+            entries = [
+                {% for item in items %}
+                {
+                    value = ${shared}
+                    enabled = ${settings.active}
+                    details = ${settings}
+                    name = "{item}"
+                }
+                {% endfor %}
+            ]
+        }
+    "#;
+
+    assert_eq!(
+        render_str_structured(config, "origin")
+            .unwrap()
+            .to_json_value(),
+        serde_json::json!({"entries": [
+            {"value": 3, "enabled": true, "details": {"active": true, "label": "ready"}, "name": "A"},
+            {"value": 3, "enabled": true, "details": {"active": true, "label": "ready"}, "name": "B"}
+        ]})
+    );
+}
+
+#[test]
+fn structured_loop_marker_inside_concatenated_objects_renders() {
+    let config = r#"
+        items = [A, B]
+        origin = {
+            entries = [
+                {% for item in items %}"{item}"{% endfor %}
+            ]
+        } { extra = true }
+    "#;
+
+    assert_eq!(
+        render_str_structured(config, "origin")
+            .unwrap()
+            .to_json_value(),
+        serde_json::json!({"entries": ["A", "B"], "extra": true})
+    );
+}
+
+#[test]
+fn nested_structured_loop_bodies_share_hocon_resolution() {
+    let config = r#"
+        shared = 7
+        groups = [{ name = A, children = [one, two] }]
+        origin {
+            entries = [
+                {% for group in groups %}
+                {
+                    name = "{group.name}"
+                    count = ${shared}
+                    children = [
+                        {% for child in group.children %}
+                        { name = "{child}", count = ${shared} }
+                        {% endfor %}
+                    ]
+                }
+                {% endfor %}
+            ]
+        }
+    "#;
+
+    assert_eq!(
+        render_str_structured(config, "origin")
+            .unwrap()
+            .to_json_value(),
+        serde_json::json!({"entries": [{
+            "name": "A", "count": 7,
+            "children": [{"name": "one", "count": 7}, {"name": "two", "count": 7}]
+        }]})
+    );
+}
+
+#[test]
+fn structured_loop_bodies_use_values_from_later_files() {
+    let directory = std::env::temp_dir().join(format!(
+        "copperlace-loop-substitutions-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(&directory).unwrap();
+    let base = directory.join("config");
+    std::fs::write(
+        base.with_extension("conf"),
+        r#"
+        shared = 1
+        items = [A, B]
+        origin {
+            entries = [
+                {% for item in items %}{ value = ${shared}, name = "{item}" }{% endfor %}
+            ]
+        }
+        "#,
+    )
+    .unwrap();
+    std::fs::write(base.with_extension("json"), r#"{"shared": 3}"#).unwrap();
+
+    assert_eq!(
+        render_file_structured(&base, "origin")
+            .unwrap()
+            .to_json_value(),
+        serde_json::json!({"entries": [
+            {"value": 3, "name": "A"},
+            {"value": 3, "name": "B"}
+        ]})
+    );
+    std::fs::remove_dir_all(directory).unwrap();
+}
+
+#[test]
+fn included_structured_loop_bodies_resolve_values_from_the_root_file() {
+    let directory = std::env::temp_dir().join(format!(
+        "copperlace-included-loop-substitutions-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(&directory).unwrap();
+    std::fs::write(
+        directory.join("fragment.conf"),
+        r#"
+        origin {
+            entries = [
+                {% for item in items %}
+                { name = "{item}", value = ${shared}, optional = ${?missing} }
+                {% endfor %}
+            ]
+        }
+        "#,
+    )
+    .unwrap();
+    let root = directory.join("root.conf");
+    std::fs::write(
+        &root,
+        "include \"fragment.conf\"\nitems = [A, B]\nshared = 3\n",
+    )
+    .unwrap();
+
+    assert_eq!(
+        render_file_structured(&root, "origin")
+            .unwrap()
+            .to_json_value(),
+        serde_json::json!({"entries": [
+            {"name": "A", "value": 3},
+            {"name": "B", "value": 3}
+        ]})
+    );
+    std::fs::remove_dir_all(directory).unwrap();
+}
+
+#[test]
+fn missing_required_hocon_substitution_in_structured_loop_is_an_error() {
+    assert!(matches!(
+        ruleset_from_str(
+            r#"
+            items = [A]
+            origin {
+                entries = [
+                    {% for item in items %}{ value = ${missing} }{% endfor %}
+                ]
+            }
+            "#
+        ),
+        Err(ConfigError::Parse(_))
+    ));
+}
+
+#[test]
+fn structured_source_loops_leave_quoted_templates_and_comments_untouched() {
+    let rendered = render_str_structured(
+        r#"
+        items = ["Mia"]
+        origin {
+            quoted = "{% for item in items %}{item}{% endfor %}"
+            # {% for ignored in items %} this is only a comment {% endfor %}
+            entries = [
+                {% for item in items %}"{item}"{% endfor %}
+            ]
+        }
+        "#,
+        "origin",
+    )
+    .unwrap();
+
+    assert_eq!(
+        rendered.to_json_value(),
+        serde_json::json!({"quoted": "Mia", "entries": ["Mia"]})
+    );
+}
+
+#[test]
+fn structured_array_loops_can_nest_and_restore_outer_metadata() {
+    let config = r#"
+        groups = [
+            { name = "A", children = ["one", "two"] },
+            { name = "B", children = ["three"] }
+        ]
+        origin {
+            groups = [
+                {% for group in groups %}
+                {
+                    name = "{group.name}",
+                    outer_index = "{loop.index}",
+                    children = [
+                        {% for child in group.children %}
+                        "{loop.index}:{child}"
+                        {% endfor %}
+                    ]
+                }
+                {% endfor %}
+            ]
+        }
+    "#;
+
+    assert_eq!(
+        render_str_structured(config, "origin")
+            .unwrap()
+            .to_json_value(),
+        serde_json::json!({
+            "groups": [
+                {"name": "A", "outer_index": "1", "children": ["1:one", "2:two"]},
+                {"name": "B", "outer_index": "2", "children": ["1:three"]}
+            ]
+        })
+    );
+}
+
+#[test]
+fn structured_array_loops_allow_empty_sources_and_report_invalid_sources() {
+    assert_eq!(
+        render_str_structured(
+            r#"
+            items = []
+            origin {
+                entries = [
+                    {% for item in items %}"{item}"{% endfor %}
+                ]
+            }
+            "#,
+            "origin"
+        )
+        .unwrap()
+        .to_json_value(),
+        serde_json::json!({"entries": []})
+    );
+
+    let rules = ruleset_from_str(
+        r#"
+        items = "one"
+        origin {
+            entries = [
+                {% for item in items %}"{item}"{% endfor %}
+            ]
+        }
+        "#,
+    )
+    .unwrap();
+    assert!(matches!(
+        rules.render_rule_structured("origin"),
+        Err(RenderError::UnsupportedIterationSource { source, value_type })
+            if source == "items" && value_type == "string"
+    ));
+
+    assert!(matches!(
+        ruleset_from_str(
+            r#"
+            items = ["one"]
+            origin {
+                entries = {% for item in items %}"{item}"{% endfor %}
+            }
+            "#
+        ),
+        Err(ConfigError::Render(RenderError::InvalidExpression(_)))
+    ));
+
+    assert!(matches!(
+        ruleset_from_str(
+            r#"
+            items = ["one"]
+            origin {
+                entries = [
+                    {% for item in items %}"{item}"
+                ]
+            }
+            "#
+        ),
+        Err(ConfigError::Parse(_))
+    ));
+}
+
+#[test]
+fn structured_array_loops_render_from_files() {
+    let path = std::env::temp_dir().join(format!(
+        "copperlace-structured-loop-{}.conf",
+        std::process::id()
+    ));
+    std::fs::write(
+        &path,
+        r#"
+        items = ["one", "two"]
+        origin {
+            entries = [
+                {% for item in items %}"{loop.index}:{item}"{% endfor %}
+            ]
+        }
+        "#,
+    )
+    .unwrap();
+
+    assert_eq!(
+        render_file_structured(&path, "origin")
+            .unwrap()
+            .to_json_value(),
+        serde_json::json!({"entries": ["1:one", "2:two"]})
+    );
+    let _ = std::fs::remove_file(path);
+}
+
+#[test]
+fn structured_loops_render_from_each_conf_include_form() {
+    let directory = std::env::temp_dir().join(format!(
+        "copperlace-include-loops-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(&directory).unwrap();
+    let fragment = directory.join("fragment.conf");
+    std::fs::write(
+        &fragment,
+        r#"
+        from_include = ${shared}
+        origin {
+            entries = [
+                {% for item in items %}"{loop.index}:{item}"{% endfor %}
+            ]
+        }
+        "#,
+    )
+    .unwrap();
+
+    for (name, directive) in [
+        (
+            "classpath",
+            "include classpath(\"fragment.conf\")".to_string(),
+        ),
+        ("bare", "include \"fragment.conf\"".to_string()),
+        ("file", format!("include file(\"{}\")", fragment.display())),
+    ] {
+        let root = directory.join(format!("{name}.conf"));
+        std::fs::write(
+            &root,
+            format!(
+                "shared = ready\nitems = [one, two]\norigin {{ label = \"{{from_include}}\" }}\n{directive}\n"
+            ),
+        )
+        .unwrap();
+        assert_eq!(
+            render_file_structured(&root, "origin")
+                .unwrap()
+                .to_json_value(),
+            serde_json::json!({"entries": ["1:one", "2:two"], "label": "ready"}),
+            "{name} include"
+        );
+    }
+    std::fs::remove_dir_all(directory).unwrap();
+}
+
+#[test]
+fn nested_and_extensionless_includes_keep_hocon_merging() {
+    let directory = std::env::temp_dir().join(format!(
+        "copperlace-nested-loops-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(&directory).unwrap();
+    std::fs::write(
+        directory.join("inner.conf"),
+        r#"origin.entries = [{% for item in items %}"{item}"{% endfor %}]"#,
+    )
+    .unwrap();
+    std::fs::write(
+        directory.join("fragment.conf"),
+        "include classpath(\"inner.conf\")\n",
+    )
+    .unwrap();
+    std::fs::write(
+        directory.join("fragment.json"),
+        r#"{"origin":{"extra":true}}"#,
+    )
+    .unwrap();
+    let root = directory.join("root.conf");
+    std::fs::write(
+        &root,
+        "items = [one, two]\ninclude classpath(\"fragment\")\n",
+    )
+    .unwrap();
+
+    assert_eq!(
+        render_file_structured(&root, "origin")
+            .unwrap()
+            .to_json_value(),
+        serde_json::json!({"entries": ["one", "two"], "extra": true})
+    );
+    std::fs::write(
+        directory.join("root.json"),
+        r#"{"origin":{"from_root_json":"kept"}}"#,
+    )
+    .unwrap();
+    assert_eq!(
+        render_file_structured(directory.join("root"), "origin")
+            .unwrap()
+            .to_json_value(),
+        serde_json::json!({
+            "entries": ["one", "two"],
+            "extra": true,
+            "from_root_json": "kept"
+        })
+    );
+    std::fs::remove_dir_all(directory).unwrap();
+}
+
+#[test]
+fn nested_object_include_keeps_relative_substitutions() {
+    let directory = std::env::temp_dir().join(format!(
+        "copperlace-object-include-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(&directory).unwrap();
+    std::fs::write(
+        directory.join("detail.conf"),
+        r#"
+        entries = [{% for item in items %}"{item}"{% endfor %}]
+        copied = ${label}
+        "#,
+    )
+    .unwrap();
+    let root = directory.join("root.conf");
+    std::fs::write(
+        &root,
+        r#"
+        items = [one]
+        origin {
+            label = ready
+            include classpath("detail.conf")
+        }
+        "#,
+    )
+    .unwrap();
+    assert_eq!(
+        render_file_structured(&root, "origin")
+            .unwrap()
+            .to_json_value(),
+        serde_json::json!({"label": "ready", "copied": "ready", "entries": ["one"]})
+    );
+    std::fs::remove_dir_all(directory).unwrap();
+}
+
+#[test]
+fn included_loops_preserve_optional_required_and_cycle_errors() {
+    let directory = std::env::temp_dir().join(format!(
+        "copperlace-include-errors-{}-{}",
+        std::process::id(),
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    std::fs::create_dir_all(&directory).unwrap();
+    let root = directory.join("root.conf");
+    std::fs::write(
+        &root,
+        r#"
+        include classpath("missing.conf")
+        # include required(classpath("also-missing.conf"))
+        # __copperlace_internal_0_ forces another marker namespace
+        items = [one]
+        origin.note = "include classpath(\"missing.conf\")"
+        origin.entries = [{% for item in items %}"{item}"{% endfor %}]
+        "#,
+    )
+    .unwrap();
+    assert_eq!(
+        render_file_structured(&root, "origin")
+            .unwrap()
+            .to_json_value(),
+        serde_json::json!({
+            "entries": ["one"],
+            "note": "include classpath(\"missing.conf\")"
+        })
+    );
+
+    std::fs::write(&root, "include required(classpath(\"missing.conf\"))\n").unwrap();
+    assert!(matches!(
+        render_file_structured(&root, "origin"),
+        Err(ConfigError::Parse(message)) if message.contains("missing.conf")
+    ));
+
+    std::fs::write(&root, "include classpath(\"cycle.conf\")\n").unwrap();
+    std::fs::write(
+        directory.join("cycle.conf"),
+        "include classpath(\"root.conf\")\n",
+    )
+    .unwrap();
+    assert!(matches!(
+        render_file_structured(&root, "origin"),
+        Err(ConfigError::Parse(message)) if message.contains("include cycle")
+    ));
+    std::fs::remove_dir_all(directory).unwrap();
 }

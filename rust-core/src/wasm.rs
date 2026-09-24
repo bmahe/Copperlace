@@ -243,9 +243,7 @@ fn ruleset_from_string_with_processors(
     config: &str,
     processors: JsValue,
 ) -> Result<crate::RuleSet, JsError> {
-    let value = hocon_rs::Config::parse_str::<hocon_rs::Value>(config, None)
-        .map_err(|error| JsError::new(&format!("failed to parse config: {error:?}")))?;
-    crate::RuleSet::from_config_with_processors(value, read_processors(processors)?)
+    crate::config::ruleset_from_str_with_processors(config, read_processors(processors)?)
         .map_err(to_js_error)
 }
 

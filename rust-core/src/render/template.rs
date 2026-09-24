@@ -172,7 +172,7 @@ impl TemplateParser<'_> {
     }
 }
 
-fn parse_for_statement(statement: &str) -> Result<(String, String), RenderError> {
+pub(crate) fn parse_for_statement(statement: &str) -> Result<(String, String), RenderError> {
     let parts = statement.split_whitespace().collect::<Vec<_>>();
     if parts.len() != 4 || parts[0] != "for" || parts[2] != "in" {
         return Err(RenderError::InvalidExpression(statement.to_string()));

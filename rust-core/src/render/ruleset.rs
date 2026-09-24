@@ -3,12 +3,14 @@ use std::collections::{BTreeMap, HashMap};
 use crate::processors::builtin_processors;
 
 use super::compile::{
-    insert_context_text_nodes, insert_named_text_nodes, value_to_structured_node,
+    contains_template_loop, insert_context_text_nodes, insert_named_text_nodes,
+    value_to_structured_template_node,
 };
 use super::error::RenderError;
 use super::nodes::TextGeneratorNode;
 use super::processor::ProcessorRegistry;
 use super::state::{RenderContext, RenderOptions, RenderState};
+use super::structured_template::ParsedTemplateConfig;
 use super::value::{CopperlaceValue, StructuredNode};
 
 /// Compiled collection of named rules from the config.
@@ -44,7 +46,21 @@ impl RuleSet {
         config: hocon_rs::Value,
         custom_processors: ProcessorRegistry,
     ) -> Result<Self, RenderError> {
-        let hocon_rs::Value::Object(values) = config else {
+        Self::from_template_config(
+            ParsedTemplateConfig {
+                value: config,
+                loops: HashMap::new(),
+            },
+            custom_processors,
+        )
+    }
+
+    pub(crate) fn from_template_config(
+        config: ParsedTemplateConfig,
+        custom_processors: ProcessorRegistry,
+    ) -> Result<Self, RenderError> {
+        let ParsedTemplateConfig { value, loops } = config;
+        let hocon_rs::Value::Object(values) = value else {
             return Err(RenderError::InvalidConfigRoot);
         };
 
@@ -56,9 +72,17 @@ impl RuleSet {
         let mut context_defaults = HashMap::new();
 
         for (name, value) in values {
+            if contains_template_loop(&value, &loops)
+                && (name == "context" || !matches!(&value, hocon_rs::Value::Object(_)))
+            {
+                return Err(RenderError::InvalidExpression(
+                    "structured loop blocks must be inside arrays in object-valued rules"
+                        .to_string(),
+                ));
+            }
             document_values.insert(
                 name.clone(),
-                value_to_structured_node(value.clone(), &processors)?,
+                value_to_structured_template_node(value.clone(), &processors, &loops)?,
             );
             if name == "context" {
                 if let hocon_rs::Value::Object(context_values) = value {
@@ -68,13 +92,14 @@ impl RuleSet {
                             context_name,
                             context_value,
                             &processors,
+                            &loops,
                         )?;
                     }
                 } else {
-                    insert_named_text_nodes(&mut text_rules, name, value, &processors)?;
+                    insert_named_text_nodes(&mut text_rules, name, value, &processors, &loops)?;
                 }
             } else {
-                insert_named_text_nodes(&mut text_rules, name, value, &processors)?;
+                insert_named_text_nodes(&mut text_rules, name, value, &processors, &loops)?;
             }
         }
 

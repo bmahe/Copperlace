@@ -27,8 +27,14 @@ fn top_level_list_compiles_to_structured_array_and_text_choice() {
         panic!("expected structured array");
     };
     assert_eq!(values.len(), 2);
-    assert!(matches!(values[0], StructuredNode::Text(_)));
-    assert!(matches!(values[1], StructuredNode::Text(_)));
+    assert!(matches!(
+        values[0].value_node(),
+        Some(StructuredNode::Text(_))
+    ));
+    assert!(matches!(
+        values[1].value_node(),
+        Some(StructuredNode::Text(_))
+    ));
 
     let output = rules.render_rule("origin").unwrap();
     assert!(["red", "blue"].contains(&output.as_str()));
@@ -89,8 +95,14 @@ fn structured_arrays_inside_objects_do_not_compile_as_choices() {
         panic!("expected structured array");
     };
     assert_eq!(entries.len(), 2);
-    assert!(matches!(entries[0], StructuredNode::Object(_)));
-    assert!(matches!(entries[1], StructuredNode::Object(_)));
+    assert!(matches!(
+        entries[0].value_node(),
+        Some(StructuredNode::Object(_))
+    ));
+    assert!(matches!(
+        entries[1].value_node(),
+        Some(StructuredNode::Object(_))
+    ));
 }
 
 #[test]

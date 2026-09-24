@@ -2,7 +2,10 @@ use std::fmt;
 use std::path::Path;
 use std::str::FromStr;
 
-use crate::render::{CopperlaceValue, RenderContext, RenderError, RenderOptions, RuleSet};
+use crate::render::config_loader;
+use crate::render::{
+    CopperlaceValue, ProcessorRegistry, RenderContext, RenderError, RenderOptions, RuleSet,
+};
 
 /// Error returned while loading, parsing, compiling, or rendering configuration.
 #[derive(Debug, PartialEq, Eq)]
@@ -188,18 +191,15 @@ impl FromStr for Copperlace {
 
 /// Parses a configuration string and compiles it into a reusable [`RuleSet`].
 pub fn ruleset_from_str(config: &str) -> Result<RuleSet, ConfigError> {
-    let value = hocon_rs::Config::parse_str::<hocon_rs::Value>(config, None)
-        .map_err(|error| ConfigError::Parse(format!("{error:?}")))?;
-    RuleSet::from_config(value).map_err(ConfigError::Render)
+    ruleset_from_str_with_processors(config, ProcessorRegistry::new())
 }
 
-pub(crate) fn config_value_from_file(
-    path: impl AsRef<Path>,
-) -> Result<hocon_rs::Value, ConfigError> {
-    let path = path.as_ref();
-    let value = hocon_rs::Config::load(path, Some(config_options_for_file(path)))
-        .map_err(|error| ConfigError::Parse(format!("{error:?}")))?;
-    Ok(value)
+pub(crate) fn ruleset_from_str_with_processors(
+    config: &str,
+    processors: ProcessorRegistry,
+) -> Result<RuleSet, ConfigError> {
+    let parsed = config_loader::load_str(config, None).map_err(ConfigError::Parse)?;
+    RuleSet::from_template_config(parsed, processors).map_err(ConfigError::Render)
 }
 
 fn config_options_for_file(path: &Path) -> hocon_rs::ConfigOptions {
@@ -218,8 +218,17 @@ fn config_options_for_file(path: &Path) -> hocon_rs::ConfigOptions {
 
 /// Loads a configuration file and compiles it into a reusable [`RuleSet`].
 pub fn ruleset_from_file(path: impl AsRef<Path>) -> Result<RuleSet, ConfigError> {
-    let value = config_value_from_file(path)?;
-    RuleSet::from_config(value).map_err(ConfigError::Render)
+    ruleset_from_file_with_processors(path, ProcessorRegistry::new())
+}
+
+pub(crate) fn ruleset_from_file_with_processors(
+    path: impl AsRef<Path>,
+    processors: ProcessorRegistry,
+) -> Result<RuleSet, ConfigError> {
+    let path = path.as_ref();
+    let parsed = config_loader::load_file(path, config_options_for_file(path))
+        .map_err(ConfigError::Parse)?;
+    RuleSet::from_template_config(parsed, processors).map_err(ConfigError::Render)
 }
 
 /// Renders one rule from a configuration string.

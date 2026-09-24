@@ -323,8 +323,42 @@ the same name, so attempting to iterate it returns
 authored: `{ value = red, weight = 2 }` is an object addressed with
 `{item.value}` and `{item.weight}`. Iteration never applies weights.
 
-Loops produce text only. A structured rule may use a loop inside a string leaf,
-but a loop does not create or splice structured array entries.
+Loops inside quoted text templates produce text only. In an object-valued
+structured rule, an unquoted loop block can instead occupy one array-entry
+position. Its body must contain one HOCON value, which is rendered once per
+source element and appended to that array. The emitted value may be a scalar,
+object, or nested array. Nested structured loops are allowed.
+
+[source]
+----
+items = [{ name = Mia }, { name = Lina }]
+shared = 3
+
+origin {
+  entries = [
+    {% for item in items %}
+    { name = "{item.name}", index = "{loop.index}", value = ${shared} }
+    {% endfor %}
+  ]
+}
+----
+
+The block is recognized only outside quoted strings and comments. Text loops
+inside a string continue to concatenate their rendered body as before.
+
+A HOCON substitution such as `${shared}` in a structured loop body resolves
+against the fully merged configuration when it is loaded, retaining its value
+type. A Copperlace binding such as `{item.name}` renders for each iteration.
+The example emits `value = 3` for both entries while `name` changes.
+The two forms can be used in nested loop bodies and included `.conf` files.
+The rest of the configuration follows normal HOCON substitution rules,
+including required and optional substitutions.
+
+A structured array produced by a loop is output data; loop sources continue to be
+authored config arrays, context arrays, dotted paths, and arrays on outer loop
+elements. File-loaded `.conf` fragments can also contain structured loops,
+including fragments imported through `include classpath(...)`, `include file(...)`,
+or bare `include "..."`. Nested imports use the same behavior.
 
 == Array Values
 
