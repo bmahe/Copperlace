@@ -345,10 +345,10 @@ impl TemplateConfigLoader {
                 "absolute path in classpath include".to_string(),
             ));
         }
-        if !matches!(spec.location, IncludeLocation::Classpath) {
-            if let Some(paths) = config_paths(path) {
-                return Ok(Some(paths));
-            }
+        if !matches!(spec.location, IncludeLocation::Classpath)
+            && let Some(paths) = config_paths(path)
+        {
+            return Ok(Some(paths));
         }
         if !matches!(spec.location, IncludeLocation::File) {
             for root in self.options.classpath.iter() {

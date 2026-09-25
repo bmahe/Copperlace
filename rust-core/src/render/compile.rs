@@ -139,7 +139,6 @@ pub(crate) fn insert_context_text_nodes(
     name: String,
     value: hocon_rs::Value,
     processors: &ProcessorRegistry,
-    loops: &HashMap<String, StructuredLoopTemplate>,
 ) -> Result<(), RenderError> {
     match value {
         hocon_rs::Value::Object(values) => {
@@ -153,7 +152,6 @@ pub(crate) fn insert_context_text_nodes(
                     format!("{name}.{child_name}"),
                     child_value,
                     processors,
-                    loops,
                 )?;
             }
         }

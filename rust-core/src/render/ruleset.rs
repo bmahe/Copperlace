@@ -92,7 +92,6 @@ impl RuleSet {
                             context_name,
                             context_value,
                             &processors,
-                            &loops,
                         )?;
                     }
                 } else {
