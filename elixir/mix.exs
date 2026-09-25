@@ -28,8 +28,8 @@ defmodule Copperlace.MixProject do
       make_precompiler_priv_paths: ["copperlace_nif.*", "native"],
       make_precompiler_url:
         "https://github.com/bmahe/Copperlace/releases/download/v#{@version}/@{artefact_filename}",
-      # Precompiled archives are built against OTP 28 (NIF API 2.18).
-      make_precompiler_nif_versions: [versions: ["2.18"]],
+      # Precompiled archives are built against OTP 28 (NIF API 2.17).
+      make_precompiler_nif_versions: [versions: ["2.17"]],
       deps: deps(),
       package: package(),
       description: description(),

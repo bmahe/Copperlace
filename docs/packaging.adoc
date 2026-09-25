@@ -440,7 +440,7 @@ precompiled archive is unavailable for the current target or NIF version,
 `elixir_make` falls back to compiling the NIF shim from source and the native
 library is resolved at runtime via the order above.
 
-Precompiled archives are built against OTP 28 (NIF API 2.18) with Elixir 1.19.
+Precompiled archives are built against OTP 28 (NIF API 2.17) with Elixir 1.19.
 Use OTP 28.1 or later with Elixir 1.19 to receive a precompiled archive.
 
 Ruleset handles are NIF resource objects; the BEAM releases them through the

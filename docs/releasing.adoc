@@ -277,7 +277,7 @@ package uses `elixir_make`'s precompiler to download the right archive at
 install time, so consumers get both the NIF shim and the Copperlace native
 library without a C toolchain or `COPPERLACE_LIBRARY_PATH`.
 
-Precompiled archives are built against OTP 28 (NIF API 2.18) with Elixir 1.19.
+Precompiled archives are built against OTP 28 (NIF API 2.17) with Elixir 1.19.
 Use OTP 28.1 or later, which is supported by Elixir 1.19. The Windows NIF shim
 is compiled with the OTP headers containing the Windows GCC fix.
 

@@ -5,7 +5,7 @@ defmodule Copperlace.Precompiler do
   # downloads a precompiled archive containing the NIF shim and the bundled
   # Copperlace native library at install time.
   #
-  # Precompiled archives are built against OTP 28 (NIF API 2.18).
+  # Precompiled archives are built against OTP 28 (NIF API 2.17).
   #
   # Archive structure (extracted to priv/):
   #   copperlace_nif.so / .dll / .dylib   (precompiled NIF shim)
