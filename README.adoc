@@ -282,7 +282,7 @@ Or add it to `Cargo.toml`:
 
 [source,toml]
 ----
-copperlace = "0.4.1"
+copperlace = "0.4.2"
 ----
 
 [source,rust]
@@ -337,7 +337,7 @@ Use the all-platform Maven Central dependency:
 <dependency>
   <groupId>dev.mahe.copperlace</groupId>
   <artifactId>copperlace</artifactId>
-  <version>0.4.1</version>
+  <version>0.4.2</version>
 </dependency>
 ----
 
@@ -345,7 +345,7 @@ Gradle Kotlin DSL:
 
 [source,kotlin]
 ----
-implementation("dev.mahe.copperlace:copperlace:0.4.1")
+implementation("dev.mahe.copperlace:copperlace:0.4.2")
 ----
 
 [source,java]
