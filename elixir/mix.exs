@@ -6,7 +6,7 @@ Code.require_file("precompiler.ex", __DIR__)
 defmodule Copperlace.MixProject do
   use Mix.Project
 
-  @version "0.4.0"
+  @version "0.4.1"
   @source_url "https://github.com/bmahe/Copperlace"
   @homepage_url "https://bmahe.github.io/Copperlace/"
 
