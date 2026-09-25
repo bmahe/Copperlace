@@ -14,7 +14,7 @@ defmodule Copperlace.MixProject do
     [
       app: :copperlace,
       version: @version,
-      elixir: "~> 1.15",
+      elixir: "~> 1.19",
       start_permanent: Mix.env() == :prod,
       compilers: [:elixir_make] ++ Mix.compilers(),
       make_cwd: "c_src",
@@ -28,10 +28,8 @@ defmodule Copperlace.MixProject do
       make_precompiler_priv_paths: ["copperlace_nif.*", "native"],
       make_precompiler_url:
         "https://github.com/bmahe/Copperlace/releases/download/v#{@version}/@{artefact_filename}",
-      # Precompiled archives are built against OTP 26 (NIF API 2.17).
-      # OTP 27+ (NIF 2.18) falls back to 2.17 via elixir_make's version fallback.
-      # OTP 25 and earlier compile the NIF shim from source.
-      make_precompiler_nif_versions: [versions: ["2.17"]],
+      # Precompiled archives are built against OTP 28 (NIF API 2.18).
+      make_precompiler_nif_versions: [versions: ["2.18"]],
       deps: deps(),
       package: package(),
       description: description(),
